@@ -15,6 +15,7 @@ import { P2P_MARKET_ARTIFACT } from '@pedospe/contracts';
 import { checkTransaction, type TxProblem } from '@/lib/p2p/tx-check';
 import type { P2pNetwork, P2pTransaction } from '@/lib/p2p/types';
 import { integratorBpsFor, type AcceptedQuote } from '@/lib/p2p/fees';
+import { orderRef } from '@/lib/p2p/order-ref';
 
 export { integratorBpsFor, MAX_INTEGRATOR_FEE_BPS, type AcceptedQuote } from '@/lib/p2p/fees';
 
@@ -148,14 +149,16 @@ export function verifyTransaction(
   }
 }
 
-export type SaleTermsProblem = 'buyer' | 'fee';
+export type SaleTermsProblem = 'ref' | 'buyer' | 'fee';
 
-/** A sale's terms, from trusted sources only: the accepted quote as the person saw it (or, when
+/** A sale's terms, from trusted sources only: its on-chain ref derived from the order's uuid (an
+    answer's own `ref` field is never read), the accepted quote as the person saw it (or, when
     this tab no longer has it, the order's own amount, its buyer and no fee), the market's
-    published sale bond rate and windows. A sale whose buyer no source names, or whose shown fee
-    no rate reproduces, is refused: `problem` says why, and nothing is signed. */
+    published sale bond rate and windows. A sale whose ref cannot be derived, whose buyer no source
+    names, or whose shown fee no rate reproduces, is refused: `problem` says why, and nothing is
+    signed. */
 export function saleTerms(input: {
-  ref: string;
+  orderId: string;
   seller: string;
   token: string;
   accepted: AcceptedQuote | null;
@@ -166,6 +169,8 @@ export function saleTerms(input: {
   };
 }): { terms: SaleTerms; problem: null } | { terms: null; problem: SaleTermsProblem } {
   const { accepted, order, market } = input;
+  const ref = orderRef(input.orderId);
+  if (!ref) return { terms: null, problem: 'ref' };
   const amountUnits = accepted?.amountUnits ?? order.amountUnits;
   const buyer = accepted?.buyer ?? order.buyer;
   if (!buyer || !ADDRESS.test(buyer) || /^0x0{40}$/.test(buyer))
@@ -179,7 +184,7 @@ export function saleTerms(input: {
   return {
     problem: null,
     terms: {
-      ref: input.ref,
+      ref,
       seller: input.seller,
       token: input.token,
       amountUnits,

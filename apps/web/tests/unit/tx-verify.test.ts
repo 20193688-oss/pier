@@ -37,7 +37,8 @@ const BUYER = '0x9e77000000000000000000000000000000000c4a' as Hex;
 const OTHER = '0x0bad000000000000000000000000000000000bad' as Hex;
 const MATCHER = '0x3a7c4e000000000000000000000000000000beef' as Hex;
 const BOT = '0xb07000000000000000000000000000000000b075' as Hex;
-const REF = keccak256(stringToHex('ord_1'));
+const ORDER_ID = '0b5e8f1c-2d3a-4b5c-8d9e-0f1a2b3c4d5e';
+const REF = orderRef(ORDER_ID)!;
 const MARKET = {
   sellBondBps: 1000,
   windows: { acceptSeconds: 300, sellPaymentSeconds: 1800, settleSeconds: 21600 },
@@ -62,7 +63,7 @@ const terms = (
   order: Partial<{ amountUnits: string; buyer: string | null }> = {},
 ) =>
   saleTerms({
-    ref: REF,
+    orderId: ORDER_ID,
     seller: SELLER,
     token: 'USDC',
     accepted: accepted === null ? null : { ...ACCEPTED, ...accepted },
@@ -155,7 +156,7 @@ describe('a sale: terms come only from what the person saw and what the market p
   test("the windows are the market's", () => {
     const t = pinned(
       saleTerms({
-        ref: REF,
+        orderId: ORDER_ID,
         seller: SELLER,
         token: 'USDC',
         accepted: ACCEPTED,
@@ -558,4 +559,35 @@ test("an order's on-chain ref is derived from its uuid as the API derives it", (
   assert.equal(orderRef(id), keccak256('0x0b5e8f1c2d3a4b5c8d9e0f1a2b3c4d5e'));
   assert.equal(orderRef(id.toUpperCase()), orderRef(id));
   assert.equal(orderRef('ord_123'), null, 'not a uuid: no ref to pin, the sale is refused');
+});
+
+test("the ref is only ever derived from the order's id, never taken from an answer", () => {
+  const serverRef = keccak256(stringToHex('what the server says'));
+  // An id that does not derive (not a uuid): refused, whatever ref the server states.
+  const r = saleTerms({
+    orderId: 'ord_123',
+    seller: SELLER,
+    token: 'USDC',
+    accepted: ACCEPTED,
+    order: { amountUnits: '100000000', buyer: BUYER },
+    market: MARKET,
+  });
+  assert.deepEqual(r, { terms: null, problem: 'ref' });
+  // A uuid id: its derived ref is pinned, and a transaction carrying the server's different ref is refused.
+  const t = pinned(
+    saleTerms({
+      orderId: ORDER_ID,
+      seller: SELLER,
+      token: 'USDC',
+      accepted: ACCEPTED,
+      order: { amountUnits: '100000000', buyer: BUYER },
+      market: MARKET,
+    }),
+  );
+  assert.equal(t.ref, orderRef(ORDER_ID));
+  assert.equal(
+    verifyTransaction(open({ ref: serverRef }), NETWORK, { action: 'openWithDeposit', ...t }),
+    'args',
+  );
+  assert.equal(verifyTransaction(open(), NETWORK, { action: 'openWithDeposit', ...t }), null);
 });
