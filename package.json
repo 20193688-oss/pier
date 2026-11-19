@@ -1,0 +1,25 @@
+{
+  "name": "pedospe",
+  "private": true,
+  "description": "pedospe: a peer-to-peer market for stablecoins against local money, with a public API",
+  "license": "UNLICENSED",
+  "type": "module",
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "prettier": "3.10.1",
+    "typescript": "6.0.3"
+  }
+}

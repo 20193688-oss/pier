@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+# secrets files used by deploy scripts must live OUTSIDE the repo; this is a backstop
+*.secrets.json
+.secrets/
