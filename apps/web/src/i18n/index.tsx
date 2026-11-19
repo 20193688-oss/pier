@@ -62,6 +62,12 @@ export function I18nProvider({ children, lang: forced }: { children: ReactNode; 
   }, []);
   useEffect(() => {
     document.documentElement.lang = lang;
+    // A language picked through the address (`?lang=en`) holds as the person navigates on.
+    try {
+      if (new URLSearchParams(location.search).has('lang')) localStorage.setItem(STORAGE_KEY, lang);
+    } catch {
+      /* storage blocked: the address keeps deciding */
+    }
   }, [lang]);
   const value = useMemo(() => ({ lang, t: CATALOGS[lang], setLang }), [lang, setLang]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
