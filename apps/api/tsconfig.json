@@ -9,7 +9,8 @@
     "declaration": false,
     "types": ["node"],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@test/*": ["./test/*"]
     }
   },
   "include": ["src", "test", "vitest.config.ts", "prisma.config.ts"]

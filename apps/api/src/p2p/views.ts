@@ -522,7 +522,6 @@ export function toChargeView(
   row: P2pChargeRow,
   tokenSymbol: string,
   checkoutUrl: string,
-  qr: string,
   now: Date,
 ): ChargeView {
   return {
@@ -543,7 +542,6 @@ export function toChargeView(
     paidAt: row.paidAt,
     expiresAt: row.expiresAt,
     url: `${checkoutUrl}/${row.id}`,
-    qr,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

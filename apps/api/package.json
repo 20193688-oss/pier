@@ -5,6 +5,9 @@
   "description": "The pedospe public API: accounts, offers, matching, orders, charges, payouts, webhooks, the indexer and the matcher",
   "license": "UNLICENSED",
   "type": "module",
+  "exports": {
+    "./dev": "./dist/dev/index.js"
+  },
   "scripts": {
     "prisma:generate": "prisma generate",
     "build": "prisma generate && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/check-dist.mjs",

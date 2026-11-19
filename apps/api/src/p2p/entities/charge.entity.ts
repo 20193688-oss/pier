@@ -73,12 +73,6 @@ export class ChargeView {
   })
   url!: string;
 
-  @ApiProperty({
-    example: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAA',
-    description: 'A QR of `url`, as a PNG data URL. Derived, never stored.',
-  })
-  qr!: string;
-
   @ApiProperty({ example: '2026-11-19T12:00:00.000Z' })
   createdAt!: Date;
 
