@@ -9,3 +9,5 @@ coverage/
 # secrets files used by deploy scripts must live OUTSIDE the repo; this is a backstop
 *.secrets.json
 .secrets/
+apps/api/src/generated/
+.dev-stack/

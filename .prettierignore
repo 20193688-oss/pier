@@ -1,0 +1,10 @@
+node_modules
+dist
+coverage
+package-lock.json
+apps/web
+.dev-stack
+apps/api/src/generated
+apps/api/prisma/migrations
+apps/api/openapi.json
+packages/sdk/src/generated

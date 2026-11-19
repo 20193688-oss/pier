@@ -1,0 +1,49 @@
+import { fileURLToPath } from 'node:url';
+import swc from 'unplugin-swc';
+import { defineConfig } from 'vitest/config';
+
+/**
+ * Nest's dependency injection reads constructor types from decorator metadata,
+ * which only SWC (not the default transformer) emits, hence the plugin.
+ * `unit` runs pure and service tests; `e2e` boots the HTTP app against a real
+ * Postgres and a real local EVM node started once in `test/e2e/global-setup.ts`.
+ */
+export default defineConfig({
+  plugins: [
+    swc.vite({
+      jsc: {
+        parser: { syntax: 'typescript', decorators: true },
+        transform: { legacyDecorator: true, decoratorMetadata: true },
+        target: 'es2023',
+      },
+      module: { type: 'es6' },
+    }),
+  ],
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
+  test: {
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: 'unit',
+          include: ['test/unit/**/*.test.ts'],
+          testTimeout: 120_000,
+          hookTimeout: 120_000,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: 'e2e',
+          include: ['test/e2e/**/*.test.ts'],
+          globalSetup: ['test/e2e/global-setup.ts'],
+          fileParallelism: false,
+          testTimeout: 120_000,
+          hookTimeout: 180_000,
+        },
+      },
+    ],
+  },
+});

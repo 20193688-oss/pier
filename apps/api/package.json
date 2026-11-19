@@ -1,0 +1,63 @@
+{
+  "name": "@pedospe/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The pedospe public API: accounts, offers, matching, orders, charges, payouts, webhooks, the indexer and the matcher",
+  "license": "UNLICENSED",
+  "type": "module",
+  "scripts": {
+    "prisma:generate": "prisma generate",
+    "build": "prisma generate && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/check-dist.mjs",
+    "start": "node dist/main.js",
+    "test": "vitest run",
+    "test:unit": "vitest run --project unit",
+    "test:e2e": "vitest run --project e2e",
+    "typecheck": "prisma generate && tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src test scripts --max-warnings=0 && prettier --check src test scripts",
+    "db:deploy": "prisma migrate deploy",
+    "openapi": "node dist/cli/openapi.js",
+    "deploy:contract": "node dist/cli/deploy.js",
+    "dev:setup": "node dist/cli/dev-setup.js",
+    "dev:simulate-transfer": "node dist/cli/simulate-transfer.js"
+  },
+  "dependencies": {
+    "@nestjs/common": "12.5.1",
+    "@nestjs/core": "12.5.1",
+    "@nestjs/platform-express": "12.5.1",
+    "@nestjs/swagger": "12.1.2",
+    "@pedospe/contracts": "0.1.0",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
+    "class-transformer": "0.5.1",
+    "class-validator": "0.15.1",
+    "cookie-parser": "1.4.7",
+    "helmet": "8.3.0",
+    "pg": "8.23.1",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2",
+    "viem": "2.58.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "@nestjs/testing": "12.5.1",
+    "@swc/core": "1.16.22",
+    "@types/cookie-parser": "1.4.10",
+    "@types/express": "5.0.6",
+    "@types/node": "26.6.6",
+    "@types/pg": "8.23.1",
+    "@types/supertest": "7.2.1",
+    "embedded-postgres": "18.7.0-beta.19",
+    "prisma": "7.10.1",
+    "supertest": "7.3.2",
+    "tsc-alias": "1.9.10",
+    "unplugin-swc": "2.0.0",
+    "vitest": "5.1.1"
+  },
+  "optionalDependencies": {
+    "@foundry-rs/anvil-darwin-amd64": "1.7.1",
+    "@foundry-rs/anvil-darwin-arm64": "1.7.1",
+    "@foundry-rs/anvil-linux-amd64": "1.7.1",
+    "@foundry-rs/anvil-linux-arm64": "1.7.1",
+    "@foundry-rs/anvil-win32-amd64": "1.7.1"
+  }
+}
