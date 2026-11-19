@@ -1,18 +1,20 @@
-/* Every API path the web app calls, in one table, so aligning with the API's final route list is
-   one edit here. Paths follow the design's route list without the old `/p2p` prefix.
+/* Every API path the web app calls, in one table, aligned with the API's committed OpenAPI
+   document (apps/api/openapi.json).
 
    Who calls what:
-   - Session (SIWE cookie): the buy/sell app's user (quotes, their own orders, transactions for
-     their own sales) and dashboard members.
-   - Dashboard calls also send the organization and tier headers below.
-   - Keyless: the hosted charge page's `/v1/checkout/*` (a payer token for its own order). */
+   - Wallet session (SIWE, HttpOnly cookie): the buy/sell app's user on `/v1/app/*` (their own
+     quotes and orders, and the transactions of their own sales), and dashboard members on
+     `/v1/organizations/*` and, with the organization and tier headers below, `/v1/p2p/*` and
+     `/v1/webhook-endpoints`.
+   - No credentials: the market overview, sign-in, and the hosted charge page's
+     `/v1/p2p-checkout/*` (a payer token for its own order). */
 
 const enc = encodeURIComponent;
 
-/** Headers that scope a dashboard member's call to one organization and one tier (an API key's
-    prefix decides its tier; a session picks one with this header). */
-export const ORG_HEADER = 'X-Organization-Id';
-export const TIER_HEADER = 'X-Tier';
+/** Headers that scope a member's session call to one organization and one tier (an API key
+    carries both). */
+export const ORG_HEADER = 'Pedospe-Organization';
+export const TIER_HEADER = 'Pedospe-Tier';
 /** The hosted charge page's capability for one order. */
 export const PAYER_TOKEN_HEADER = 'X-Payer-Token';
 
@@ -23,46 +25,57 @@ export const ROUTES = {
   authSession: '/v1/auth/session',
   authLogout: '/v1/auth/logout',
 
-  // Organizations, members, API keys, webhooks
-  orgs: '/v1/orgs',
-  org: (id: string) => `/v1/orgs/${enc(id)}`,
-  members: (org: string) => `/v1/orgs/${enc(org)}/members`,
-  member: (org: string, address: string) => `/v1/orgs/${enc(org)}/members/${enc(address)}`,
-  apiKeys: '/v1/api-keys',
-  apiKey: (id: string) => `/v1/api-keys/${enc(id)}`,
-  webhooks: '/v1/webhooks',
-  webhook: (id: string) => `/v1/webhooks/${enc(id)}`,
-  webhookDeliveries: (id: string) => `/v1/webhooks/${enc(id)}/deliveries`,
-  webhookRotate: (id: string) => `/v1/webhooks/${enc(id)}/rotate-secret`,
-  webhookTest: (id: string) => `/v1/webhooks/${enc(id)}/test`,
+  // Organizations, members, API keys
+  orgs: '/v1/organizations',
+  org: (id: string) => `/v1/organizations/${enc(id)}`,
+  members: (org: string) => `/v1/organizations/${enc(org)}/members`,
+  member: (org: string, memberId: string) =>
+    `/v1/organizations/${enc(org)}/members/${enc(memberId)}`,
+  apiKeys: (org: string) => `/v1/organizations/${enc(org)}/api-keys`,
+  apiKey: (org: string, id: string) => `/v1/organizations/${enc(org)}/api-keys/${enc(id)}`,
 
-  // The market
+  // Webhook endpoints (organization and tier headers)
+  webhooks: '/v1/webhook-endpoints',
+  webhook: (id: string) => `/v1/webhook-endpoints/${enc(id)}`,
+  webhookDeliveries: (id: string) => `/v1/webhook-endpoints/${enc(id)}/deliveries`,
+
+  // The market overview (public; `?tier=live|test`)
   market: '/v1/market',
-  accountChallenge: '/v1/accounts/challenge',
-  accounts: '/v1/accounts',
-  account: (id: string) => `/v1/accounts/${enc(id)}`,
-  methods: '/v1/payment-methods',
-  method: (id: string) => `/v1/payment-methods/${enc(id)}`,
-  offers: '/v1/offers',
-  offer: (id: string) => `/v1/offers/${enc(id)}`,
-  quotes: '/v1/quotes',
-  orders: '/v1/orders',
-  order: (id: string) => `/v1/orders/${enc(id)}`,
+
+  // The public buy/sell app (the signed-in wallet's own orders)
+  appQuotes: '/v1/app/quotes',
+  appOrders: '/v1/app/orders',
+  appOrder: (id: string) => `/v1/app/orders/${enc(id)}`,
+  appOrderAction: (id: string, action: 'paid' | 'cancel' | 'dispute') =>
+    `/v1/app/orders/${enc(id)}/${action}`,
+  appOrderTransactions: (id: string) => `/v1/app/orders/${enc(id)}/transactions`,
+
+  // The dashboard's market (organization and tier headers)
+  accountChallenge: '/v1/p2p/accounts/challenge',
+  accounts: '/v1/p2p/accounts',
+  account: (id: string) => `/v1/p2p/accounts/${enc(id)}`,
+  methods: '/v1/p2p/payment-methods',
+  method: (id: string) => `/v1/p2p/payment-methods/${enc(id)}`,
+  offers: '/v1/p2p/offers',
+  offer: (id: string) => `/v1/p2p/offers/${enc(id)}`,
+  quotes: '/v1/p2p/quotes',
+  orders: '/v1/p2p/orders',
+  order: (id: string) => `/v1/p2p/orders/${enc(id)}`,
   orderAction: (id: string, action: 'paid' | 'cancel' | 'dispute') =>
-    `/v1/orders/${enc(id)}/${action}`,
-  merchantOrders: '/v1/merchant/orders',
-  merchantOrder: (id: string) => `/v1/merchant/orders/${enc(id)}`,
-  transferMatches: '/v1/merchant/transfer-matches',
-  transactions: '/v1/transactions',
-  charges: '/v1/charges',
-  charge: (id: string) => `/v1/charges/${enc(id)}`,
-  payouts: '/v1/payouts',
-  payout: (id: string) => `/v1/payouts/${enc(id)}`,
+    `/v1/p2p/orders/${enc(id)}/${action}`,
+  merchantOrders: '/v1/p2p/merchant/orders',
+  merchantOrder: (id: string) => `/v1/p2p/merchant/orders/${enc(id)}`,
+  transferMatches: '/v1/p2p/merchant/transfer-matches',
+  transactions: '/v1/p2p/transactions',
+  charges: '/v1/p2p/charges',
+  charge: (id: string) => `/v1/p2p/charges/${enc(id)}`,
+  payouts: '/v1/p2p/payouts',
+  payout: (id: string) => `/v1/p2p/payouts/${enc(id)}`,
 
   // The hosted charge page (keyless)
-  checkoutCharge: (id: string) => `/v1/checkout/charges/${enc(id)}`,
-  checkoutChargeOrders: (id: string) => `/v1/checkout/charges/${enc(id)}/orders`,
-  checkoutOrder: (id: string) => `/v1/checkout/orders/${enc(id)}`,
+  checkoutCharge: (id: string) => `/v1/p2p-checkout/charges/${enc(id)}`,
+  checkoutChargeOrders: (id: string) => `/v1/p2p-checkout/charges/${enc(id)}/orders`,
+  checkoutOrder: (id: string) => `/v1/p2p-checkout/orders/${enc(id)}`,
   checkoutOrderAction: (id: string, action: 'paid' | 'cancel') =>
-    `/v1/checkout/orders/${enc(id)}/${action}`,
+    `/v1/p2p-checkout/orders/${enc(id)}/${action}`,
 } as const;

@@ -104,14 +104,43 @@ export const PRICES: Record<string, { buy: number; sell: number }> = {
   CLP: { buy: 951, sell: 932 },
 };
 
-export const MARKET = {
-  networks: NETWORKS,
-  currencies: CURRENCIES,
+/** The rules the mock market runs by (seconds, basis points). */
+export const RULES = {
   protocolFeeBps: 30,
-  windows: { paymentSeconds: 1800, acceptSeconds: 300, settleSeconds: 21600 },
-  sellBondBps: 1000,
+  bondBps: 1000,
+  buyPaymentSeconds: 1800,
+  sellAcceptSeconds: 300,
+  sellPaymentSeconds: 1800,
+  sellSettleSeconds: 21600,
+};
+
+/** `GET /v1/market` as the API answers it (MarketOverviewView). */
+export const MARKET = {
+  available: true,
+  networks: NETWORKS.map((n) => ({
+    ...n,
+    explorerUrl: n.explorer,
+    paused: false,
+    protocolFeeBps: RULES.protocolFeeBps,
+  })),
+  currencies: CURRENCIES.map((c) => ({
+    code: c.code,
+    decimals: c.code === 'CLP' ? 0 : 2,
+    rails: c.rails.map((r) => ({
+      id: r.id,
+      name: r.id,
+      fields: r.fields.map((f) => ({ name: f.key, description: '', required: f.required })),
+    })),
+  })),
+  bondBps: RULES.bondBps,
+  maxIntegratorFeeBps: 500,
+  windows: {
+    buyPaymentWindow: RULES.buyPaymentSeconds,
+    sellAcceptWindow: RULES.sellAcceptSeconds,
+    sellPaymentWindow: RULES.sellPaymentSeconds,
+    sellSettleWindow: RULES.sellSettleSeconds,
+  },
   matcher: MATCHER,
-  maxPayoutItems: 100,
 };
 
 /** The merchants the matcher picks from in mock mode (their public profile only). */

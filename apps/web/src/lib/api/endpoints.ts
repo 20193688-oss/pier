@@ -1,7 +1,8 @@
-/* The API's operations as typed functions: each sends one request (src/lib/api/client.ts) and reads
-   the answer through a normalizer, so the screens get one vocabulary whatever the exact wire
-   shape. `scope` adds the organization and tier headers for dashboard calls. */
-import { itemOf, listOf, request, type Tier } from '@/lib/api/client';
+/* The API's operations as typed functions, aligned with apps/api/openapi.json: each sends one
+   request (src/lib/api/client.ts) and reads the answer through a normalizer, so the screens get
+   one vocabulary whatever the exact wire shape. `scope` adds the organization and tier headers to
+   a member's dashboard calls. */
+import { ApiError, itemOf, listOf, request, type Tier } from '@/lib/api/client';
 import { ORG_HEADER, PAYER_TOKEN_HEADER, ROUTES, TIER_HEADER } from '@/lib/api/routes';
 import {
   normalizeApiKey,
@@ -13,7 +14,6 @@ import {
   normalizeSession,
   normalizeWebhook,
   type ApiScope,
-  type KeyTier,
   type Role,
 } from '@/lib/api/types';
 import {
@@ -30,8 +30,8 @@ import {
 } from '@/lib/p2p/normalize';
 import { parseCheckoutCharge, parseCheckoutOrder, parseCreatedOrder } from '@/lib/p2p/checkout';
 import type { P2pChallenge, P2pMarket, P2pTransaction } from '@/lib/p2p/types';
-import { ApiError } from '@/lib/api/client';
 
+/** A member's dashboard call: which organization, which tier (`live` or `test`). */
 export interface Scope {
   org?: string | null;
   tier?: Tier | null;
@@ -49,24 +49,32 @@ const must = <T>(v: T | null): T => {
   return v;
 };
 
+/** The tier the public buy/sell app trades on: the API's APP_TIER (`live` unless the deployment
+    says otherwise; a local stack on the development chain uses `test`). */
+export const APP_TIER: Tier = import.meta.env.VITE_APP_TIER === 'test' ? 'test' : 'live';
+
 /* --- Sign-in with Ethereum --- */
 
 export const auth = {
-  nonce: async (address: string) => {
-    const r = await request<{ nonce?: unknown }>({
+  /** A single-use nonce and the domain the message must name (the API's SIWE domain). */
+  nonce: async (): Promise<{ nonce: string; domain: string | null }> => {
+    const r = await request<{ nonce?: unknown; domain?: unknown }>({
       method: 'POST',
       path: ROUTES.authNonce,
-      body: { address },
     });
     if (typeof r?.nonce !== 'string' || !/^[A-Za-z0-9]{8,}$/.test(r.nonce)) throw bad();
-    return r.nonce;
+    const domain =
+      typeof r.domain === 'string' && /^[a-z0-9.-]+(:\d+)?$/i.test(r.domain) ? r.domain : null;
+    return { nonce: r.nonce, domain };
   },
-  verify: async (message: string, signature: string) =>
-    must(
-      normalizeSession(
-        await request({ method: 'POST', path: ROUTES.authVerify, body: { message, signature } }),
-      ),
-    ),
+  /** Verify the signed message; the session arrives as an HttpOnly cookie (the token the body
+      also carries, for non-browser clients, is never kept). Then read who is signed in. */
+  verify: async (message: string, signature: string) => {
+    await request({ method: 'POST', path: ROUTES.authVerify, body: { message, signature } });
+    const s = await auth.session();
+    if (!s) throw bad();
+    return s;
+  },
   session: async () => {
     try {
       return normalizeSession(await request({ method: 'GET', path: ROUTES.authSession }));
@@ -75,7 +83,7 @@ export const auth = {
       throw e;
     }
   },
-  logout: () => request({ method: 'POST', path: ROUTES.authLogout, body: {} }),
+  logout: () => request({ method: 'POST', path: ROUTES.authLogout }),
 };
 
 /* --- Organizations, members, keys, webhooks --- */
@@ -87,33 +95,32 @@ export const orgs = {
     normalizeOrganization(
       itemOf(await request({ method: 'POST', path: ROUTES.orgs, body: { name } })),
     ),
+  rename: async (org: string, name: string) =>
+    normalizeOrganization(
+      itemOf(await request({ method: 'PATCH', path: ROUTES.org(org), body: { name } })),
+    ),
   members: async (org: string) =>
     listOf(await request({ method: 'GET', path: ROUTES.members(org) })).map(normalizeMember),
-  addMember: async (org: string, body: { address: string; role: Role; label?: string }) =>
+  addMember: async (org: string, body: { address: string; role: Role }) =>
     normalizeMember(itemOf(await request({ method: 'POST', path: ROUTES.members(org), body }))),
-  updateMember: async (org: string, address: string, body: { role: Role }) =>
+  updateMember: async (org: string, memberId: string, body: { role: Role }) =>
     normalizeMember(
-      itemOf(await request({ method: 'PATCH', path: ROUTES.member(org, address), body })),
+      itemOf(await request({ method: 'PATCH', path: ROUTES.member(org, memberId), body })),
     ),
-  removeMember: (org: string, address: string) =>
-    request({ method: 'DELETE', path: ROUTES.member(org, address) }),
+  removeMember: (org: string, memberId: string) =>
+    request({ method: 'DELETE', path: ROUTES.member(org, memberId) }),
 };
 
 export const apiKeys = {
-  list: async (scope: Scope) =>
-    listOf(await request({ method: 'GET', path: ROUTES.apiKeys, headers: scoped(scope) })).map(
-      normalizeApiKey,
-    ),
-  create: async (scope: Scope, body: { name: string; tier: KeyTier; scopes: ApiScope[] }) =>
+  list: async (org: string) =>
+    listOf(await request({ method: 'GET', path: ROUTES.apiKeys(org) })).map(normalizeApiKey),
+  create: async (org: string, body: { name: string; tier: Tier; scopes: ApiScope[] }) =>
     must(
       normalizeCreatedApiKey(
-        itemOf(
-          await request({ method: 'POST', path: ROUTES.apiKeys, body, headers: scoped(scope) }),
-        ),
+        itemOf(await request({ method: 'POST', path: ROUTES.apiKeys(org), body })),
       ),
     ),
-  revoke: (scope: Scope, id: string) =>
-    request({ method: 'DELETE', path: ROUTES.apiKey(id), headers: scoped(scope) }),
+  revoke: (org: string, id: string) => request({ method: 'DELETE', path: ROUTES.apiKey(org, id) }),
 };
 
 export const webhooks = {
@@ -143,23 +150,13 @@ export const webhooks = {
     request({ method: 'DELETE', path: ROUTES.webhook(id), headers: scoped(scope) }),
   deliveries: async (scope: Scope, id: string) =>
     listOf(
-      await request({ method: 'GET', path: ROUTES.webhookDeliveries(id), headers: scoped(scope) }),
+      await request({
+        method: 'GET',
+        path: ROUTES.webhookDeliveries(id),
+        query: { take: 50 },
+        headers: scoped(scope),
+      }),
     ).map(normalizeDelivery),
-  rotate: async (scope: Scope, id: string) =>
-    must(
-      normalizeCreatedWebhook(
-        itemOf(
-          await request({
-            method: 'POST',
-            path: ROUTES.webhookRotate(id),
-            body: {},
-            headers: scoped(scope),
-          }),
-        ),
-      ),
-    ),
-  test: (scope: Scope, id: string) =>
-    request({ method: 'POST', path: ROUTES.webhookTest(id), body: {}, headers: scoped(scope) }),
 };
 
 /* --- The market --- */
@@ -168,28 +165,25 @@ export const webhooks = {
    tier and reused: a sale's terms are checked against this copy, never against a quote. */
 const marketCache = new Map<string, P2pMarket>();
 
-async function fetchMarket(scope?: Scope): Promise<P2pMarket> {
+async function fetchMarket(tier: Tier): Promise<P2pMarket> {
   return must(
-    normalizeMarket(
-      itemOf(await request({ method: 'GET', path: ROUTES.market, headers: scoped(scope) })),
-    ),
+    normalizeMarket(itemOf(await request({ method: 'GET', path: ROUTES.market, query: { tier } }))),
   );
 }
 
 export const market = {
-  get: async (scope?: Scope): Promise<P2pMarket> => {
-    const key = `${scope?.org ?? ''}:${scope?.tier ?? ''}`;
-    const hit = marketCache.get(key);
+  get: async (tier: Tier = APP_TIER): Promise<P2pMarket> => {
+    const hit = marketCache.get(tier);
     if (hit) return hit;
-    const m = await fetchMarket(scope);
-    marketCache.set(key, m);
+    const m = await fetchMarket(tier);
+    marketCache.set(tier, m);
     return m;
   },
-  /** Forget the cached copy (tests; a market that changed its rules). */
+  /** Forget the cached copies (tests; a market that changed its rules). */
   clear: () => marketCache.clear(),
 };
 
-const tx = (raw: unknown): P2pTransaction => {
+const tx = (raw: unknown, action?: string): P2pTransaction => {
   const o = itemOf(raw) as Record<string, unknown> | null;
   if (!o || typeof o.to !== 'string' || typeof o.data !== 'string') throw bad();
   return {
@@ -198,7 +192,7 @@ const tx = (raw: unknown): P2pTransaction => {
     data: o.data,
     value: typeof o.value === 'string' ? o.value : '0',
     description: typeof o.description === 'string' ? o.description : undefined,
-    action: typeof o.action === 'string' ? o.action : undefined,
+    action: typeof o.action === 'string' ? o.action : action,
   };
 };
 
@@ -223,67 +217,62 @@ export interface SellOrderInput {
   beneficiary: { holderName: string; document: string; details: Record<string, string> };
 }
 
-/** The buy/sell app's user (session) and the dashboard's client view of orders. */
+/** The buy/sell app: the signed-in wallet's own quotes and orders (`/v1/app/*`). */
 export const trade = {
-  quote: async (input: QuoteInput, decimals: Decimals = null, scope?: Scope) =>
+  quote: async (input: QuoteInput, decimals: Decimals = null) =>
     normalizeQuote(
-      itemOf(
-        await request({ method: 'POST', path: ROUTES.quotes, body: input, headers: scoped(scope) }),
-      ),
+      itemOf(await request({ method: 'POST', path: ROUTES.appQuotes, body: input })),
       decimals,
     ),
-  createOrder: async (
-    input: BuyOrderInput | SellOrderInput,
-    decimals: Decimals = null,
-    scope?: Scope,
-  ) =>
-    normalizeOrder(
-      itemOf(
-        await request({
-          method: 'POST',
-          path: ROUTES.orders,
-          body: { kind: input.side, ...input },
-          headers: scoped(scope),
-        }),
-      ),
+  createOrder: async (input: BuyOrderInput | SellOrderInput, decimals: Decimals = null) => {
+    // The API takes only these fields: the side comes from the quote.
+    const body =
+      input.side === 'BUY'
+        ? { quoteId: input.quoteId, payer: input.payer }
+        : { quoteId: input.quoteId, beneficiary: input.beneficiary };
+    return normalizeOrder(
+      itemOf(await request({ method: 'POST', path: ROUTES.appOrders, body })),
       decimals,
+    );
+  },
+  orders: async (decimals: Decimals = null) =>
+    listOf(await request({ method: 'GET', path: ROUTES.appOrders, query: { take: 50 } })).map((o) =>
+      normalizeOrder(o, decimals),
     ),
-  orders: async (decimals: Decimals = null, scope?: Scope, query?: Record<string, string>) =>
-    listOf(
-      await request({ method: 'GET', path: ROUTES.orders, query, headers: scoped(scope) }),
-    ).map((o) => normalizeOrder(o, decimals)),
-  order: async (id: string, decimals: Decimals = null, scope?: Scope) =>
-    normalizeOrder(
-      itemOf(await request({ method: 'GET', path: ROUTES.order(id), headers: scoped(scope) })),
-      decimals,
-    ),
+  order: async (id: string, decimals: Decimals = null) =>
+    normalizeOrder(itemOf(await request({ method: 'GET', path: ROUTES.appOrder(id) })), decimals),
   act: async (
     id: string,
     action: 'paid' | 'cancel' | 'dispute',
     body: { reference?: string } = {},
     decimals: Decimals = null,
-    scope?: Scope,
   ) =>
     normalizeOrder(
       itemOf(
         await request({
           method: 'POST',
-          path: ROUTES.orderAction(id, action),
-          body,
-          headers: scoped(scope),
+          path: ROUTES.appOrderAction(id, action),
+          body: action === 'paid' ? body : undefined,
         }),
       ),
       decimals,
     ),
-  /** An unsigned transaction for the caller's own wallet (the API builds it, the wallet signs). */
+  /** An unsigned transaction for the seller's own wallet, on its own sale. */
   transaction: async (
-    body: { network: string; from: string; action: string; args: Record<string, unknown> },
-    scope?: Scope,
+    orderId: string,
+    action: 'accept' | 'markPaid' | 'release' | 'cancel' | 'dispute',
   ) =>
-    tx(await request({ method: 'POST', path: ROUTES.transactions, body, headers: scoped(scope) })),
+    tx(
+      await request({
+        method: 'POST',
+        path: ROUTES.appOrderTransactions(orderId),
+        body: { action },
+      }),
+      action,
+    ),
 };
 
-/* --- The merchant / business dashboard --- */
+/* --- The merchant / business dashboard (`/v1/p2p/*`) --- */
 
 export const accounts = {
   challenge: async (scope: Scope, address: string): Promise<P2pChallenge> => {
@@ -295,17 +284,16 @@ export const accounts = {
         headers: scoped(scope),
       }),
     ) as Record<string, unknown>;
-    if (!o || typeof o.message !== 'string' || typeof o.id !== 'string') throw bad();
-    return { id: o.id, message: o.message, expiresAt: String(o.expiresAt ?? '') };
+    if (!o || typeof o.message !== 'string') throw bad();
+    return {
+      id: typeof o.id === 'string' ? o.id : '',
+      message: o.message,
+      expiresAt: String(o.expiresAt ?? ''),
+    };
   },
   register: async (
     scope: Scope,
-    body: {
-      challengeId: string;
-      signature: string;
-      label?: string;
-      merchant?: { displayName: string };
-    },
+    body: { address: string; signature: string; label?: string; displayName?: string },
   ) =>
     normalizeAccount(
       itemOf(
@@ -313,9 +301,14 @@ export const accounts = {
       ),
     ),
   list: async (scope: Scope) =>
-    listOf(await request({ method: 'GET', path: ROUTES.accounts, headers: scoped(scope) })).map(
-      normalizeAccount,
-    ),
+    listOf(
+      await request({
+        method: 'GET',
+        path: ROUTES.accounts,
+        query: { take: 100 },
+        headers: scoped(scope),
+      }),
+    ).map(normalizeAccount),
   get: async (scope: Scope, id: string) =>
     normalizeAccount(
       itemOf(await request({ method: 'GET', path: ROUTES.account(id), headers: scoped(scope) })),
@@ -323,10 +316,7 @@ export const accounts = {
   update: async (
     scope: Scope,
     id: string,
-    body: {
-      label?: string | null;
-      merchant?: { displayName?: string; status?: 'ACTIVE' | 'PAUSED' };
-    },
+    body: { label?: string; displayName?: string; merchantStatus?: 'ACTIVE' | 'PAUSED' },
   ) =>
     normalizeAccount(
       itemOf(
@@ -339,14 +329,38 @@ export const accounts = {
 
 export const methods = {
   list: async (scope: Scope) =>
-    listOf(await request({ method: 'GET', path: ROUTES.methods, headers: scoped(scope) })).map(
-      normalizeMethod,
-    ),
-  create: async (scope: Scope, body: Record<string, unknown>) =>
+    listOf(
+      await request({
+        method: 'GET',
+        path: ROUTES.methods,
+        query: { take: 100 },
+        headers: scoped(scope),
+      }),
+    ).map(normalizeMethod),
+  create: async (
+    scope: Scope,
+    body: {
+      accountId: string;
+      currency: string;
+      rail: string;
+      holderName: string;
+      details: Record<string, string>;
+      label?: string;
+    },
+  ) =>
     normalizeMethod(
       itemOf(await request({ method: 'POST', path: ROUTES.methods, body, headers: scoped(scope) })),
     ),
-  update: async (scope: Scope, id: string, body: Record<string, unknown>) =>
+  update: async (
+    scope: Scope,
+    id: string,
+    body: {
+      active?: boolean;
+      details?: Record<string, string>;
+      holderName?: string;
+      label?: string;
+    },
+  ) =>
     normalizeMethod(
       itemOf(
         await request({ method: 'PATCH', path: ROUTES.method(id), body, headers: scoped(scope) }),
@@ -356,16 +370,41 @@ export const methods = {
     request({ method: 'DELETE', path: ROUTES.method(id), headers: scoped(scope) }),
 };
 
+export interface OfferInput {
+  accountId: string;
+  side: 'SELL_TOKEN' | 'BUY_TOKEN';
+  network: string;
+  token: string;
+  currency: string;
+  rails: string[];
+  price: string;
+  priceTtlSeconds: number;
+  minFiat: string;
+  maxFiat: string;
+  active: boolean;
+}
+
 export const offers = {
   list: async (scope: Scope) =>
-    listOf(await request({ method: 'GET', path: ROUTES.offers, headers: scoped(scope) })).map(
-      normalizeOffer,
-    ),
-  create: async (scope: Scope, body: Record<string, unknown>) =>
+    listOf(
+      await request({
+        method: 'GET',
+        path: ROUTES.offers,
+        query: { take: 100 },
+        headers: scoped(scope),
+      }),
+    ).map(normalizeOffer),
+  create: async (scope: Scope, body: OfferInput) =>
     normalizeOffer(
       itemOf(await request({ method: 'POST', path: ROUTES.offers, body, headers: scoped(scope) })),
     ),
-  update: async (scope: Scope, id: string, body: Record<string, unknown>) =>
+  update: async (
+    scope: Scope,
+    id: string,
+    body: Partial<
+      Pick<OfferInput, 'active' | 'maxFiat' | 'minFiat' | 'price' | 'priceTtlSeconds' | 'rails'>
+    >,
+  ) =>
     normalizeOffer(
       itemOf(
         await request({ method: 'PATCH', path: ROUTES.offer(id), body, headers: scoped(scope) }),
@@ -378,7 +417,12 @@ export const offers = {
 export const merchant = {
   orders: async (scope: Scope, decimals: Decimals = null) =>
     listOf(
-      await request({ method: 'GET', path: ROUTES.merchantOrders, headers: scoped(scope) }),
+      await request({
+        method: 'GET',
+        path: ROUTES.merchantOrders,
+        query: { take: 100 },
+        headers: scoped(scope),
+      }),
     ).map((o) => normalizeOrder({ role: 'merchant', ...(o as object) }, decimals)),
   order: async (scope: Scope, id: string, decimals: Decimals = null) =>
     normalizeOrder(
@@ -405,30 +449,97 @@ export const merchant = {
     ),
 };
 
+/** The organization's own orders (as a client) and the unsigned transactions for its wallets. */
+export const clientOrders = {
+  list: async (scope: Scope, decimals: Decimals = null) =>
+    listOf(
+      await request({
+        method: 'GET',
+        path: ROUTES.orders,
+        query: { take: 100 },
+        headers: scoped(scope),
+      }),
+    ).map((o) => normalizeOrder(o, decimals)),
+  act: async (
+    scope: Scope,
+    id: string,
+    action: 'paid' | 'cancel' | 'dispute',
+    body: { reference?: string } = {},
+    decimals: Decimals = null,
+  ) =>
+    normalizeOrder(
+      itemOf(
+        await request({
+          method: 'POST',
+          path: ROUTES.orderAction(id, action),
+          body: action === 'paid' ? body : undefined,
+          headers: scoped(scope),
+        }),
+      ),
+      decimals,
+    ),
+  /** `from`: one of the organization's account ids (or, on a sale, the seller's address). */
+  transaction: async (
+    scope: Scope,
+    body: { network: string; from: string; action: string; args: Record<string, unknown> },
+  ) =>
+    tx(
+      await request({ method: 'POST', path: ROUTES.transactions, body, headers: scoped(scope) }),
+      body.action,
+    ),
+};
+
 export const charges = {
   list: async (scope: Scope) =>
-    listOf(await request({ method: 'GET', path: ROUTES.charges, headers: scoped(scope) })).map(
-      normalizeCharge,
-    ),
-  create: async (scope: Scope, body: Record<string, unknown>) =>
+    listOf(
+      await request({
+        method: 'GET',
+        path: ROUTES.charges,
+        query: { take: 100 },
+        headers: scoped(scope),
+      }),
+    ).map(normalizeCharge),
+  create: async (
+    scope: Scope,
+    body: {
+      currency: string;
+      fiatAmount: string;
+      network: string;
+      token: string;
+      recipient: string;
+      payeeName: string;
+      description?: string;
+      expiresAt?: string;
+      multiUse?: boolean;
+    },
+  ) =>
     normalizeCharge(
       itemOf(await request({ method: 'POST', path: ROUTES.charges, body, headers: scoped(scope) })),
     ),
-  remove: (scope: Scope, id: string) =>
+  remove: async (scope: Scope, id: string) =>
     request({ method: 'DELETE', path: ROUTES.charge(id), headers: scoped(scope) }),
 };
 
 export const payouts = {
   list: async (scope: Scope, decimals: Decimals = null) =>
-    listOf(await request({ method: 'GET', path: ROUTES.payouts, headers: scoped(scope) })).map(
-      (b) => normalizePayoutBatch(b, decimals),
-    ),
+    listOf(
+      await request({
+        method: 'GET',
+        path: ROUTES.payouts,
+        query: { take: 50 },
+        headers: scoped(scope),
+      }),
+    ).map((b) => normalizePayoutBatch(b, decimals)),
   get: async (scope: Scope, id: string, decimals: Decimals = null) =>
     normalizePayoutBatch(
       itemOf(await request({ method: 'GET', path: ROUTES.payout(id), headers: scoped(scope) })),
       decimals,
     ),
-  create: async (scope: Scope, body: Record<string, unknown>, decimals: Decimals = null) =>
+  create: async (
+    scope: Scope,
+    body: { accountId: string; network: string; token: string; items: unknown[] },
+    decimals: Decimals = null,
+  ) =>
     normalizePayoutBatch(
       itemOf(await request({ method: 'POST', path: ROUTES.payouts, body, headers: scoped(scope) })),
       decimals,
@@ -490,7 +601,6 @@ export const checkout = {
           method: 'POST',
           path: ROUTES.checkoutOrderAction(orderId, 'cancel'),
           headers: payer(token),
-          body: {},
         }),
       ),
     ),

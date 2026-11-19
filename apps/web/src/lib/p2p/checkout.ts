@@ -76,9 +76,7 @@ const str = (v: unknown, re?: RegExp, max = 200) =>
 // eslint-disable-next-line no-control-regex -- refusing control characters is the point
 const CONTROL = /[\u0000-\u001f\u007f]/;
 const line = (v: unknown, max = 120) =>
-  typeof v === 'string' && v.trim() && v.length <= max && !CONTROL.test(v)
-    ? v.trim()
-    : null;
+  typeof v === 'string' && v.trim() && v.length <= max && !CONTROL.test(v) ? v.trim() : null;
 const date = (v: unknown) => (typeof v === 'string' && Number.isFinite(Date.parse(v)) ? v : null);
 const optional = <T>(v: unknown, read: (x: unknown) => T | null): T | null | undefined =>
   v === null || v === undefined ? null : (read(v) ?? undefined);

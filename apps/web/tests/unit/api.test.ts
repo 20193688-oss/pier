@@ -12,7 +12,7 @@ import {
   setTransport,
   type ApiRequest,
 } from '@/lib/api/client';
-import { apiKeys, auth, checkout, market } from '@/lib/api/endpoints';
+import { apiKeys, auth, checkout, market, trade, webhooks } from '@/lib/api/endpoints';
 import { ORG_HEADER, PAYER_TOKEN_HEADER, TIER_HEADER } from '@/lib/api/routes';
 import {
   keyTier,
@@ -27,7 +27,10 @@ import { readAnnouncement } from '@/lib/wallet/eip6963';
 import { siweMessage } from '@/lib/wallet/actions';
 import { getAddress } from 'viem';
 
-afterEach(() => setTransport(fetchTransport));
+afterEach(() => {
+  setTransport(fetchTransport);
+  market.clear();
+});
 
 test('the error shape, flat or nested, with its retry hint', () => {
   const e = errorFrom(422, {
@@ -51,17 +54,21 @@ test('a call carries the organization and tier, and a failure becomes an ApiErro
   const seen: ApiRequest[] = [];
   setTransport(async (req) => {
     seen.push(req);
-    return req.path === '/v1/api-keys' && req.method === 'GET'
-      ? {
-          status: 200,
-          json: { data: [{ id: 'k', name: 'Bot', prefix: 'pk_live_ab12', scopes: ['p2p:read'] }] },
-        }
-      : { status: 401, json: { error: { code: 'unauthenticated', message: 'Sign in' } } };
+    if (req.path === '/v1/organizations/org_1/api-keys' && req.method === 'GET')
+      return {
+        status: 200,
+        json: { data: [{ id: 'k', name: 'Bot', prefix: 'pk_live_ab12', scopes: ['p2p:read'] }] },
+      };
+    if (req.path === '/v1/webhook-endpoints') return { status: 200, json: { data: [] } };
+    return { status: 401, json: { error: { code: 'unauthenticated', message: 'Sign in' } } };
   });
-  const keys = await apiKeys.list({ org: 'org_1', tier: 'testnet' });
+  const keys = await apiKeys.list('org_1');
   assert.equal(keys[0].tier, 'live', 'the prefix decides the tier');
-  assert.equal(seen[0].headers?.[ORG_HEADER], 'org_1');
-  assert.equal(seen[0].headers?.[TIER_HEADER], 'testnet');
+  await webhooks.list({ org: 'org_1', tier: 'test' });
+  assert.equal(seen[1].headers?.[ORG_HEADER], 'org_1');
+  assert.equal(seen[1].headers?.[TIER_HEADER], 'test');
+  assert.equal(ORG_HEADER, 'Pedospe-Organization');
+  assert.equal(TIER_HEADER, 'Pedospe-Tier');
   assert.equal(await auth.session(), null, 'a 401 on the session means nobody is signed in');
   await assert.rejects(
     () => market.get(),
@@ -97,7 +104,7 @@ test('the charge page sends its payer token as a header and refuses a malformed 
     (e: unknown) => e instanceof ApiError && e.code === 'bad_response',
   );
   assert.equal(seen[0].headers?.[PAYER_TOKEN_HEADER], 'tok');
-  assert.equal(seen[0].path, '/v1/checkout/orders/ord_12345678');
+  assert.equal(seen[0].path, '/v1/p2p-checkout/orders/ord_12345678');
 });
 
 test('sessions, members, keys, webhooks and deliveries are read tolerantly', () => {
@@ -187,4 +194,102 @@ test('the sign-in message names this site, the address, the nonce and a short ex
   assert.match(m, /Nonce: abcdef123456/);
   assert.match(m, /Chain ID: 8453/);
   assert.match(m, /Expiration Time: 2026-11-19T12:10:00.000Z/);
+});
+
+test('the market is read once per tier and reused; a failure is not kept', async () => {
+  let calls = 0;
+  setTransport(async (req) => {
+    calls += 1;
+    if (calls === 1) return { status: 503, json: { error: { code: 'unavailable', message: 'x' } } };
+    return {
+      status: 200,
+      json: {
+        available: true,
+        tier: req.query?.tier,
+        networks: [],
+        currencies: [],
+        bondBps: 1000,
+        windows: {
+          buyPaymentWindow: 1800,
+          sellAcceptWindow: 300,
+          sellPaymentWindow: 2400,
+          sellSettleWindow: 21600,
+        },
+      },
+    };
+  });
+  await assert.rejects(() => market.get('test'));
+  const m = await market.get('test');
+  assert.equal(await market.get('test'), m);
+  assert.equal(calls, 2);
+  assert.deepEqual(
+    [m.sellBondBps, m.windows.sellPaymentSeconds, m.windows.paymentSeconds, m.available],
+    [1000, 2400, 1800, true],
+  );
+});
+
+test("the app's order body carries only the quote and who pays or is paid", async () => {
+  const seen: ApiRequest[] = [];
+  setTransport(async (req) => {
+    seen.push(req);
+    return {
+      status: 201,
+      json: { id: '0b5e8f1c-2d3a-4b5c-8d9e-0f1a2b3c4d5e', kind: 'BUY', status: 'pending' },
+    };
+  });
+  await trade.createOrder({ side: 'BUY', quoteId: 'q1', payer: { name: 'Ana', document: '1' } });
+  await trade.createOrder({
+    side: 'SELL',
+    quoteId: 'q2',
+    beneficiary: { holderName: 'Ana', document: '1', details: {} },
+  });
+  assert.deepEqual(
+    seen.map((r) => [r.path, r.body]),
+    [
+      ['/v1/app/orders', { quoteId: 'q1', payer: { name: 'Ana', document: '1' } }],
+      [
+        '/v1/app/orders',
+        { quoteId: 'q2', beneficiary: { holderName: 'Ana', document: '1', details: {} } },
+      ],
+    ],
+  );
+  setTransport(async (req) => {
+    seen.push(req);
+    return {
+      status: 200,
+      json: {
+        chainId: 1,
+        to: '0x5eed00000000000000000000000000000000ba5e',
+        data: '0x37bdc99b',
+        value: '0',
+        description: 'Release',
+      },
+    };
+  });
+  const t = await trade.transaction('o1', 'release');
+  assert.deepEqual(
+    [seen.at(-1)?.path, seen.at(-1)?.body, t.action],
+    ['/v1/app/orders/o1/transactions', { action: 'release' }, 'release'],
+  );
+});
+
+test('sign-in takes the nonce and the domain the API names', async () => {
+  setTransport(async () => ({
+    status: 200,
+    json: {
+      nonce: 'abcdef123456',
+      domain: 'app.pedospe.example',
+      expiresAt: '2026-11-19T12:05:00Z',
+    },
+  }));
+  assert.deepEqual(await auth.nonce(), { nonce: 'abcdef123456', domain: 'app.pedospe.example' });
+  setTransport(async () => ({
+    status: 200,
+    json: { nonce: 'abcdef123456', domain: 'evil.example/x' },
+  }));
+  assert.deepEqual(
+    await auth.nonce(),
+    { nonce: 'abcdef123456', domain: null },
+    'a malformed domain is not used',
+  );
 });

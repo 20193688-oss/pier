@@ -6,7 +6,7 @@ export interface Snippet {
   code: string;
 }
 
-const env = `export API="$PEDOSPE_API_URL/v1"
+const env = `export API="$PEDOSPE_API_URL/v1/p2p"
 export AUTH="Authorization: Bearer $PEDOSPE_API_KEY"   # pk_test_... or pk_live_...`;
 
 export const SNIPPETS: Record<string, Snippet> = {
@@ -14,11 +14,14 @@ export const SNIPPETS: Record<string, Snippet> = {
 
   market: {
     lang: 'bash',
-    code: `curl "$PEDOSPE_API_URL/v1/market" -H "Authorization: Bearer $PEDOSPE_API_KEY"
-# -> { "tier": "testnet", "networks": [ { "id": "base", "chainId": 84532, "contract": "0x...",
-#      "tokens": [ { "symbol": "USDC", "address": "0x...", "decimals": 6 } ] } ],
-#      "currencies": [ { "code": "ARS", "rails": [ { "id": "ar_bank_transfer", "fields": [...] } ] } ],
-#      "protocolFeeBps": 30, "windows": { ... }, "sellBondBps": 1000, "matcher": "0x..." }`,
+    code: `curl "$PEDOSPE_API_URL/v1/market?tier=test"
+# -> { "available": true, "tier": "test",
+#      "networks": [ { "id": "base", "chainId": 84532, "contract": "0x...", "paused": false,
+#        "protocolFeeBps": 30, "tokens": [ { "symbol": "USDC", "address": "0x...", "decimals": 6 } ] } ],
+#      "currencies": [ { "code": "ARS", "decimals": 2, "rails": [ { "id": "ar_bank_transfer", "fields": [...] } ] } ],
+#      "bondBps": 1000, "maxIntegratorFeeBps": 500, "matcher": "0x...",
+#      "windows": { "buyPaymentWindow": 1800, "sellAcceptWindow": 300,
+#                   "sellPaymentWindow": 1800, "sellSettleWindow": 21600 } }`,
   },
 
   registerWallet: {
@@ -204,21 +207,21 @@ curl -X POST $API/orders -H "$AUTH" -H "Content-Type: application/json" \\
     "expiresAt": "2026-12-01T00:00:00Z",
     "multiUse": false
   }'
-# -> { "id": "ch_...", "url": "https://<pedospe web>/c/ch_...", "status": "open", ... }`,
+# -> { "id": "ch_...", "url": "https://<pedospe web>/pay/ch_...", "status": "open", ... }`,
   },
 
   checkout: {
     lang: 'bash',
     code: `# No API key: these are the payer's routes.
-curl "$PEDOSPE_API_URL/v1/checkout/charges/CHARGE_ID"
+curl "$PEDOSPE_API_URL/v1/p2p-checkout/charges/CHARGE_ID"
 
-curl -X POST "$PEDOSPE_API_URL/v1/checkout/charges/CHARGE_ID/orders" \\
+curl -X POST "$PEDOSPE_API_URL/v1/p2p-checkout/charges/CHARGE_ID/orders" \\
   -H "Content-Type: application/json" \\
   -d '{ "rail": "ar_bank_transfer",
         "payer": { "name": "Ana Gómez", "document": "32964233", "email": "ana@example.com" } }'
 # -> { "id": "...", "status": "pending", "payerToken": "..." }
 
-curl "$PEDOSPE_API_URL/v1/checkout/orders/ORDER_ID" -H "X-Payer-Token: PAYER_TOKEN"`,
+curl "$PEDOSPE_API_URL/v1/p2p-checkout/orders/ORDER_ID" -H "X-Payer-Token: PAYER_TOKEN"`,
   },
 
   payouts: {
@@ -255,7 +258,7 @@ MXN,2500,mx_spei,María López,GODE561231GR8,,,,,,002010077777777771,inv-1003`,
   apiKey: {
     lang: 'bash',
     code: `# A test key trades on test networks, a live key on mainnets.
-curl "$PEDOSPE_API_URL/v1/orders" -H "Authorization: Bearer pk_test_..."`,
+curl "$PEDOSPE_API_URL/v1/p2p/orders" -H "Authorization: Bearer pk_test_..."`,
   },
 
   webhookPayload: {

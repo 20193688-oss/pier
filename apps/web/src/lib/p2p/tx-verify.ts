@@ -162,7 +162,7 @@ export function saleTerms(input: {
   order: { amountUnits: string; buyer: string | null };
   market: {
     sellBondBps: number;
-    windows: { acceptSeconds: number; paymentSeconds: number; settleSeconds: number };
+    windows: { acceptSeconds: number; sellPaymentSeconds: number; settleSeconds: number };
   };
 }): { terms: SaleTerms; problem: null } | { terms: null; problem: SaleTermsProblem } {
   const { accepted, order, market } = input;
@@ -186,7 +186,7 @@ export function saleTerms(input: {
       buyer,
       bondUnits: ((BigInt(amountUnits) * BigInt(market.sellBondBps)) / 10_000n).toString(),
       acceptWindow: market.windows.acceptSeconds,
-      paymentWindow: market.windows.paymentSeconds,
+      paymentWindow: market.windows.sellPaymentSeconds,
       settleWindow: market.windows.settleSeconds,
       integrator,
       integratorFeeBps: bps,

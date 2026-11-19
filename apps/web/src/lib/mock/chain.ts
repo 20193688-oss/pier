@@ -10,7 +10,7 @@ import {
   type Hex,
 } from 'viem';
 import { MARKET_ABI } from '@/lib/p2p/tx-verify';
-import { MARKET, NETWORKS } from '@/lib/mock/fixtures';
+import { MARKET, NETWORKS, RULES } from '@/lib/mock/fixtures';
 import { db, hash32, iso, now, onCompleted, save, type Wire } from '@/lib/mock/db';
 
 const net = (id: string) => NETWORKS.find((n) => n.id === id);
@@ -39,9 +39,9 @@ export function saleSteps(o: Wire): Wire[] {
         token: getAddress(o.token),
         amount: BigInt(o.tokenAmount),
         bond: BigInt(o.bond),
-        acceptWindow: MARKET.windows.acceptSeconds,
-        paymentWindow: MARKET.windows.paymentSeconds,
-        settleWindow: MARKET.windows.settleSeconds,
+        acceptWindow: RULES.sellAcceptSeconds,
+        paymentWindow: RULES.sellPaymentSeconds,
+        settleWindow: RULES.sellSettleSeconds,
         integrator: '0x0000000000000000000000000000000000000000',
         integratorFeeBps: 0,
       },
@@ -100,7 +100,7 @@ export function buildTransaction(body: Wire): { tx?: Wire; error?: [number, stri
           n.id,
           n.contract,
           enc('setMatcher', [
-            getAddress(MARKET.matcher),
+            getAddress(MARKET.matcher!),
             BigInt(String(args.maxPerOrder ?? '0')),
             args.autoSettle === true,
           ]),
@@ -170,7 +170,7 @@ export function applyTransaction(from: string, chainId: number, to: string, data
       if (o) {
         o.status = 'awaiting_acceptance';
         o.onchainId = String(s.nextOnchainId++);
-        o.acceptDeadline = iso(t + MARKET.windows.acceptSeconds * 1000);
+        o.acceptDeadline = iso(t + RULES.sellAcceptSeconds * 1000);
         o.txHashes = { ...o.txHashes, open: hash };
         o._t = { ...o._t, opened: t };
         o.updatedAt = iso(t);
@@ -181,7 +181,7 @@ export function applyTransaction(from: string, chainId: number, to: string, data
       const o = byChainId(a[0]);
       if (o) {
         o.status = 'awaiting_payment';
-        o.paymentDeadline = iso(t + MARKET.windows.paymentSeconds * 1000);
+        o.paymentDeadline = iso(t + RULES.sellPaymentSeconds * 1000);
         o.txHashes = { ...o.txHashes, accept: hash };
         o.updatedAt = iso(t);
       }
@@ -191,7 +191,7 @@ export function applyTransaction(from: string, chainId: number, to: string, data
       const o = byChainId(a[0]);
       if (o) {
         o.status = 'paid';
-        o.settleDeadline = o.kind === 'SELL' ? iso(t + MARKET.windows.settleSeconds * 1000) : null;
+        o.settleDeadline = o.kind === 'SELL' ? iso(t + RULES.sellSettleSeconds * 1000) : null;
         o.txHashes = { ...o.txHashes, paid: hash };
         o.updatedAt = iso(t);
       }

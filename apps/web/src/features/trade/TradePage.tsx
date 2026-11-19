@@ -38,8 +38,9 @@ export default function TradePage() {
     marketApi
       .get()
       .then((m) => {
-        setMarket(m);
-        setUnavailable(false);
+        // A market that runs on no network for this tier is "not available", not an error.
+        setMarket(m.available ? m : null);
+        setUnavailable(!m.available);
       })
       .catch((e) => {
         setUnavailable(e instanceof ApiError && e.status === 503);

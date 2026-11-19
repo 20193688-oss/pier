@@ -262,8 +262,9 @@ test('the fallback route list covers every route the app calls', () => {
     [],
   );
   const paths = ROUTE_GROUPS.flatMap((g) => g.routes.map((r) => `${r.method} ${r.path}`));
-  assert.ok(paths.includes('POST /v1/orders/{id}/paid'));
-  assert.ok(paths.includes('PATCH /v1/orgs/{org}/members/{address}'));
+  assert.ok(paths.includes('POST /v1/p2p/orders/{id}/paid'));
+  assert.ok(paths.includes('PATCH /v1/organizations/{orgId}/members/{memberId}'));
+  assert.ok(paths.includes('POST /v1/app/orders/{id}/transactions'));
   assert.equal(new Set(paths).size, paths.length, 'no route twice');
 });
 

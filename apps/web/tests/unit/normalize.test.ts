@@ -89,7 +89,12 @@ test('the market: flat rails, windows and fee, paused networks left out', () => 
       ],
     },
   ]);
-  assert.deepEqual(m.windows, { paymentSeconds: 1800, acceptSeconds: 300, settleSeconds: 21600 });
+  assert.deepEqual(m.windows, {
+    paymentSeconds: 1800,
+    acceptSeconds: 300,
+    settleSeconds: 21600,
+    sellPaymentSeconds: 1800,
+  });
   assert.equal(m.sellBondBps, 1000);
   assert.equal(m.protocolFeeBps, 30);
   assert.equal(m.matcher, '');

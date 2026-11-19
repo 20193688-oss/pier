@@ -6,7 +6,7 @@ import { ROUTES } from '@/lib/api/routes';
 
 export type RouteKey = keyof typeof ROUTES;
 export type RouteGroupKey =
-  'auth' | 'orgs' | 'keys' | 'market' | 'merchant' | 'collections' | 'checkout';
+  'auth' | 'orgs' | 'keys' | 'app' | 'market' | 'merchant' | 'collections' | 'checkout';
 
 type Entry = [method: 'GET' | 'POST' | 'PATCH' | 'DELETE', key: RouteKey, ...args: string[]];
 
@@ -25,26 +25,37 @@ const GROUPS: [RouteGroupKey, Entry[]][] = [
     [
       ['GET', 'orgs'],
       ['POST', 'orgs'],
-      ['GET', 'org', '{id}'],
-      ['GET', 'members', '{org}'],
-      ['POST', 'members', '{org}'],
-      ['PATCH', 'member', '{org}', '{address}'],
-      ['DELETE', 'member', '{org}', '{address}'],
+      ['GET', 'org', '{orgId}'],
+      ['GET', 'members', '{orgId}'],
+      ['POST', 'members', '{orgId}'],
+      ['PATCH', 'member', '{orgId}', '{memberId}'],
+      ['DELETE', 'member', '{orgId}', '{memberId}'],
     ],
   ],
   [
     'keys',
     [
-      ['GET', 'apiKeys'],
-      ['POST', 'apiKeys'],
-      ['DELETE', 'apiKey', '{id}'],
+      ['GET', 'apiKeys', '{orgId}'],
+      ['POST', 'apiKeys', '{orgId}'],
+      ['DELETE', 'apiKey', '{orgId}', '{keyId}'],
       ['GET', 'webhooks'],
       ['POST', 'webhooks'],
       ['PATCH', 'webhook', '{id}'],
       ['DELETE', 'webhook', '{id}'],
       ['GET', 'webhookDeliveries', '{id}'],
-      ['POST', 'webhookRotate', '{id}'],
-      ['POST', 'webhookTest', '{id}'],
+    ],
+  ],
+  [
+    'app',
+    [
+      ['POST', 'appQuotes'],
+      ['GET', 'appOrders'],
+      ['POST', 'appOrders'],
+      ['GET', 'appOrder', '{id}'],
+      ['POST', 'appOrderAction', '{id}', 'paid'],
+      ['POST', 'appOrderAction', '{id}', 'cancel'],
+      ['POST', 'appOrderAction', '{id}', 'dispute'],
+      ['POST', 'appOrderTransactions', '{id}'],
     ],
   ],
   [

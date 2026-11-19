@@ -2,11 +2,11 @@
    sessionStorage so a reload (or a dev hot reload) keeps the session and every order. Orders move
    on their own as time passes (a merchant accepting, paying, releasing), the way the indexer
    would move them from on-chain events. */
-import { keccak256, stringToHex } from 'viem';
+import { orderRef } from '@/lib/p2p/order-ref';
 import {
   BUSINESS_WALLET,
   DEMO_ADDRESS,
-  MARKET,
+  RULES,
   MERCHANTS,
   MERCHANT_WALLET,
   NETWORKS,
@@ -36,7 +36,7 @@ export interface MockState {
   nextOnchainId: number;
 }
 
-const VERSION = 3;
+const VERSION = 4;
 const STORAGE_KEY = 'pedospe.mock';
 
 export const now = () => Date.now();
@@ -47,7 +47,7 @@ export const rid = (prefix: string, n = 12) => {
 };
 export const hash32 = () =>
   `0x${[...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
-export const refOf = (id: string) => keccak256(stringToHex(id));
+export const refOf = (id: string) => orderRef(id)!;
 export const units = (decimal: number, decimals = 6) =>
   BigInt(Math.round(decimal * 10 ** decimals)).toString();
 
@@ -81,7 +81,7 @@ export function makeOrder(o: {
   const network = o.network ?? 'base';
   const t = token(network, o.symbol);
   const tokens = Math.floor((o.fiat / o.price) * 100) / 100;
-  const id = rid('ord');
+  const id = crypto.randomUUID();
   const bonded = o.kind === 'SELL' || o.kind === 'PAYOUT';
   return {
     id,
@@ -97,7 +97,7 @@ export function makeOrder(o: {
     currency: o.currency,
     rail: o.rail,
     price: String(o.price),
-    feeBps: MARKET.protocolFeeBps,
+    feeBps: RULES.protocolFeeBps,
     integratorFeeBps: 0,
     buyerAddress: o.buyer,
     sellerAddress: o.seller,
@@ -133,8 +133,15 @@ function seed(): MockState {
     orgs: ORGS.map((o) => ({ ...o })),
     members: {
       org_nortecambios: [
-        { address: DEMO_ADDRESS, role: 'owner', label: null, addedAt: '2026-09-02T13:00:00.000Z' },
         {
+          id: 'mem_norte_owner',
+          address: DEMO_ADDRESS,
+          role: 'owner',
+          label: null,
+          addedAt: '2026-09-02T13:00:00.000Z',
+        },
+        {
+          id: 'mem_norte_ops',
           address: '0x0a5e000000000000000000000000000000000a11',
           role: 'admin',
           label: 'Operaciones',
@@ -143,12 +150,19 @@ function seed(): MockState {
       ],
       org_tiendalerma: [
         {
+          id: 'mem_lerma_owner',
           address: '0x7e11a00000000000000000000000000000000001',
           role: 'owner',
           label: 'Dueña',
           addedAt: '2026-10-11T15:30:00.000Z',
         },
-        { address: DEMO_ADDRESS, role: 'admin', label: null, addedAt: '2026-10-12T09:00:00.000Z' },
+        {
+          id: 'mem_lerma_demo',
+          address: DEMO_ADDRESS,
+          role: 'admin',
+          label: null,
+          addedAt: '2026-10-12T09:00:00.000Z',
+        },
       ],
     },
     orders: [],
@@ -812,7 +826,11 @@ export function pub<T extends Wire>(o: T): Wire {
     expire it when its deadline passed. Called on every read. */
 export function tick(o: Wire): Wire {
   const t = now();
-  const w = MARKET.windows;
+  const w = {
+    paymentSeconds: RULES.buyPaymentSeconds,
+    sellPaymentSeconds: RULES.sellPaymentSeconds,
+    settleSeconds: RULES.sellSettleSeconds,
+  };
   const T = o._t ?? (o._t = {});
   const at = (ms: number) => iso(ms);
   const touch = () => (o.updatedAt = at(t));
@@ -849,7 +867,7 @@ export function tick(o: Wire): Wire {
   if (o.status === 'awaiting_acceptance' && T.opened && t - T.opened > 4000) {
     o.status = 'awaiting_payment';
     T.accepted = t;
-    o.paymentDeadline = at(t + w.paymentSeconds * 1000);
+    o.paymentDeadline = at(t + w.sellPaymentSeconds * 1000);
     o.txHashes = { ...o.txHashes, accept: hash32() };
     touch();
   }

@@ -3,6 +3,8 @@
    malformed required one becomes an empty value the screen can show. Pure;
    tests/unit/api-types.test.ts. */
 
+import type { Tier } from '@/lib/api/client';
+
 export type Role = 'owner' | 'admin' | 'member';
 export const ROLES: readonly Role[] = ['owner', 'admin', 'member'];
 
@@ -26,13 +28,14 @@ export interface Organization {
 }
 
 export interface Member {
+  id: string;
   address: string;
   role: Role;
   label: string | null;
   addedAt: string;
 }
 
-export type KeyTier = 'live' | 'test';
+export type KeyTier = Tier;
 export const API_SCOPES = ['p2p:read', 'p2p:write'] as const;
 export type ApiScope = (typeof API_SCOPES)[number];
 
@@ -115,6 +118,7 @@ export function normalizeOrganization(raw: unknown): Organization {
 export function normalizeMember(raw: unknown): Member {
   const o = isObj(raw) ? raw : {};
   return {
+    id: s(o.id ?? o.address),
     address: s(o.address),
     role: role(o.role),
     label: sOrNull(o.label),
@@ -188,7 +192,12 @@ export function normalizeDelivery(raw: unknown): WebhookDelivery {
     event: s(o.event ?? o.type),
     status: st,
     attempts: Number(o.attempts ?? 0) || 0,
-    responseStatus: typeof o.responseStatus === 'number' ? o.responseStatus : null,
+    responseStatus:
+      typeof o.responseStatus === 'number'
+        ? o.responseStatus
+        : typeof o.lastStatus === 'number'
+          ? o.lastStatus
+          : null,
     createdAt: s(o.createdAt),
     nextAttemptAt: sOrNull(o.nextAttemptAt),
   };

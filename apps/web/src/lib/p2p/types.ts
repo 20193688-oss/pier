@@ -44,7 +44,16 @@ export interface P2pMarket {
   protocolFeeBps: number;
   /* Seconds: how long a buyer has to pay, a merchant to accept a bonded order, and a sale's
      settle window. */
-  windows: { paymentSeconds: number; acceptSeconds: number; settleSeconds: number };
+  /* Seconds: a purchase's time to pay, a sale's (or payout's) time for the merchant to accept,
+     to pay, and its settle window. */
+  windows: {
+    paymentSeconds: number;
+    acceptSeconds: number;
+    settleSeconds: number;
+    sellPaymentSeconds: number;
+  };
+  /* Whether the market runs on at least one network for this tier. */
+  available: boolean;
   sellBondBps: number;
   /* pedospe's matcher: the address a merchant authorises to open orders on its balance. */
   matcher: string;

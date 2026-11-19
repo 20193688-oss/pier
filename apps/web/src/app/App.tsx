@@ -75,14 +75,15 @@ const router = createBrowserRouter([
           { path: '*', element: <NotFound /> },
         ],
       },
-      {
-        path: '/c/:chargeId',
+      // The API links a charge as <web>/pay/<id>; /c/<id> is the short form.
+      ...['/pay/:chargeId', '/c/:chargeId'].map((path) => ({
+        path,
         element: (
           <Suspense fallback={<Loading />}>
             <ChargePage />
           </Suspense>
         ),
-      },
+      })),
       {
         path: '/dashboard/*',
         element: (

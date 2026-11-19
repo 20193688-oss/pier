@@ -84,13 +84,17 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async (w, progress) => {
       progress?.('connecting');
       const address = await connectWallet(w.provider);
-      const nonce = await auth.nonce(address);
+      const { nonce, domain } = await auth.nonce();
       const chainId = await currentChainId(w.provider).catch(() => 1);
+      // The API names the domain its sign-in accepts (its SIWE domain, the web app's host); the
+      // wallet compares it with the page and warns when they differ.
       const message = siweMessage({
         address,
         nonce,
         statement: t.common.wallet.statement,
         chainId,
+        domain: domain ?? window.location.host,
+        uri: domain ? `${window.location.protocol}//${domain}` : window.location.origin,
       });
       progress?.('signing');
       const signature = await signText(w.provider, address, message);

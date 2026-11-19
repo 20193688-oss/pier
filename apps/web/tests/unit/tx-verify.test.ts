@@ -20,6 +20,7 @@ import {
   type AcceptedQuote,
 } from '@/lib/p2p/fees';
 import { normalizeQuote } from '@/lib/p2p/normalize';
+import { orderRef } from '@/lib/p2p/order-ref';
 import type { P2pTransaction } from '@/lib/p2p/types';
 
 const NETWORK = {
@@ -39,7 +40,7 @@ const BOT = '0xb07000000000000000000000000000000000b075' as Hex;
 const REF = keccak256(stringToHex('ord_1'));
 const MARKET = {
   sellBondBps: 1000,
-  windows: { acceptSeconds: 300, paymentSeconds: 1800, settleSeconds: 21600 },
+  windows: { acceptSeconds: 300, sellPaymentSeconds: 1800, settleSeconds: 21600 },
 };
 
 const tx = (to: string, data: Hex, chainId = 8453): P2pTransaction => ({
@@ -161,7 +162,7 @@ describe('a sale: terms come only from what the person saw and what the market p
         order: { amountUnits: '1', buyer: BUYER },
         market: {
           sellBondBps: 500,
-          windows: { acceptSeconds: 60, paymentSeconds: 600, settleSeconds: 0 },
+          windows: { acceptSeconds: 60, sellPaymentSeconds: 600, settleSeconds: 0 },
         },
       }),
     );
@@ -550,4 +551,11 @@ test('a quote carries the terms the sale is pinned to', () => {
     [bare.merchantAddress, bare.bondUnits, bare.integrator, bare.integratorFeeBps],
     [null, null, null, 0],
   );
+});
+
+test("an order's on-chain ref is derived from its uuid as the API derives it", () => {
+  const id = '0b5e8f1c-2d3a-4b5c-8d9e-0f1a2b3c4d5e';
+  assert.equal(orderRef(id), keccak256('0x0b5e8f1c2d3a4b5c8d9e0f1a2b3c4d5e'));
+  assert.equal(orderRef(id.toUpperCase()), orderRef(id));
+  assert.equal(orderRef('ord_123'), null, 'not a uuid: no ref to pin, the sale is refused');
 });

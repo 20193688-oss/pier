@@ -23,6 +23,7 @@ import { decimalsFrom, decimalsOf } from '@/lib/p2p/normalize';
 import { explorerTx } from '@/lib/p2p/tx-check';
 import { saveSteps, savedQuoteTerms, savedSteps } from '@/lib/p2p/steps';
 import { saleTerms } from '@/lib/p2p/tx-verify';
+import { orderRef } from '@/lib/p2p/order-ref';
 import { amountOnly, money, plainAmount, units } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Field, Notice, Spinner } from '@/components/ui/controls';
@@ -157,32 +158,30 @@ export function OrderPanel({
   /* A sale's on-chain step built by the API for this wallet. */
   const builtStep = (action: 'release' | 'cancel' | 'dispute', label: string): TxStep => ({
     label,
-    build: () =>
-      tradeApi.transaction({
-        network: order.network,
-        from: me,
-        action,
-        args: { orderId: order.id },
-      }),
+    build: () => tradeApi.transaction(order.id, action),
     expect: { action, orderId: order.onchainId ?? null },
   });
+
+  /* The order's on-chain ref, derived from its id as the API derives it (never an answer's field
+     when the id is a uuid). */
+  const ref = orderRef(order.id) ?? order.ref ?? null;
 
   /* A sale's terms, pinned to what the person accepted (or, in a tab that no longer has it, the
      order's own amount and buyer with no fee) and the market's published rules: never skipped. */
   const sale = saleTerms({
-    ref: order.ref ?? '',
+    ref: ref ?? '',
     seller: me,
     token: order.token,
     accepted: savedQuoteTerms(order.id),
     order: { amountUnits: tokenUnits, buyer: order.buyer },
     market,
   });
-  const unverifiable = !buy && order.status === 'pending' && (!order.ref || sale.problem !== null);
+  const unverifiable = !buy && order.status === 'pending' && (!ref || sale.problem !== null);
   const saleSteps: TxStep[] = (() => {
     const list = order.transactions ?? [];
     const approve = list.find((x) => x.action === 'approve' || x.description === 'approve');
     const open = list.find((x) => x !== approve);
-    if (!approve || !open || !network || !sale.terms || !order.ref) return [];
+    if (!approve || !open || !network || !sale.terms || !ref) return [];
     return [
       {
         label: fmt(o.stepApprove, {

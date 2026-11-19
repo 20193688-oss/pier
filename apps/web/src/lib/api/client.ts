@@ -8,7 +8,8 @@
    Every error answer is read as the API's one error shape `{ error: { code, message, details? } }`
    into an ApiError; a network failure is an ApiError with status 0. */
 
-export type Tier = 'mainnet' | 'testnet';
+/** An organization's tier: `live` (mainnet networks) or `test` (test networks). */
+export type Tier = 'live' | 'test';
 
 export interface ApiRequest {
   method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';

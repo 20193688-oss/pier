@@ -116,7 +116,15 @@ export function normalizeMarket(raw: unknown): P2pMarket | null {
       paymentSeconds: Number(w.paymentSeconds ?? w.buyPaymentWindow ?? 1800),
       acceptSeconds: Number(w.acceptSeconds ?? w.sellAcceptWindow ?? 300),
       settleSeconds: Number(w.settleSeconds ?? w.sellSettleWindow ?? 0),
+      sellPaymentSeconds: Number(
+        w.sellPaymentSeconds ??
+          w.sellPaymentWindow ??
+          w.paymentSeconds ??
+          w.buyPaymentWindow ??
+          1800,
+      ),
     },
+    available: raw.available !== false,
     sellBondBps: Number(raw.sellBondBps ?? raw.bondBps ?? 0),
     matcher: str(raw.matcher) ?? '',
     maxPayoutItems: Number(raw.maxPayoutItems ?? 100),

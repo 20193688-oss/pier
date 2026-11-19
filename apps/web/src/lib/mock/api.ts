@@ -2,7 +2,7 @@
    the API's wire shapes, status codes and error shape `{ error: { code, message } }`. Installed
    as the client's transport in mock mode (src/lib/mock/index.ts). */
 import type { ApiRequest, ApiResponse } from '@/lib/api/client';
-import { ORG_HEADER, PAYER_TOKEN_HEADER, TIER_HEADER } from '@/lib/api/routes';
+import { ORG_HEADER, PAYER_TOKEN_HEADER } from '@/lib/api/routes';
 import { checkBeneficiary, isRailId, RAILS } from '@/lib/p2p/rails';
 import {
   CURRENCIES,
@@ -11,6 +11,7 @@ import {
   MERCHANT_ACCOUNTS,
   NETWORKS,
   PRICES,
+  RULES,
 } from '@/lib/mock/fixtures';
 import { db, iso, makeOrder, now, pub, rid, save, tick, units, type Wire } from '@/lib/mock/db';
 import { buildTransaction, saleSteps } from '@/lib/mock/chain';
@@ -24,6 +25,7 @@ interface Ctx {
 }
 
 const ok = (json: unknown, status = 200): ApiResponse => ({ status, json });
+const none = (): ApiResponse => ({ status: 204, json: null });
 const fail = (status: number, code: string, message: string): ApiResponse => ({
   status,
   json: { error: { code, message } },
@@ -106,7 +108,16 @@ function checkoutView(o: Wire) {
 
 const routes: [ApiRequest['method'], string, Handler][] = [
   // Sign-in with Ethereum
-  ['POST', '/v1/auth/nonce', () => ok({ nonce: rid('n', 16).replace('_', '') })],
+  [
+    'POST',
+    '/v1/auth/nonce',
+    () =>
+      ok({
+        nonce: rid('n', 16).replace('_', ''),
+        domain: location.host,
+        expiresAt: iso(now() + 5 * 60_000),
+      }),
+  ],
   [
     'POST',
     '/v1/auth/verify',
@@ -116,7 +127,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
         return fail(401, 'invalid_signature', 'The signature does not match.');
       db().session = { address: m[0] };
       save();
-      return sessionAnswer();
+      return ok({ address: m[0], expiresAt: iso(now() + 12 * 3600_000), token: 'ps_sess_demo' });
     },
   ],
   [
@@ -130,19 +141,19 @@ const routes: [ApiRequest['method'], string, Handler][] = [
     () => {
       db().session = null;
       save();
-      return ok({ ok: true });
+      return none();
     },
   ],
 
   // Organizations and members
   [
     'GET',
-    '/v1/orgs',
+    '/v1/organizations',
     () => (session() ? list(myOrgs()) : fail(401, 'unauthenticated', 'Sign in first.')),
   ],
   [
     'POST',
-    '/v1/orgs',
+    '/v1/organizations',
     ({ body }) => {
       const s = session();
       if (!s) return fail(401, 'unauthenticated', 'Sign in first.');
@@ -158,10 +169,10 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       return ok(org, 201);
     },
   ],
-  ['GET', '/v1/orgs/:org/members', withOrg((_c, org) => list(db().members[org] ?? []))],
+  ['GET', '/v1/organizations/:org/members', withOrg((_c, org) => list(db().members[org] ?? []))],
   [
     'POST',
-    '/v1/orgs/:org/members',
+    '/v1/organizations/:org/members',
     withOrg(({ body }, org) => {
       const address = String(body.address ?? '');
       if (!/^0x[0-9a-fA-F]{40}$/.test(address))
@@ -170,10 +181,11 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       if (members.some((m) => m.address.toLowerCase() === address.toLowerCase()))
         return fail(409, 'already_member', 'Already a member.');
       const m = {
+        id: rid('mem', 10),
         address,
         role: body.role ?? 'member',
-        label: body.label || null,
-        addedAt: iso(now()),
+        label: null,
+        createdAt: iso(now()),
       };
       members.push(m);
       save();
@@ -182,11 +194,9 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'PATCH',
-    '/v1/orgs/:org/members/:address',
+    '/v1/organizations/:org/members/:memberId',
     withOrg(({ body, params }, org) => {
-      const m = (db().members[org] ?? []).find(
-        (x) => x.address.toLowerCase() === params.address.toLowerCase(),
-      );
+      const m = (db().members[org] ?? []).find((x) => x.id === params.memberId);
       if (!m) return fail(404, 'not_found', 'Member not found.');
       if (
         m.role === 'owner' &&
@@ -201,24 +211,28 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'DELETE',
-    '/v1/orgs/:org/members/:address',
+    '/v1/organizations/:org/members/:memberId',
     withOrg(({ params }, org) => {
       const members = db().members[org] ?? [];
-      const m = members.find((x) => x.address.toLowerCase() === params.address.toLowerCase());
+      const m = members.find((x) => x.id === params.memberId);
       if (!m) return fail(404, 'not_found', 'Member not found.');
       if (m.role === 'owner' && members.filter((x) => x.role === 'owner').length < 2)
         return fail(409, 'last_owner', 'An organization keeps at least one owner.');
       db().members[org] = members.filter((x) => x !== m);
       save();
-      return ok({ ok: true });
+      return none();
     }),
   ],
 
   // API keys
-  ['GET', '/v1/api-keys', withOrg((_c, org) => list(db().keys.filter((k) => k._org === org)))],
+  [
+    'GET',
+    '/v1/organizations/:org/api-keys',
+    withOrg((_c, org) => list(db().keys.filter((k) => k._org === org))),
+  ],
   [
     'POST',
-    '/v1/api-keys',
+    '/v1/organizations/:org/api-keys',
     withOrg(({ body }, org) => {
       const tier = body.tier === 'live' ? 'live' : 'test';
       const scopes = Array.isArray(body.scopes)
@@ -245,21 +259,25 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'DELETE',
-    '/v1/api-keys/:id',
+    '/v1/organizations/:org/api-keys/:id',
     withOrg(({ params }, org) => {
       const k = db().keys.find((x) => x.id === params.id && x._org === org);
       if (!k) return fail(404, 'not_found', 'Key not found.');
       k.revokedAt = iso(now());
       save();
-      return ok(pub(k));
+      return none();
     }),
   ],
 
   // Webhooks
-  ['GET', '/v1/webhooks', withOrg((_c, org) => list(db().webhooks.filter((w) => w._org === org)))],
+  [
+    'GET',
+    '/v1/webhook-endpoints',
+    withOrg((_c, org) => list(db().webhooks.filter((w) => w._org === org))),
+  ],
   [
     'POST',
-    '/v1/webhooks',
+    '/v1/webhook-endpoints',
     withOrg(({ body }, org) => {
       const url = String(body.url ?? '');
       if (!/^https:\/\/[^\s/$.?#].[^\s]*$/i.test(url))
@@ -282,7 +300,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'PATCH',
-    '/v1/webhooks/:id',
+    '/v1/webhook-endpoints/:id',
     withOrg(({ body, params }, org) => {
       const w = db().webhooks.find((x) => x.id === params.id && x._org === org);
       if (!w) return fail(404, 'not_found', 'Endpoint not found.');
@@ -300,19 +318,19 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'DELETE',
-    '/v1/webhooks/:id',
+    '/v1/webhook-endpoints/:id',
     withOrg(({ params }, org) => {
       const before = db().webhooks.length;
       db().webhooks = db().webhooks.filter((x) => !(x.id === params.id && x._org === org));
       save();
       return before === db().webhooks.length
         ? fail(404, 'not_found', 'Endpoint not found.')
-        : ok({ ok: true });
+        : none();
     }),
   ],
   [
     'GET',
-    '/v1/webhooks/:id/deliveries',
+    '/v1/webhook-endpoints/:id/deliveries',
     withOrg(({ params }) =>
       list(
         db()
@@ -321,72 +339,59 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       ),
     ),
   ],
-  [
-    'POST',
-    '/v1/webhooks/:id/rotate-secret',
-    withOrg(({ params }, org) => {
-      const w = db().webhooks.find((x) => x.id === params.id && x._org === org);
-      return w
-        ? ok({ ...pub(w), secret: rid('whsec', 24) })
-        : fail(404, 'not_found', 'Endpoint not found.');
-    }),
-  ],
-  [
-    'POST',
-    '/v1/webhooks/:id/test',
-    withOrg(({ params }) => {
-      const d = {
-        id: rid('dlv', 8),
-        _endpoint: params.id,
-        event: 'P2P_ORDER_CREATED',
-        status: 'delivered',
-        attempts: 1,
-        responseStatus: 200,
-        createdAt: iso(now()),
-        nextAttemptAt: null,
-      };
-      db().deliveries.push(d);
-      save();
-      return ok(pub(d), 201);
-    }),
-  ],
 
   // The market
   [
     'GET',
     '/v1/market',
-    ({ header }) =>
-      ok({ ...MARKET, tier: header(TIER_HEADER) === 'testnet' ? 'testnet' : 'mainnet' }),
+    ({ req }) => ok({ ...MARKET, tier: req.query?.tier === 'test' ? 'test' : 'live' }),
   ],
-  ['POST', '/v1/quotes', ({ body }) => quote(body)],
-  ['POST', '/v1/orders', ({ body }) => createOrder(body)],
+  ['POST', '/v1/app/quotes', ({ body }) => quote(body)],
+  ['POST', '/v1/app/orders', ({ body }) => createOrder(body)],
   [
     'GET',
-    '/v1/orders',
-    (ctx) => {
+    '/v1/app/orders',
+    () => {
       const s = session();
       if (!s) return fail(401, 'unauthenticated', 'Sign in first.');
-      const org = ctx.header(ORG_HEADER);
-      if (org) {
-        const o = orgOf(ctx);
-        if (isResp(o)) return o;
-        return ok({
-          data: db()
-            .orders.filter((x) => x._owner === org)
-            .map((x) => orderView(x, 'client'))
-            .sort(byNewest),
-        });
-      }
-      return ok({
-        data: myAppOrders(s.address)
-          .map((x) => orderView(x, 'client'))
-          .sort(byNewest),
-      });
+      const data = myAppOrders(s.address)
+        .map((x) => orderView(x, 'client'))
+        .sort(byNewest);
+      return ok({ data, skip: 0, take: 50, total: data.length });
     },
   ],
   [
     'GET',
-    '/v1/orders/:id',
+    '/v1/p2p/orders',
+    withOrg((_c, org) => {
+      const data = db()
+        .orders.filter((x) => x._owner === org)
+        .map((x) => orderView(x, 'client'))
+        .sort(byNewest);
+      return ok({ data, skip: 0, take: 100, total: data.length });
+    }),
+  ],
+  [
+    'POST',
+    '/v1/app/orders/:id/transactions',
+    ({ params, body }) => {
+      const s = session();
+      if (!s) return fail(401, 'unauthenticated', 'Sign in first.');
+      const o = myAppOrders(s.address).find((x) => x.id === params.id);
+      if (!o) return fail(404, 'not_found', 'Order not found.');
+      if (o.kind !== 'SELL' || o.sellerAddress.toLowerCase() !== s.address.toLowerCase())
+        return fail(409, 'not_seller', "Only a sale's seller signs its actions.");
+      const r = buildTransaction({
+        network: o.network,
+        action: body.action,
+        args: { orderId: o.id },
+      });
+      return r.error ? fail(...r.error) : ok(r.tx);
+    },
+  ],
+  [
+    'GET',
+    '/v1/app/orders/:id',
     ({ params }) => {
       const s = session();
       if (!s) return fail(401, 'unauthenticated', 'Sign in first.');
@@ -399,12 +404,20 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       );
     },
   ],
-  ['POST', '/v1/orders/:id/paid', ({ params, body }) => buyerAction(params.id, 'paid', body)],
-  ['POST', '/v1/orders/:id/cancel', ({ params, body }) => buyerAction(params.id, 'cancel', body)],
-  ['POST', '/v1/orders/:id/dispute', ({ params, body }) => buyerAction(params.id, 'dispute', body)],
+  ['POST', '/v1/app/orders/:id/paid', ({ params, body }) => buyerAction(params.id, 'paid', body)],
   [
     'POST',
-    '/v1/transactions',
+    '/v1/app/orders/:id/cancel',
+    ({ params, body }) => buyerAction(params.id, 'cancel', body),
+  ],
+  [
+    'POST',
+    '/v1/app/orders/:id/dispute',
+    ({ params, body }) => buyerAction(params.id, 'dispute', body),
+  ],
+  [
+    'POST',
+    '/v1/p2p/transactions',
     ({ body }) => {
       if (!session()) return fail(401, 'unauthenticated', 'Sign in first.');
       const r = buildTransaction(body);
@@ -415,32 +428,32 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   // The dashboard: accounts, methods, offers, merchant orders
   [
     'POST',
-    '/v1/accounts/challenge',
+    '/v1/p2p/accounts/challenge',
     withOrg(({ body }, org) => {
       const address = String(body.address ?? '');
       if (!/^0x[0-9a-fA-F]{40}$/.test(address))
         return fail(422, 'invalid_address', 'Not an EVM address.');
       if (db().accounts.some((a) => a.address.toLowerCase() === address.toLowerCase()))
         return fail(409, 'address_taken', 'This wallet is already registered.');
-      const id = rid('chl', 12);
+      const id = `${org}:${address.toLowerCase()}`;
       const expiresAt = iso(now() + 5 * 60_000);
-      const message = `pedospe wallet registration\n\nOrganization: ${org}\nAddress: ${address}\nPurpose: register this wallet for the market\nChallenge: ${id}\nExpires: ${expiresAt}`;
+      const message = `pedospe wallet registration\n\nOrganization: ${org}\nTier: test\nAddress: ${address}\nNonce: ${rid('n', 12)}\nExpires: ${expiresAt}`;
       db().challenges[id] = { id, org, address, message, expiresAt };
       save();
-      return ok({ id, message, expiresAt }, 201);
+      return ok({ message, expiresAt });
     }),
   ],
   [
     'POST',
-    '/v1/accounts',
+    '/v1/p2p/accounts',
     withOrg(({ body }, org) => {
-      const ch = db().challenges[String(body.challengeId)];
+      const ch = db().challenges[`${org}:${String(body.address ?? '').toLowerCase()}`];
       if (!ch || ch.org !== org || Date.parse(ch.expiresAt) < now())
         return fail(410, 'challenge_expired', 'Ask for a new challenge.');
       if (!/^0x[0-9a-fA-F]{130}$/.test(String(body.signature ?? '')))
         return fail(401, 'invalid_signature', 'The signature does not match.');
       delete db().challenges[ch.id];
-      const displayName = body.merchant?.displayName ? String(body.merchant.displayName) : null;
+      const displayName = body.displayName ? String(body.displayName) : null;
       const a = {
         id: rid('acc', 10),
         _org: org,
@@ -470,7 +483,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'GET',
-    '/v1/accounts',
+    '/v1/p2p/accounts',
     withOrg((_c, org) =>
       ok({
         data: db()
@@ -481,7 +494,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'GET',
-    '/v1/accounts/:id',
+    '/v1/p2p/accounts/:id',
     withOrg(({ params }, org) => {
       const a = db().accounts.find((x) => x.id === params.id && x._org === org);
       return a ? ok(accountView(a)) : fail(404, 'not_found', 'Account not found.');
@@ -489,35 +502,35 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'PATCH',
-    '/v1/accounts/:id',
+    '/v1/p2p/accounts/:id',
     withOrg(({ params, body }, org) => {
       const a = db().accounts.find((x) => x.id === params.id && x._org === org);
       if (!a) return fail(404, 'not_found', 'Account not found.');
       if ('label' in body) a.label = body.label || null;
-      if (body.merchant?.displayName) a.displayName = body.merchant.displayName;
-      if (body.merchant?.status && a.merchantStatus !== 'SUSPENDED')
-        a.merchantStatus = body.merchant.status;
+      if (body.displayName) a.displayName = body.displayName;
+      if (body.merchantStatus && a.merchantStatus !== 'SUSPENDED')
+        a.merchantStatus = body.merchantStatus;
       save();
       return ok(accountView(a));
     }),
   ],
   [
     'DELETE',
-    '/v1/accounts/:id',
+    '/v1/p2p/accounts/:id',
     withOrg(({ params }, org) => {
       db().accounts = db().accounts.filter((x) => !(x.id === params.id && x._org === org));
       save();
-      return ok({ ok: true });
+      return none();
     }),
   ],
   [
     'GET',
-    '/v1/payment-methods',
+    '/v1/p2p/payment-methods',
     withOrg((_c, org) => list(db().methods.filter((m) => m._org === org))),
   ],
   [
     'POST',
-    '/v1/payment-methods',
+    '/v1/p2p/payment-methods',
     withOrg(({ body }, org) => {
       if (!isRailId(body.rail)) return fail(422, 'unknown_rail', 'Unknown rail.');
       const m = {
@@ -540,7 +553,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'PATCH',
-    '/v1/payment-methods/:id',
+    '/v1/p2p/payment-methods/:id',
     withOrg(({ params, body }, org) => {
       const m = db().methods.find((x) => x.id === params.id && x._org === org);
       if (!m) return fail(404, 'not_found', 'Payment method not found.');
@@ -558,17 +571,17 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'DELETE',
-    '/v1/payment-methods/:id',
+    '/v1/p2p/payment-methods/:id',
     withOrg(({ params }, org) => {
       db().methods = db().methods.filter((x) => !(x.id === params.id && x._org === org));
       save();
-      return ok({ ok: true });
+      return none();
     }),
   ],
-  ['GET', '/v1/offers', withOrg((_c, org) => list(db().offers.filter((m) => m._org === org)))],
+  ['GET', '/v1/p2p/offers', withOrg((_c, org) => list(db().offers.filter((m) => m._org === org)))],
   [
     'POST',
-    '/v1/offers',
+    '/v1/p2p/offers',
     withOrg(({ body }, org) => {
       const t = tokenOf(String(body.network), String(body.token));
       if (!t) return fail(422, 'unknown_token', 'Unknown token on this network.');
@@ -597,7 +610,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'PATCH',
-    '/v1/offers/:id',
+    '/v1/p2p/offers/:id',
     withOrg(({ params, body }, org) => {
       const o = db().offers.find((x) => x.id === params.id && x._org === org);
       if (!o) return fail(404, 'not_found', 'Offer not found.');
@@ -610,16 +623,16 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'DELETE',
-    '/v1/offers/:id',
+    '/v1/p2p/offers/:id',
     withOrg(({ params }, org) => {
       db().offers = db().offers.filter((x) => !(x.id === params.id && x._org === org));
       save();
-      return ok({ ok: true });
+      return none();
     }),
   ],
   [
     'GET',
-    '/v1/merchant/orders',
+    '/v1/p2p/merchant/orders',
     withOrg((_c, org) =>
       ok({
         data: db()
@@ -631,7 +644,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'GET',
-    '/v1/merchant/orders/:id',
+    '/v1/p2p/merchant/orders/:id',
     withOrg(({ params }, org) => {
       const o = db().orders.find((x) => x.id === params.id && x._merchantOrg === org);
       return o ? ok(orderView(o, 'merchant')) : fail(404, 'not_found', 'Order not found.');
@@ -639,7 +652,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'POST',
-    '/v1/merchant/transfer-matches',
+    '/v1/p2p/merchant/transfer-matches',
     withOrg(({ body }, org) => {
       const amount = Number(body.amount);
       const name = String(body.payerName ?? '').toLowerCase();
@@ -684,7 +697,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   // Charges and payouts
   [
     'GET',
-    '/v1/charges',
+    '/v1/p2p/charges',
     withOrg((_c, org) =>
       ok({
         data: db()
@@ -696,7 +709,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'POST',
-    '/v1/charges',
+    '/v1/p2p/charges',
     withOrg(({ body }, org) => {
       const t = tokenOf(String(body.network), String(body.token));
       if (!t) return fail(422, 'unknown_token', 'Unknown token on this network.');
@@ -737,7 +750,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'DELETE',
-    '/v1/charges/:id',
+    '/v1/p2p/charges/:id',
     withOrg(({ params }, org) => {
       const c = db().charges.find((x) => x.id === params.id && x._org === org);
       if (!c) return fail(404, 'not_found', 'Charge not found.');
@@ -748,7 +761,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'GET',
-    '/v1/payouts',
+    '/v1/p2p/payouts',
     withOrg((_c, org) =>
       ok({
         data: db()
@@ -760,18 +773,18 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'GET',
-    '/v1/payouts/:id',
+    '/v1/p2p/payouts/:id',
     withOrg(({ params }, org) => {
       const p = db().payouts.find((x) => x.id === params.id && x._org === org);
       return p ? ok(payoutView(p)) : fail(404, 'not_found', 'Payout batch not found.');
     }),
   ],
-  ['POST', '/v1/payouts', withOrg(({ body }, org) => createPayouts(body, org))],
+  ['POST', '/v1/p2p/payouts', withOrg(({ body }, org) => createPayouts(body, org))],
 
   // The hosted charge page (keyless)
   [
     'GET',
-    '/v1/checkout/charges/:id',
+    '/v1/p2p-checkout/charges/:id',
     ({ params }) => {
       const c = db().charges.find((x) => x.id === params.id);
       if (!c) return fail(404, 'not_found', 'Charge not found.');
@@ -785,7 +798,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
         currency: c.currency,
         fiatAmount: c.fiatAmount,
         description: c.description,
-        payeeName: c.payeeName,
+        merchantName: c.payeeName,
         status: c.status,
         rails: cur?.rails.map((r) => r.id) ?? [],
         expiresAt: c.expiresAt,
@@ -794,7 +807,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'POST',
-    '/v1/checkout/charges/:id/orders',
+    '/v1/p2p-checkout/charges/:id/orders',
     ({ params, body }) => {
       const c = db().charges.find((x) => x.id === params.id);
       if (!c) return fail(404, 'not_found', 'Charge not found.');
@@ -837,10 +850,10 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       return ok({ ...checkoutView(o), payerToken }, 201);
     },
   ],
-  ['GET', '/v1/checkout/orders/:id', (ctx) => payerOrder(ctx, (o) => ok(checkoutView(o)))],
+  ['GET', '/v1/p2p-checkout/orders/:id', (ctx) => payerOrder(ctx, (o) => ok(checkoutView(o)))],
   [
     'POST',
-    '/v1/checkout/orders/:id/paid',
+    '/v1/p2p-checkout/orders/:id/paid',
     (ctx) =>
       payerOrder(ctx, (o) => {
         if (tick(o).status !== 'awaiting_payment')
@@ -854,7 +867,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
   ],
   [
     'POST',
-    '/v1/checkout/orders/:id/cancel',
+    '/v1/p2p-checkout/orders/:id/cancel',
     (ctx) =>
       payerOrder(ctx, (o) => {
         if (!['pending', 'awaiting_payment'].includes(tick(o).status))
@@ -921,7 +934,7 @@ function quote(body: Wire): ApiResponse {
   const usd = Number(tokenUnits) / 1e6;
   if (!(usd >= 5 && usd <= 5000))
     return fail(422, 'no_match', 'No merchant takes this amount right now.');
-  const fee = (tokenUnits * BigInt(MARKET.protocolFeeBps)) / 10000n;
+  const fee = (tokenUnits * BigInt(RULES.protocolFeeBps)) / 10000n;
   const merchant = usd > 1500 ? MERCHANTS[1] : MERCHANTS[0];
   const q = {
     id: rid('qt', 12),
@@ -939,10 +952,16 @@ function quote(body: Wire): ApiResponse {
     integratorFee: '0',
     netAmount: (tokenUnits - fee).toString(),
     merchant,
-    merchantAddress: MERCHANT_SELLER,
-    ...(buy ? {} : { bond: ((tokenUnits * BigInt(MARKET.sellBondBps)) / 10000n).toString() }),
-    integrator: null,
+    bond: buy ? '0' : ((tokenUnits * BigInt(RULES.bondBps)) / 10000n).toString(),
+    protocolFeeBps: RULES.protocolFeeBps,
     integratorFeeBps: 0,
+    windows: buy
+      ? { acceptWindow: 0, paymentWindow: RULES.buyPaymentSeconds, settleWindow: 0 }
+      : {
+          acceptWindow: RULES.sellAcceptSeconds,
+          paymentWindow: RULES.sellPaymentSeconds,
+          settleWindow: RULES.sellSettleSeconds,
+        },
     expiresAt: iso(now() + 60_000),
   };
   db().quotes[q.id] = q;
@@ -1035,7 +1054,7 @@ function buyerAction(id: string, action: 'paid' | 'cancel' | 'dispute', body: Wi
 
 function chargeView(c: Wire) {
   if (c.status === 'open' && c.expiresAt && Date.parse(c.expiresAt) < now()) c.status = 'expired';
-  return { ...pub(c), url: `${location.origin}/c/${c.id}` };
+  return { ...pub(c), url: `${location.origin}/pay/${c.id}` };
 }
 
 function payoutView(p: Wire) {
@@ -1068,8 +1087,8 @@ function createPayouts(body: Wire, org: string): ApiResponse {
   if (!account)
     return fail(422, 'unknown_account', 'Pay from a registered wallet of this organization.');
   const items = Array.isArray(body.items) ? body.items : [];
-  if (!items.length || items.length > MARKET.maxPayoutItems)
-    return fail(422, 'invalid_items', `Send 1 to ${MARKET.maxPayoutItems} payouts.`);
+  if (!items.length || items.length > 100)
+    return fail(422, 'invalid_items', `Send 1 to ${100} payouts.`);
   const t = tokenOf(String(body.network), String(body.token));
   if (!t) return fail(422, 'unknown_token', 'Unknown token on this network.');
   const id = rid('pob', 10);
@@ -1104,7 +1123,7 @@ function createPayouts(body: Wire, org: string): ApiResponse {
       seller: account.address,
     });
     o.onchainId = String(db().nextOnchainId++);
-    o.acceptDeadline = iso(now() + MARKET.windows.acceptSeconds * 1000);
+    o.acceptDeadline = iso(now() + RULES.sellAcceptSeconds * 1000);
     o._t = { opened: now() };
     o.beneficiary = { rail: it.rail, ...it.beneficiary };
     o.payoutBatchId = id;
