@@ -1,0 +1,132 @@
+/* The public home page. */
+const landing = {
+  metaTitle: 'pedospe: compra y vende USDC con transferencia bancaria',
+  metaDescription:
+    'Escribe un monto, transfiere desde tu banco y recibe USDC en tu wallet. Los fondos quedan bloqueados en un contrato hasta que el pago se confirma.',
+  hero: {
+    title: 'USDC por transferencia bancaria, de persona a persona',
+    body: 'Escribe cuánto quieres comprar, transfiere desde tu banco a la cuenta que te mostramos y los USDC llegan a tu wallet. Mientras tanto quedan bloqueados en un contrato inteligente, no en manos de nadie.',
+    buy: 'Comprar USDC',
+    sell: 'Vender USDC',
+    rails:
+      'Transferencia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia, Perú y Chile.',
+  },
+  slip: {
+    caption: 'Así se ve una orden: el monto exacto, la cuenta y el tiempo que te queda.',
+    order: 'Orden de compra',
+    transfer: 'Transfiere exactamente',
+    to: 'A esta cuenta',
+    holder: 'Titular',
+    cbu: 'CBU',
+    receive: 'Recibes',
+    left: 'Tiempo para pagar',
+    locked: 'Bloqueado en el contrato hasta que el comerciante confirma',
+    button: 'Ya transferí',
+  },
+  how: {
+    title: 'Cómo funciona una compra',
+    lede: 'Sin libro de anuncios ni regateo: escribes un monto y el mercado elige al comerciante.',
+    steps: [
+      {
+        title: 'Escribe el monto',
+        body: 'En tu moneda. El mercado elige un comerciante con precio y historial, y te muestra cuánto recibes, con la comisión incluida.',
+      },
+      {
+        title: 'Transfiere el monto exacto',
+        body: 'Desde una cuenta a tu nombre, a la cuenta del comerciante que te mostramos, antes de que termine el tiempo. Después tocas «Ya transferí».',
+      },
+      {
+        title: 'Recibe los USDC',
+        body: 'El comerciante ve tu transferencia y libera la orden. El contrato envía los USDC a tu wallet, en la red que elegiste.',
+      },
+    ],
+    sell: 'Vender es lo mismo al revés: bloqueas tus USDC en la orden, el comerciante te transfiere a tu cuenta y tú liberas los USDC cuando ves el dinero.',
+  },
+  trust: {
+    title: 'Nadie se queda con tus fondos',
+    items: [
+      {
+        title: 'Bloqueados en un contrato',
+        body: 'Cada orden bloquea los USDC en un contrato inteligente público. pedospe no tiene ninguna clave que pueda moverlos a otro lado.',
+      },
+      {
+        title: 'Los plazos devuelven',
+        body: 'Si el pago no llega a tiempo, la orden vence y los USDC vuelven a quien los vendió. Nada queda trabado.',
+      },
+      {
+        title: 'Disputas con límite',
+        body: 'Si algo sale mal, un revisor decide. Solo puede repartir la orden entre su comprador y su vendedor, nunca enviarla a un tercero.',
+      },
+      {
+        title: 'Comerciantes con historial',
+        body: 'Cada precio muestra cuántas órdenes completó el comerciante y qué tan rápido libera.',
+      },
+    ],
+  },
+  merchants: {
+    title: 'Para comerciantes',
+    body: 'Pon tu liquidez a trabajar sin entregarla. Tus USDC quedan en el contrato del mercado a tu nombre y puedes retirarlos cuando quieras.',
+    points: [
+      'Autorizas al mercado a abrir órdenes sobre tu saldo, con un límite por orden que eliges tú.',
+      'Publicas precios por moneda y medio de pago, a mano o con un bot por API.',
+      'Tu bot reenvía los avisos de transferencia de tu banco y recibe la liberación lista para firmar.',
+      'Webhooks firmados para cada cambio de estado de tus órdenes.',
+    ],
+    cta: 'Abrir el panel',
+  },
+  business: {
+    title: 'Para empresas y desarrolladores',
+    body: 'Cobra en moneda local y recibe USDC, paga a cientos de personas desde un archivo, o integra compra y venta en tu propia app.',
+    points: [
+      {
+        title: 'Cobros',
+        body: 'Un enlace y un código QR por cobro. Quien paga transfiere desde su banco; tú recibes USDC.',
+      },
+      {
+        title: 'Pagos a terceros',
+        body: 'Sube un CSV: cada fila se valida antes de enviarse y cada pago se sigue por separado.',
+      },
+      {
+        title: 'API pública',
+        body: 'Claves de prueba y de producción con permisos, y webhooks firmados con HMAC.',
+      },
+    ],
+    codeLabel: 'Crear un cobro con la API',
+    cta: 'Leer la documentación',
+  },
+  faq: {
+    title: 'Preguntas frecuentes',
+    items: [
+      {
+        q: '¿pedospe guarda mis fondos?',
+        a: 'No. Los USDC están en tu wallet o bloqueados en el contrato de cada orden. pedospe no tiene ninguna clave que pueda moverlos a otro destino.',
+      },
+      {
+        q: '¿Necesito crear una cuenta?',
+        a: 'No. Conectas tu wallet y firmas un mensaje que demuestra que es tuya. Esa firma no mueve fondos ni tiene costo.',
+      },
+      {
+        q: '¿Qué pasa si transfiero y el comerciante no libera?',
+        a: 'Reportas un problema desde la orden. Los USDC siguen bloqueados y un revisor decide con los comprobantes, entre tú y el comerciante.',
+      },
+      {
+        q: '¿Qué pasa si no llego a transferir a tiempo?',
+        a: 'La orden vence y no se cobra nada. Si ya transferiste, no canceles: reporta un problema.',
+      },
+      {
+        q: '¿Cuánto cuesta?',
+        a: 'El precio de cada comerciante y la comisión del mercado se muestran antes de abrir la orden. Recibes exactamente lo que dice la cotización.',
+      },
+      {
+        q: '¿Por qué tiene que ser una cuenta a mi nombre?',
+        a: 'El comerciante comprueba que la transferencia venga de la persona que abrió la orden. Así se evitan pagos con cuentas de terceros.',
+      },
+    ],
+  },
+  closing: {
+    title: 'Empieza con el monto que quieras',
+    body: 'Conecta tu wallet, escribe un monto y mira el precio antes de decidir.',
+  },
+};
+
+export default landing;
