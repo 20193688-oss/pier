@@ -143,6 +143,28 @@ describe('EMV merchant QR', () => {
     });
   });
 
+  it('fails closed on prototype-key currencies and unparsable account templates', () => {
+    const base = tlv('00', '01') + tlv('01', '12');
+    const tail = tlv('58', 'AR') + tlv('59', 'Cafe') + tlv('60', 'Salta');
+    for (const code of ['constructor', 'toString', '__proto__', '32']) {
+      expect(parseEmv(withCrc(base + tlv('53', code) + tlv('54', '10.00') + tail))).toEqual({
+        ok: false,
+        error: 'malformed',
+      });
+    }
+    // A merchant-account template (26-51) or additional data (62) that is not TLV.
+    expect(
+      parseEmv(withCrc(base + tlv('26', 'br.gov.bcb.pix') + tlv('53', '986') + tlv('58', 'BR'))),
+    ).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+    expect(parseEmv(withCrc(base + tlv('53', '032') + tail + tlv('62', 'MESA-4')))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+  });
+
   it('refuses a changed payload, a broken TLV and non-EMV text', () => {
     expect(parseEmv(AR_QR.replace('1500.50', '9500.50'))).toEqual({ ok: false, error: 'bad-crc' });
     expect(parseEmv(`${AR_QR.slice(0, 20)}99`)).toEqual({ ok: false, error: 'malformed' });

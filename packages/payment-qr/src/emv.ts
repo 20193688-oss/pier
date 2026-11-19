@@ -49,23 +49,27 @@ export type EmvResult = { ok: true; qr: MerchantQr } | { ok: false; error: EmvEr
 /** Longest payload accepted (EMV allows 512 characters). */
 export const EMV_MAX_LENGTH = 512;
 
-const CURRENCIES: Record<string, string> = {
-  '032': 'ARS',
-  '068': 'BOB',
-  '152': 'CLP',
-  '170': 'COP',
-  '484': 'MXN',
-  '600': 'PYG',
-  '604': 'PEN',
-  '840': 'USD',
-  '858': 'UYU',
-  '986': 'BRL',
-};
+/* ISO 4217 numeric → alpha. A Map, so a field value such as "constructor" is never a key. */
+const CURRENCIES: ReadonlyMap<string, string> = new Map([
+  ['032', 'ARS'],
+  ['068', 'BOB'],
+  ['152', 'CLP'],
+  ['170', 'COP'],
+  ['484', 'MXN'],
+  ['600', 'PYG'],
+  ['604', 'PEN'],
+  ['840', 'USD'],
+  ['858', 'UYU'],
+  ['986', 'BRL'],
+]);
 
 const PIX_GUI = 'br.gov.bcb.pix';
 const AMOUNT_RE = /^\d{1,10}(\.\d{1,2})?$/;
+const CURRENCY_RE = /^\d{3}$/;
 
 const isTemplate = (id: number) => (id >= 26 && id <= 51) || id === 62 || id === 64 || id >= 80;
+/* Templates whose content decides who is paid or what the payment says: they must parse. */
+const mustParse = (id: number) => (id >= 26 && id <= 51) || id === 62;
 
 /** CRC16/CCITT-FALSE (polynomial 0x1021, initial 0xFFFF) of `text`'s UTF-8 bytes, as the four
     upper-case hex digits field 63 carries. */
@@ -122,9 +126,15 @@ export function parseEmv(input: string): EmvResult {
   if (hasDuplicateIds(fields)) return { ok: false, error: 'malformed' };
 
   for (const f of fields) {
-    if (!isTemplate(Number(f.id))) continue;
+    const id = Number(f.id);
+    if (!isTemplate(id)) continue;
     const children = parseTlv(f.value);
-    if (!children) continue;
+    // A merchant-account or additional-data template that is not TLV fails closed: a banking
+    // app could read something this parser skipped.
+    if (!children) {
+      if (mustParse(id)) return { ok: false, error: 'malformed' };
+      continue;
+    }
     if (hasDuplicateIds(children)) return { ok: false, error: 'malformed' };
     f.children = children;
   }
@@ -147,18 +157,19 @@ export function parseEmv(input: string): EmvResult {
   }
   if (pixAccounts > 1) return { ok: false, error: 'malformed' };
 
-  const amount = field(fields, '54')?.value ?? null;
-  if (amount !== null && !AMOUNT_RE.test(amount)) return { ok: false, error: 'malformed' };
-  if (amount !== null && !CURRENCIES[field(fields, '53')?.value ?? '']) {
+  const currencyNumeric = field(fields, '53')?.value ?? null;
+  if (currencyNumeric !== null && !CURRENCY_RE.test(currencyNumeric)) {
     return { ok: false, error: 'malformed' };
   }
+  const currency = currencyNumeric !== null ? (CURRENCIES.get(currencyNumeric) ?? null) : null;
+  const amount = field(fields, '54')?.value ?? null;
+  if (amount !== null && !AMOUNT_RE.test(amount)) return { ok: false, error: 'malformed' };
+  if (amount !== null && currency === null) return { ok: false, error: 'malformed' };
   const initiation = field(fields, '01')?.value ?? null;
   if (initiation !== null && initiation !== '11' && initiation !== '12') {
     return { ok: false, error: 'malformed' };
   }
-  const currencyNumeric = field(fields, '53')?.value ?? null;
   const countryCode = field(fields, '58')?.value?.toUpperCase() ?? null;
-  const currency = currencyNumeric ? (CURRENCIES[currencyNumeric] ?? null) : null;
   const additional = field(fields, '62')?.children ?? [];
 
   const standard: MerchantQrStandard =
