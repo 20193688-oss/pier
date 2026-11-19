@@ -29,7 +29,7 @@ import {
   type Decimals,
 } from '@/lib/p2p/normalize';
 import { parseCheckoutCharge, parseCheckoutOrder, parseCreatedOrder } from '@/lib/p2p/checkout';
-import type { P2pChallenge, P2pTransaction } from '@/lib/p2p/types';
+import type { P2pChallenge, P2pMarket, P2pTransaction } from '@/lib/p2p/types';
 import { ApiError } from '@/lib/api/client';
 
 export interface Scope {
@@ -164,13 +164,29 @@ export const webhooks = {
 
 /* --- The market --- */
 
-export const market = {
-  get: async (scope?: Scope) =>
-    must(
-      normalizeMarket(
-        itemOf(await request({ method: 'GET', path: ROUTES.market, headers: scoped(scope) })),
-      ),
+/* The market's published rules (contracts, tokens, bond rate, windows) are read once per tab and
+   tier and reused: a sale's terms are checked against this copy, never against a quote. */
+const marketCache = new Map<string, P2pMarket>();
+
+async function fetchMarket(scope?: Scope): Promise<P2pMarket> {
+  return must(
+    normalizeMarket(
+      itemOf(await request({ method: 'GET', path: ROUTES.market, headers: scoped(scope) })),
     ),
+  );
+}
+
+export const market = {
+  get: async (scope?: Scope): Promise<P2pMarket> => {
+    const key = `${scope?.org ?? ''}:${scope?.tier ?? ''}`;
+    const hit = marketCache.get(key);
+    if (hit) return hit;
+    const m = await fetchMarket(scope);
+    marketCache.set(key, m);
+    return m;
+  },
+  /** Forget the cached copy (tests; a market that changed its rules). */
+  clear: () => marketCache.clear(),
 };
 
 const tx = (raw: unknown): P2pTransaction => {

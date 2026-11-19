@@ -23,10 +23,13 @@ const trade = {
   details: 'Detalle del precio',
   fee: 'Comisión del mercado',
   integratorFee: 'Comisión del socio',
+  integratorFeeNote: 'Incluye una comisión del socio de {rate}.',
   netReceive: 'Recibes',
   merchant: 'Comerciante',
   validFor: 'Precio válido por {time}',
   refreshing: 'Actualizando el precio…',
+  quoteUntrusted:
+    'Este precio trae condiciones que no podemos comprobar, así que no lo usamos. Prueba con otro monto.',
   quoteFailed:
     'Ningún comerciante puede tomar este monto ahora. Prueba con otro monto o medio de pago.',
   cta: {
@@ -134,6 +137,10 @@ const trade = {
     actionFailed: 'No pudimos hacerlo ahora. Prueba de nuevo.',
     explorer: 'Ver la transacción',
     notFound: 'Esta orden no es de la wallet conectada.',
+    unverifiable:
+      'No podemos comprobar en este navegador a quién paga esta orden, así que no te pedimos firmarla. No se bloqueó nada: abre una orden nueva.',
+    unverifiableFee:
+      'Las comisiones de esta orden no coinciden con las que viste en el precio, así que no te pedimos firmarla. No se bloqueó nada: abre una orden nueva.',
     signIn: 'Conecta la wallet que abrió esta orden para seguirla.',
     timeBar: 'Tiempo restante para pagar',
   },

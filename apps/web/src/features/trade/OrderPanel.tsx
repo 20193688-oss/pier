@@ -27,7 +27,7 @@ import { amountOnly, money, plainAmount, units } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Field, Notice, Spinner } from '@/components/ui/controls';
 import { Icon } from '@/components/ui/Icon';
-import { CopyRow, StatusPill, useNow } from '@/components/ui/misc';
+import { CopyRow, figureSize, StatusPill, useNow } from '@/components/ui/misc';
 import { accountRows, railName, TokenMark } from '@/components/p2p/parts';
 import { SignFlow, type TxStep } from '@/components/wallet/SignFlow';
 import { useSession } from '@/lib/session';
@@ -167,14 +167,22 @@ export function OrderPanel({
     expect: { action, orderId: order.onchainId ?? null },
   });
 
+  /* A sale's terms, pinned to what the person accepted (or, in a tab that no longer has it, the
+     order's own amount and buyer with no fee) and the market's published rules: never skipped. */
+  const sale = saleTerms({
+    ref: order.ref ?? '',
+    seller: me,
+    token: order.token,
+    accepted: savedQuoteTerms(order.id),
+    order: { amountUnits: tokenUnits, buyer: order.buyer },
+    market,
+  });
+  const unverifiable = !buy && order.status === 'pending' && (!order.ref || sale.problem !== null);
   const saleSteps: TxStep[] = (() => {
-    // The amount and terms the person accepted in the quote, not a later answer's.
-    const terms = savedQuoteTerms(order.id);
-    const saleUnits = terms.amountUnits ?? tokenUnits;
     const list = order.transactions ?? [];
     const approve = list.find((x) => x.action === 'approve' || x.description === 'approve');
     const open = list.find((x) => x !== approve);
-    if (!approve || !open || !network) return [];
+    if (!approve || !open || !network || !sale.terms || !order.ref) return [];
     return [
       {
         label: fmt(o.stepApprove, {
@@ -186,23 +194,13 @@ export function OrderPanel({
           action: 'approve',
           token: order.token,
           spender: network.contract,
-          amountUnits: saleUnits,
+          amountUnits: sale.terms.amountUnits,
         },
       },
       {
         label: o.stepOpen,
         build: async () => open,
-        expect: {
-          action: 'openWithDeposit',
-          ...saleTerms({
-            ref: order.ref ?? '',
-            seller: me,
-            token: order.token,
-            amountUnits: saleUnits,
-            quote: terms,
-            market,
-          }),
-        },
+        expect: { action: 'openWithDeposit', ...sale.terms },
       },
     ];
   })();
@@ -263,7 +261,9 @@ export function OrderPanel({
         <>
           <div className="px-5 pt-5 pb-5 sm:px-6">
             <p className="text-ink-2">{o.transferTitle}</p>
-            <p className="figure mt-2 text-[clamp(1.9rem,9vw,2.6rem)]">
+            <p
+              className={`figure mt-2 ${figureSize(money(lang, order.fiatAmount, order.currency))}`}
+            >
               <span className="marker marker-sweep">
                 {money(lang, order.fiatAmount, order.currency)}
               </span>
@@ -359,7 +359,17 @@ export function OrderPanel({
       )}
 
       <div className="flex flex-col gap-4 px-5 pt-5 pb-6 sm:px-6">
-        {order.status === 'pending' && (buy || signed || !saleSteps.length) && (
+        {unverifiable && (
+          <>
+            <Notice tone="error">
+              {sale.problem === 'fee' ? o.unverifiableFee : o.unverifiable}
+            </Notice>
+            <button type="button" className="btn btn-ink self-start" onClick={onNew}>
+              {o.newOrder}
+            </button>
+          </>
+        )}
+        {order.status === 'pending' && !unverifiable && (buy || signed || !saleSteps.length) && (
           <p className="flex items-center gap-3 text-ink-2" role="status">
             <Spinner />
             {signed ? o.sent : o.pending}

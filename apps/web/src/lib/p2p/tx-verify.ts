@@ -14,25 +14,28 @@ import { decodeFunctionData, erc20Abi, isAddressEqual, zeroAddress, type Hex } f
 import { P2P_MARKET_ARTIFACT } from '@pedospe/contracts';
 import { checkTransaction, type TxProblem } from '@/lib/p2p/tx-check';
 import type { P2pNetwork, P2pTransaction } from '@/lib/p2p/types';
+import { integratorBpsFor, type AcceptedQuote } from '@/lib/p2p/fees';
+
+export { integratorBpsFor, MAX_INTEGRATOR_FEE_BPS, type AcceptedQuote } from '@/lib/p2p/fees';
 
 export const MARKET_ABI = P2P_MARKET_ARTIFACT.abi;
 
-/** Every term a sale's `openWithDeposit` must carry, from the quote the person accepted and the
-    market's published rules. */
+/** Every term a sale's `openWithDeposit` must carry: what the person saw (the amount, the fee
+    shown to them) and what the market publishes (the bond rate, the windows). Every field is
+    required; there is no "not compared". */
 export interface SaleTerms {
   /* The order's own reference (bytes32) and the seller: the connected wallet. */
   ref: string;
   seller: string;
   token: string;
   amountUnits: string;
-  /* The merchant that buys: its address as the quote named it, or null when the quote did not
-     name one (then the page makes no claim about it, and nothing else may differ). */
-  buyer: string | null;
+  /* The merchant that buys. */
+  buyer: string;
   bondUnits: string;
   acceptWindow: number;
   paymentWindow: number;
   settleWindow: number;
-  /* The zero address and 0 when the quote carries no integrator fee. */
+  /* The zero address and 0 when the fee shown to the person was zero. */
   integrator: string;
   integratorFeeBps: number;
 }
@@ -108,7 +111,7 @@ export function verifyTransaction(
         same(p.seller, expect.seller) &&
         same(p.token, tokenAddress(expect.token)) &&
         eqUnits(p.amount, expect.amountUnits) &&
-        (expect.buyer === null || same(p.buyer, expect.buyer)) &&
+        same(p.buyer, expect.buyer) &&
         eqUnits(p.bond, expect.bondUnits) &&
         eqInt(p.acceptWindow, expect.acceptWindow) &&
         eqInt(p.paymentWindow, expect.paymentWindow) &&
@@ -145,40 +148,48 @@ export function verifyTransaction(
   }
 }
 
-/** A sale's terms from the quote the person accepted and the market's rules: no integrator fee
-    unless the quote carried one (then its address and rate, as the quote named them), the bond the
-    quote stated or the market's sale bond rate of the amount, the market's windows. */
+export type SaleTermsProblem = 'buyer' | 'fee';
+
+/** A sale's terms, from trusted sources only: the accepted quote as the person saw it (or, when
+    this tab no longer has it, the order's own amount, its buyer and no fee), the market's
+    published sale bond rate and windows. A sale whose buyer no source names, or whose shown fee
+    no rate reproduces, is refused: `problem` says why, and nothing is signed. */
 export function saleTerms(input: {
   ref: string;
   seller: string;
   token: string;
-  amountUnits: string;
-  quote: {
-    buyer: string | null;
-    bondUnits: string | null;
-    integrator: string | null;
-    integratorFeeBps: number;
-  };
+  accepted: AcceptedQuote | null;
+  order: { amountUnits: string; buyer: string | null };
   market: {
     sellBondBps: number;
     windows: { acceptSeconds: number; paymentSeconds: number; settleSeconds: number };
   };
-}): SaleTerms {
-  const { quote, market } = input;
-  const bond =
-    quote.bondUnits ??
-    ((BigInt(input.amountUnits) * BigInt(market.sellBondBps)) / 10_000n).toString();
+}): { terms: SaleTerms; problem: null } | { terms: null; problem: SaleTermsProblem } {
+  const { accepted, order, market } = input;
+  const amountUnits = accepted?.amountUnits ?? order.amountUnits;
+  const buyer = accepted?.buyer ?? order.buyer;
+  if (!buyer || !ADDRESS.test(buyer) || /^0x0{40}$/.test(buyer))
+    return { terms: null, problem: 'buyer' };
+  const feeUnits = accepted?.integratorFeeUnits ?? '0';
+  const bps = integratorBpsFor(amountUnits, feeUnits);
+  if (bps === null) return { terms: null, problem: 'fee' };
+  const integrator = bps > 0 ? accepted?.integrator : zeroAddress;
+  if (!integrator || !ADDRESS.test(integrator) || (bps > 0 && /^0x0{40}$/.test(integrator)))
+    return { terms: null, problem: 'fee' };
   return {
-    ref: input.ref,
-    seller: input.seller,
-    token: input.token,
-    amountUnits: input.amountUnits,
-    buyer: quote.buyer,
-    bondUnits: bond,
-    acceptWindow: market.windows.acceptSeconds,
-    paymentWindow: market.windows.paymentSeconds,
-    settleWindow: market.windows.settleSeconds,
-    integrator: quote.integratorFeeBps > 0 && quote.integrator ? quote.integrator : zeroAddress,
-    integratorFeeBps: quote.integratorFeeBps > 0 && quote.integrator ? quote.integratorFeeBps : 0,
+    problem: null,
+    terms: {
+      ref: input.ref,
+      seller: input.seller,
+      token: input.token,
+      amountUnits,
+      buyer,
+      bondUnits: ((BigInt(amountUnits) * BigInt(market.sellBondBps)) / 10_000n).toString(),
+      acceptWindow: market.windows.acceptSeconds,
+      paymentWindow: market.windows.paymentSeconds,
+      settleWindow: market.windows.settleSeconds,
+      integrator,
+      integratorFeeBps: bps,
+    },
   };
 }

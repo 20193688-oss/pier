@@ -7,8 +7,7 @@ import { fmt, useDocumentMeta, useI18n } from '@/i18n';
 import { market as marketApi, trade as tradeApi } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
 import { isUnauthorized } from '@/lib/api/messages';
-import { decimalsFrom, decimalsOf } from '@/lib/p2p/normalize';
-import { toBaseUnits } from '@/lib/p2p/amounts';
+import { decimalsFrom } from '@/lib/p2p/normalize';
 import { saveQuoteTerms, saveSteps } from '@/lib/p2p/steps';
 import { dateTime, money, units } from '@/lib/format';
 import { useSession } from '@/lib/session';
@@ -113,16 +112,9 @@ export default function TradePage() {
             market={market}
             initialSide={initialSide}
             onConnect={() => setConnecting(true)}
-            onOpened={(o, q) => {
+            onOpened={(o, accepted) => {
               saveSteps(o.id, o.transactions);
-              if (o.kind === 'SELL')
-                saveQuoteTerms(o.id, {
-                  amountUnits: toBaseUnits(q.tokenAmount, decimalsOf(market, q.network, q.token)),
-                  buyer: q.merchantAddress,
-                  bondUnits: q.bondUnits,
-                  integrator: q.integrator,
-                  integratorFeeBps: q.integratorFeeBps,
-                });
+              if (o.kind === 'SELL') saveQuoteTerms(o.id, accepted);
               openOrder(o.id);
             }}
           />

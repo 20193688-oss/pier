@@ -15,7 +15,8 @@ import {
   normalizeDetails,
   type FieldError,
 } from '@/lib/p2p/rails';
-import { parseDecimal, toBaseUnits } from '@/lib/p2p/amounts';
+import { bpsLabel, parseDecimal, toBaseUnits } from '@/lib/p2p/amounts';
+import { integratorBpsFor, trustQuote, type AcceptedQuote } from '@/lib/p2p/fees';
 import { decimalsOf } from '@/lib/p2p/normalize';
 import { countdown, msLeft } from '@/lib/p2p/orders';
 import { currencyName, money, percent, rate, shortAddress, units } from '@/lib/format';
@@ -37,9 +38,11 @@ import { useSession } from '@/lib/session';
 import type { P2pMarket, P2pOrder, P2pQuote, P2pSide } from '@/lib/p2p/types';
 
 type QuoteState = {
-  status: 'idle' | 'loading' | 'ready' | 'error';
+  status: 'idle' | 'loading' | 'ready' | 'error' | 'untrusted';
   key: string;
   data: P2pQuote | null;
+  /* What the person sees and would accept: the amount, the fee shown, the named addresses. */
+  accepted: AcceptedQuote | null;
 };
 
 export function TradeForm({
@@ -51,7 +54,7 @@ export function TradeForm({
   market: P2pMarket;
   initialSide: P2pSide;
   onConnect: () => void;
-  onOpened: (o: P2pOrder, quote: P2pQuote) => void;
+  onOpened: (o: P2pOrder, accepted: AcceptedQuote) => void;
 }) {
   const { t, lang } = useI18n();
   const a = t.trade;
@@ -70,7 +73,12 @@ export function TradeForm({
   const [amount, setAmount] = useState('');
   const [picker, setPicker] = useState<null | 'currency' | 'token'>(null);
   const [inverse, setInverse] = useState(false);
-  const [quote, setQuote] = useState<QuoteState>({ status: 'idle', key: '', data: null });
+  const [quote, setQuote] = useState<QuoteState>({
+    status: 'idle',
+    key: '',
+    data: null,
+    accepted: null,
+  });
   const [step, setStep] = useState<'form' | 'details'>('form');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -111,16 +119,27 @@ export function TradeForm({
   const ask = useCallback(
     (k: string) => {
       latest.current = k;
-      setQuote((q) => ({ status: 'loading', key: k, data: q.key === k ? q.data : null }));
+      setQuote((q) => ({
+        status: 'loading',
+        key: k,
+        data: q.key === k ? q.data : null,
+        accepted: q.key === k ? q.accepted : null,
+      }));
       tradeApi
         .quote(JSON.parse(k), tokenDecimals)
         .then((data) => {
-          if (latest.current === k) setQuote({ status: 'ready', key: k, data });
+          if (latest.current !== k) return;
+          const accepted = trustQuote(data, JSON.parse(k), tokenDecimals);
+          setQuote(
+            accepted
+              ? { status: 'ready', key: k, data, accepted }
+              : { status: 'untrusted', key: k, data: null, accepted: null },
+          );
         })
         .catch((e) => {
           if (latest.current !== k) return;
           if (isUnauthorized(e)) expire();
-          setQuote({ status: 'error', key: k, data: null });
+          setQuote({ status: 'error', key: k, data: null, accepted: null });
         });
     },
     [tokenDecimals, expire],
@@ -128,7 +147,7 @@ export function TradeForm({
   useEffect(() => {
     if (!quoteKey) {
       latest.current = '';
-      setQuote({ status: 'idle', key: '', data: null });
+      setQuote({ status: 'idle', key: '', data: null, accepted: null });
       return;
     }
     const h = setTimeout(() => ask(quoteKey), 450);
@@ -166,12 +185,15 @@ export function TradeForm({
     if (!rail) return { label: a.cta.method, ok: false };
     if (quote.status === 'error' && quote.key === quoteKey)
       return { label: a.cta.noQuote, ok: false };
-    if (!fresh || expired) return { label: a.cta.quoting, ok: false, busy: true };
+    if (quote.status === 'untrusted' && quote.key === quoteKey)
+      return { label: a.cta.noQuote, ok: false };
+    if (!fresh || !quote.accepted || expired)
+      return { label: a.cta.quoting, ok: false, busy: true };
     return { label: a.cta.continue, ok: true };
   })();
 
   const openOrder = async () => {
-    if (!fresh || busy) return;
+    if (!fresh || !quote.accepted || busy) return;
     setBusy(true);
     setError('');
     try {
@@ -196,7 +218,7 @@ export function TradeForm({
       const order = await tradeApi.createOrder(body, tokenDecimals);
       setAmount('');
       setStep('form');
-      onOpened(order, fresh);
+      onOpened(order, quote.accepted!);
     } catch (e) {
       if (isUnauthorized(e)) {
         expire();
@@ -499,10 +521,23 @@ export function TradeForm({
               <span className="text-ink-3">{a.fee}</span>
               <span className="num">{units(lang, fresh.protocolFee, symbol)}</span>
             </div>
-            {Number(fresh.integratorFee) > 0 && (
-              <div className="flex justify-between gap-3">
-                <span className="text-ink-3">{a.integratorFee}</span>
-                <span className="num">{units(lang, fresh.integratorFee, symbol)}</span>
+            {Number(fresh.integratorFee) > 0 && quote.accepted && (
+              <div className="flex flex-col gap-0.5">
+                <div className="flex justify-between gap-3">
+                  <span className="text-ink-3">{a.integratorFee}</span>
+                  <span className="num">{units(lang, fresh.integratorFee, symbol)}</span>
+                </div>
+                <span className="text-[0.8125rem] text-ink-3">
+                  {fmt(a.integratorFeeNote, {
+                    rate: bpsLabel(
+                      integratorBpsFor(
+                        quote.accepted.amountUnits,
+                        quote.accepted.integratorFeeUnits,
+                      ) ?? 0,
+                      lang,
+                    ),
+                  })}
+                </span>
               </div>
             )}
           </div>
@@ -540,6 +575,9 @@ export function TradeForm({
         </button>
         {quote.status === 'error' && quote.key === quoteKey && (
           <Notice tone="warn">{a.quoteFailed}</Notice>
+        )}
+        {quote.status === 'untrusted' && quote.key === quoteKey && (
+          <Notice tone="error">{a.quoteUntrusted}</Notice>
         )}
       </div>
 

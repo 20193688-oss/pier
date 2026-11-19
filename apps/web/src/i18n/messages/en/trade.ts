@@ -24,10 +24,13 @@ const trade: typeof es = {
   details: 'Price details',
   fee: 'Market fee',
   integratorFee: 'Partner fee',
+  integratorFeeNote: 'Includes a {rate} partner fee.',
   netReceive: 'You receive',
   merchant: 'Merchant',
   validFor: 'Price valid for {time}',
   refreshing: 'Updating the price…',
+  quoteUntrusted:
+    'This price comes with terms we cannot check, so we do not use it. Try another amount.',
   quoteFailed: 'No merchant can take this amount right now. Try another amount or payment method.',
   cta: {
     loading: 'Loading the market…',
@@ -134,6 +137,10 @@ const trade: typeof es = {
     actionFailed: 'We could not do that now. Try again.',
     explorer: 'View the transaction',
     notFound: 'This order does not belong to the connected wallet.',
+    unverifiable:
+      'This browser cannot check who this order pays, so we do not ask you to sign it. Nothing was locked: open a new order.',
+    unverifiableFee:
+      'The fees of this order do not match the ones you saw in the price, so we do not ask you to sign it. Nothing was locked: open a new order.',
     signIn: 'Connect the wallet that opened this order to follow it.',
     timeBar: 'Time left to pay',
   },

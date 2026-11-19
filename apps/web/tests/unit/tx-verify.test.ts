@@ -13,6 +13,12 @@ import {
   type Hex,
 } from 'viem';
 import { MARKET_ABI, saleTerms, verifyTransaction, type SaleTerms } from '@/lib/p2p/tx-verify';
+import {
+  integratorBpsFor,
+  MAX_INTEGRATOR_FEE_BPS,
+  trustQuote,
+  type AcceptedQuote,
+} from '@/lib/p2p/fees';
 import { normalizeQuote } from '@/lib/p2p/normalize';
 import type { P2pTransaction } from '@/lib/p2p/types';
 
@@ -44,19 +50,32 @@ const tx = (to: string, data: Hex, chainId = 8453): P2pTransaction => ({
 });
 const call = (fn: string, args: readonly unknown[]) =>
   encodeFunctionData({ abi: MARKET_ABI, functionName: fn as never, args: args as never });
-const terms = (quote: Partial<Parameters<typeof saleTerms>[0]['quote']> = {}): SaleTerms =>
+const ACCEPTED: AcceptedQuote = {
+  amountUnits: '100000000',
+  integratorFeeUnits: '0',
+  buyer: BUYER,
+  integrator: null,
+};
+const terms = (
+  accepted: Partial<AcceptedQuote> | null = {},
+  order: Partial<{ amountUnits: string; buyer: string | null }> = {},
+) =>
   saleTerms({
     ref: REF,
     seller: SELLER,
     token: 'USDC',
-    amountUnits: '100000000',
-    quote: { buyer: BUYER, bondUnits: null, integrator: null, integratorFeeBps: 0, ...quote },
+    accepted: accepted === null ? null : { ...ACCEPTED, ...accepted },
+    order: { amountUnits: '100000000', buyer: BUYER, ...order },
     market: MARKET,
   });
+const pinned = (r: ReturnType<typeof saleTerms>): SaleTerms => {
+  assert.equal(r.problem, null);
+  return r.terms!;
+};
 
 /* The terms the person accepted: a 100 USDC sale to BUYER, the market's bond and windows, no
    integrator fee. */
-const expectOpen = { action: 'openWithDeposit' as const, ...terms() };
+const expectOpen = { action: 'openWithDeposit' as const, ...pinned(terms()) };
 
 const params = (over: Record<string, unknown> = {}) => ({
   ref: REF,
@@ -78,7 +97,7 @@ const open = (over: Record<string, unknown> = {}) =>
 describe('a sale: openWithDeposit must carry every accepted term', () => {
   test('the accepted terms pass', () => {
     assert.equal(verifyTransaction(open(), NETWORK, expectOpen), null);
-    const t = terms();
+    const t = pinned(terms());
     assert.deepEqual(
       [
         t.bondUnits,
@@ -123,56 +142,188 @@ describe('a sale: openWithDeposit must carry every accepted term', () => {
       'function',
     );
   });
+});
 
-  test('a quote that names no merchant address pins every other term and claims nothing about it', () => {
-    const e = { action: 'openWithDeposit' as const, ...terms({ buyer: null }) };
-    assert.equal(e.buyer, null);
-    assert.equal(verifyTransaction(open({ buyer: OTHER }), NETWORK, e), null);
+describe('a sale: terms come only from what the person saw and what the market publishes', () => {
+  test("the bond is the market's sale bond rate of the amount, whatever a quote says", () => {
+    const t = pinned(terms({ amountUnits: '250000000' }));
+    assert.equal(t.bondUnits, '25000000');
+    assert.equal(t.amountUnits, '250000000', 'the amount the person typed');
+  });
+
+  test("the windows are the market's", () => {
+    const t = pinned(
+      saleTerms({
+        ref: REF,
+        seller: SELLER,
+        token: 'USDC',
+        accepted: ACCEPTED,
+        order: { amountUnits: '1', buyer: BUYER },
+        market: {
+          sellBondBps: 500,
+          windows: { acceptSeconds: 60, paymentSeconds: 600, settleSeconds: 0 },
+        },
+      }),
+    );
+    assert.deepEqual(
+      [t.acceptWindow, t.paymentWindow, t.settleWindow, t.bondUnits],
+      [60, 600, 0, '5000000'],
+    );
+  });
+
+  test("no saved acceptance: the order's own buyer and amount, no fee", () => {
+    const t = pinned(terms(null));
+    assert.deepEqual(
+      [t.buyer, t.amountUnits, t.integrator, t.integratorFeeBps],
+      [BUYER, '100000000', zeroAddress, 0],
+    );
+    const e = { action: 'openWithDeposit' as const, ...t };
     assert.equal(
-      verifyTransaction(open({ buyer: OTHER, integrator: OTHER, integratorFeeBps: 1 }), NETWORK, e),
+      verifyTransaction(open({ buyer: OTHER }), NETWORK, e),
+      'args',
+      'a mismatched buyer is refused',
+    );
+    assert.equal(
+      verifyTransaction(open({ integrator: OTHER, integratorFeeBps: 5 }), NETWORK, e),
+      'args',
+      'no fee was shown',
+    );
+  });
+
+  test('no trusted source names the buyer: refused before any signature', () => {
+    assert.deepEqual(terms(null, { buyer: null }), { terms: null, problem: 'buyer' });
+    assert.deepEqual(terms({ buyer: null }, { buyer: null }), { terms: null, problem: 'buyer' });
+    assert.deepEqual(terms(null, { buyer: zeroAddress }), { terms: null, problem: 'buyer' });
+    assert.deepEqual(terms(null, { buyer: 'nope' }), { terms: null, problem: 'buyer' });
+  });
+
+  test('the buyer the quote named wins over a later answer', () => {
+    const t = pinned(terms({ buyer: BUYER }, { buyer: OTHER }));
+    assert.equal(t.buyer, BUYER);
+    assert.equal(
+      verifyTransaction(open({ buyer: OTHER }), NETWORK, { action: 'openWithDeposit', ...t }),
       'args',
     );
   });
 
-  test("a quote with an integrator fee: that address and that rate only; the quote's bond when it states one", () => {
-    const e = {
-      action: 'openWithDeposit' as const,
-      ...terms({ bondUnits: '12000000', integrator: OTHER, integratorFeeBps: 50 }),
-    };
+  test('an integrator fee: the rate that reproduces the fee shown, to the named recipient', () => {
+    // 0.5% of 100 USDC, shown as 0.5 USDC.
+    const t = pinned(terms({ integratorFeeUnits: '500000', integrator: OTHER }));
+    assert.deepEqual([t.integrator, t.integratorFeeBps], [OTHER, 50]);
+    const e = { action: 'openWithDeposit' as const, ...t };
     assert.equal(
-      verifyTransaction(
-        open({ integrator: OTHER, integratorFeeBps: 50, bond: 12_000_000n }),
-        NETWORK,
-        e,
-      ),
+      verifyTransaction(open({ integrator: OTHER, integratorFeeBps: 50 }), NETWORK, e),
       null,
     );
     assert.equal(
-      verifyTransaction(
-        open({ integrator: OTHER, integratorFeeBps: 51, bond: 12_000_000n }),
-        NETWORK,
-        e,
-      ),
+      verifyTransaction(open({ integrator: OTHER, integratorFeeBps: 51 }), NETWORK, e),
       'args',
     );
     assert.equal(
-      verifyTransaction(
-        open({ integrator: BOT, integratorFeeBps: 50, bond: 12_000_000n }),
-        NETWORK,
-        e,
-      ),
+      verifyTransaction(open({ integrator: BOT, integratorFeeBps: 50 }), NETWORK, e),
       'args',
     );
-    assert.equal(
-      verifyTransaction(open({ integrator: OTHER, integratorFeeBps: 50 }), NETWORK, e),
-      'args',
-      'the market rate is not the quoted bond',
-    );
-    const noAddress = terms({ integratorFeeBps: 50 });
     assert.deepEqual(
-      [noAddress.integrator, noAddress.integratorFeeBps],
-      [zeroAddress, 0],
-      'a fee with no named recipient is never accepted',
+      terms({ integratorFeeUnits: '500000', integrator: null }),
+      { terms: null, problem: 'fee' },
+      'a fee with no named recipient',
+    );
+    assert.deepEqual(
+      terms({ integratorFeeUnits: '6000000', integrator: OTHER }),
+      { terms: null, problem: 'fee' },
+      'above the contract cap',
+    );
+    assert.deepEqual(
+      terms({ integratorFeeUnits: '7', integrator: OTHER }),
+      { terms: null, problem: 'fee' },
+      'no rate reproduces it',
+    );
+  });
+
+  test('the rate that reproduces a fee, as the contract rounds it', () => {
+    assert.equal(integratorBpsFor('100000000', '0'), 0);
+    assert.equal(integratorBpsFor('100000000', '500000'), 50);
+    assert.equal(integratorBpsFor('100000000', '5000000'), 500);
+    assert.equal(integratorBpsFor('100000000', '5010000'), null, 'over the 500 bps cap');
+    assert.equal(integratorBpsFor('333333333', '1666666'), 50, 'rounded down like the contract');
+    assert.equal(integratorBpsFor('100000000', '123'), null);
+    assert.equal(integratorBpsFor('0', '1'), null);
+    assert.equal(integratorBpsFor('x', '0'), null);
+    assert.equal(MAX_INTEGRATOR_FEE_BPS, 500);
+  });
+});
+
+describe('a quote is trusted only for what was asked and what it shows', () => {
+  const asked = {
+    side: 'SELL',
+    network: 'base',
+    token: 'USDC',
+    currency: 'ARS',
+    rail: 'ar_bank_transfer',
+    tokenAmount: '100000000',
+  };
+  const q = normalizeQuote({
+    id: 'q',
+    side: 'SELL',
+    network: 'base',
+    tokenSymbol: 'USDC',
+    tokenDecimals: 6,
+    currency: 'ARS',
+    rail: 'ar_bank_transfer',
+    price: '1452',
+    fiatAmount: '145200.00',
+    tokenAmount: '100000000',
+    protocolFee: '300000',
+    integratorFee: '0',
+    netAmount: '99700000',
+    merchantAddress: BUYER,
+    expiresAt: '2026-11-19T12:00:00Z',
+  });
+  test('a quote that answers what was asked', () =>
+    assert.deepEqual(trustQuote(q, asked, 6), {
+      amountUnits: '100000000',
+      integratorFeeUnits: '0',
+      buyer: BUYER,
+      integrator: null,
+    }));
+  test('refused: another amount than typed', () =>
+    assert.equal(trustQuote({ ...q, tokenAmount: '101' }, asked, 6), null));
+  test('refused: another network, token, currency, rail or side', () => {
+    for (const over of [
+      { network: 'arbitrum' },
+      { token: 'USDT' },
+      { currency: 'BRL' },
+      { rail: 'br_pix' },
+      { side: 'BUY' as const },
+    ])
+      assert.equal(trustQuote({ ...q, ...over }, asked, 6), null, JSON.stringify(over));
+  });
+  test('refused: a purchase quoting another local amount than typed', () =>
+    assert.equal(
+      trustQuote(
+        { ...q, side: 'BUY', fiatAmount: '150001' },
+        {
+          side: 'BUY',
+          network: 'base',
+          token: 'USDC',
+          currency: 'ARS',
+          rail: 'ar_bank_transfer',
+          fiatAmount: '150000',
+        },
+        6,
+      ),
+      null,
+    ));
+  test('refused: an integrator fee no rate reproduces, over the cap, or with no recipient', () => {
+    assert.equal(
+      trustQuote({ ...q, integratorFee: '0.000007', integrator: OTHER }, asked, 6),
+      null,
+    );
+    assert.equal(trustQuote({ ...q, integratorFee: '6', integrator: OTHER }, asked, 6), null);
+    assert.equal(trustQuote({ ...q, integratorFee: '0.5', integrator: null }, asked, 6), null);
+    assert.equal(
+      trustQuote({ ...q, integratorFee: '0.5', integrator: OTHER }, asked, 6)?.integratorFeeUnits,
+      '500000',
     );
   });
 });
