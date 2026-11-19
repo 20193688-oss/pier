@@ -1,0 +1,28 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2023",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "declaration": false,
+    "sourceMap": false,
+    "allowImportingTsExtensions": false,
+    "types": ["vite/client", "node"],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@e2e/*": ["./e2e/*"]
+    }
+  },
+  "include": [
+    "src",
+    "tests",
+    "e2e",
+    "vite.config.ts",
+    "playwright.config.ts",
+    "eslint.config.js",
+    "scripts"
+  ]
+}

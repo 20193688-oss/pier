@@ -1,0 +1,539 @@
+/* pedospe's look: paper and ink.
+
+   - Paper: a cool mineral off-white page; sheets (cards, slips) a touch lighter; wells (inputs)
+     a touch darker. Dark mode turns the paper into a deep green-black ink-stone.
+   - Ink: a deep greenback green for text and primary actions, two lighter inks for secondary text.
+   - Marker: one highlighter yellow, kept for the one thing a person must not get wrong (the exact
+     amount to transfer, the active step). Never decoration.
+   - Type: one family, Archivo, with its width axis as the voice: wide and heavy for amounts and
+     headings (banknote numerals), normal width for reading. Tabular figures wherever numbers
+     line up.
+   - Radius follows hierarchy: sheets 22px, controls 12px, chips round. Depth comes from paper
+     tones and a hairline, not from shadows. */
+@import 'tailwindcss';
+@import '@fontsource-variable/archivo/wdth.css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  --paper: #f1f3ee;
+  --sheet: #fbfcf9;
+  --well: #e6eae3;
+  --ink: #10261f;
+  --ink-2: #3f514a;
+  --ink-3: #5c6d66;
+  --line: #d3d9d0;
+  --line-2: #b4beb1;
+  --marker: #ffd23f;
+  --marker-ink: #10261f;
+  --on-ink: #f6f8f3;
+  --ok: #17734a;
+  --ok-soft: #dcefe3;
+  --warn: #8a5a00;
+  --warn-soft: #f8ebcc;
+  --bad: #b0341d;
+  --bad-soft: #f6e0da;
+  --info: #22579e;
+  --info-soft: #dfe8f4;
+  --focus: #2f6fd6;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --paper: #0c1714;
+  --sheet: #13211d;
+  --well: #0a1310;
+  --ink: #e8eee8;
+  --ink-2: #b3c1ba;
+  --ink-3: #8c9c95;
+  --line: #22342e;
+  --line-2: #34493f;
+  --marker: #ffd23f;
+  --marker-ink: #10261f;
+  --on-ink: #0c1714;
+  --ok: #57c993;
+  --ok-soft: #133426;
+  --warn: #e8b04f;
+  --warn-soft: #3a2c10;
+  --bad: #f2836f;
+  --bad-soft: #3d1c16;
+  --info: #84b2f0;
+  --info-soft: #162a44;
+  --focus: #84b2f0;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --paper: #0c1714;
+    --sheet: #13211d;
+    --well: #0a1310;
+    --ink: #e8eee8;
+    --ink-2: #b3c1ba;
+    --ink-3: #8c9c95;
+    --line: #22342e;
+    --line-2: #34493f;
+    --marker: #ffd23f;
+    --marker-ink: #10261f;
+    --on-ink: #0c1714;
+    --ok: #57c993;
+    --ok-soft: #133426;
+    --warn: #e8b04f;
+    --warn-soft: #3a2c10;
+    --bad: #f2836f;
+    --bad-soft: #3d1c16;
+    --info: #84b2f0;
+    --info-soft: #162a44;
+    --focus: #84b2f0;
+    color-scheme: dark;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-well: var(--well);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-line: var(--line);
+  --color-line-2: var(--line-2);
+  --color-marker: var(--marker);
+  --color-marker-ink: var(--marker-ink);
+  --color-on-ink: var(--on-ink);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-bad: var(--bad);
+  --color-bad-soft: var(--bad-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-sans: 'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, sans-serif;
+  --radius-sheet: 22px;
+  --radius-ctl: 12px;
+}
+
+@layer base {
+  html {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.5;
+    -webkit-text-size-adjust: 100%;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--paper);
+  }
+  ::selection {
+    background: var(--marker);
+    color: var(--marker-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-stretch: 112%;
+    font-weight: 700;
+    letter-spacing: -0.015em;
+    line-height: 1.12;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+  a {
+    color: inherit;
+  }
+  code,
+  kbd,
+  pre {
+    font-family: ui-monospace, 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: not-allowed;
+  }
+  [hidden] {
+    display: none !important;
+  }
+}
+
+@layer components {
+  /* Numbers that line up: amounts, account numbers, countdowns. */
+  .num {
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+  /* Banknote numerals: the wide, heavy cut for amounts people act on. */
+  .figure {
+    font-stretch: 125%;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums lining-nums;
+    line-height: 1;
+  }
+  .wide {
+    font-stretch: 118%;
+  }
+
+  .sheet {
+    background: var(--sheet);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sheet);
+  }
+
+  /* The highlighter: a marker stroke behind the exact amount. It sweeps in once when the order
+     screen opens (the one orchestrated motion), and sits still with reduced motion. */
+  .marker {
+    background-image: linear-gradient(
+      100deg,
+      transparent 0.2em,
+      var(--marker) 0.2em,
+      var(--marker) calc(100% - 0.15em),
+      transparent calc(100% - 0.15em)
+    );
+    background-repeat: no-repeat;
+    background-size: 100% 62%;
+    background-position: 0 78%;
+    color: var(--marker-ink);
+    padding: 0 0.12em;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  :root[data-theme='dark'] .marker,
+  .marker-dark-text {
+    color: var(--marker-ink);
+  }
+  .marker-sweep {
+    animation: marker-sweep 700ms cubic-bezier(0.2, 0.7, 0.2, 1) 150ms both;
+  }
+  @keyframes marker-sweep {
+    from {
+      background-size: 0% 62%;
+    }
+    to {
+      background-size: 100% 62%;
+    }
+  }
+
+  /* A slip: a sheet with a perforated tear line, used for the order a person pays (a receipt). */
+  .slip {
+    position: relative;
+    background: var(--sheet);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sheet);
+  }
+  .tear {
+    position: relative;
+    height: 22px;
+    margin: 0 -1px;
+    background:
+      radial-gradient(circle at 0 50%, var(--paper) 10px, transparent 10.5px) left / 22px 22px
+        no-repeat,
+      radial-gradient(circle at 100% 50%, var(--paper) 10px, transparent 10.5px) right / 22px 22px
+        no-repeat;
+  }
+  .tear::after {
+    content: '';
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    top: 50%;
+    border-top: 2px dashed var(--line-2);
+  }
+
+  /* Form controls */
+  .field {
+    width: 100%;
+    min-height: 48px;
+    padding: 0.7rem 0.9rem;
+    background: var(--well);
+    color: var(--ink);
+    border: 1px solid transparent;
+    border-radius: var(--radius-ctl);
+    font: inherit;
+    font-size: 1rem;
+    transition: border-color 120ms;
+  }
+  .field::placeholder {
+    color: var(--ink-3);
+    opacity: 0.8;
+  }
+  .field:hover {
+    border-color: var(--line-2);
+  }
+  .field:focus {
+    outline: none;
+    border-color: var(--ink);
+    background: var(--sheet);
+  }
+  .field[aria-invalid='true'] {
+    border-color: var(--bad);
+  }
+  select.field {
+    appearance: none;
+    padding-right: 2.4rem;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235c6d66' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.8rem center;
+    background-size: 1.1rem;
+  }
+
+  /* Buttons: ink is the primary action, outline the secondary, quiet the tertiary. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 44px;
+    padding: 0.6rem 1.1rem;
+    border-radius: var(--radius-ctl);
+    border: 1px solid transparent;
+    font: inherit;
+    font-weight: 600;
+    font-stretch: 108%;
+    line-height: 1.2;
+    text-decoration: none;
+    transition:
+      background-color 120ms,
+      border-color 120ms,
+      transform 80ms;
+    white-space: nowrap;
+  }
+  .btn:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+  .btn:disabled {
+    opacity: 0.5;
+  }
+  .btn-ink {
+    background: var(--ink);
+    color: var(--on-ink);
+  }
+  .btn-ink:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--ink) 88%, var(--paper));
+  }
+  .btn-line {
+    background: transparent;
+    color: var(--ink);
+    border-color: var(--line-2);
+  }
+  .btn-line:hover:not(:disabled) {
+    border-color: var(--ink);
+  }
+  .btn-quiet {
+    background: transparent;
+    color: var(--ink-2);
+  }
+  .btn-quiet:hover:not(:disabled) {
+    background: var(--well);
+    color: var(--ink);
+  }
+  .btn-bad {
+    background: var(--bad);
+    color: #fff;
+  }
+  .btn-lg {
+    min-height: 56px;
+    padding: 0.9rem 1.4rem;
+    font-size: 1.0625rem;
+    border-radius: 14px;
+  }
+  .btn-sm {
+    min-height: 36px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.875rem;
+  }
+
+  /* Status pills */
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.2rem 0.65rem 0.2rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.4;
+    white-space: nowrap;
+  }
+  .pill::before {
+    content: '';
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: 999px;
+    background: currentColor;
+  }
+  .pill-ok {
+    background: var(--ok-soft);
+    color: var(--ok);
+  }
+  .pill-pend {
+    background: var(--warn-soft);
+    color: var(--warn);
+  }
+  .pill-fail {
+    background: var(--bad-soft);
+    color: var(--bad);
+  }
+  .pill-ref {
+    background: var(--info-soft);
+    color: var(--info);
+  }
+  .pill-off {
+    background: var(--well);
+    color: var(--ink-3);
+  }
+
+  /* Segmented tabs (Buy / Sell, test / live) */
+  .seg {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    padding: 4px;
+    gap: 4px;
+    background: var(--well);
+    border-radius: 14px;
+  }
+  .seg > button {
+    min-height: 44px;
+    border-radius: 10px;
+    border: 0;
+    background: transparent;
+    color: var(--ink-2);
+    font: inherit;
+    font-weight: 650;
+    font-stretch: 110%;
+  }
+  .seg > button[aria-selected='true'],
+  .seg > button[aria-pressed='true'] {
+    background: var(--sheet);
+    color: var(--ink);
+    box-shadow: 0 1px 0 var(--line);
+  }
+
+  /* Data tables in the dashboard */
+  .table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9375rem;
+  }
+  .table th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.8125rem;
+    color: var(--ink-3);
+    padding: 0.6rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  .table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--line);
+    vertical-align: middle;
+  }
+  .table tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .skeleton {
+    background: linear-gradient(90deg, var(--well), var(--line), var(--well));
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+    border-radius: 8px;
+  }
+  @keyframes shimmer {
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  .spinner {
+    width: 1.1rem;
+    height: 1.1rem;
+    border-radius: 999px;
+    border: 2px solid currentColor;
+    border-right-color: transparent;
+    animation: spin 700ms linear infinite;
+    flex: none;
+  }
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .prose-doc {
+    max-width: 72ch;
+  }
+  .prose-doc h2 {
+    font-size: 1.5rem;
+    margin: 2.2rem 0 0.8rem;
+  }
+  .prose-doc h3 {
+    font-size: 1.15rem;
+    margin: 1.6rem 0 0.6rem;
+  }
+  .prose-doc p,
+  .prose-doc ul,
+  .prose-doc ol {
+    margin: 0 0 1rem;
+    color: var(--ink-2);
+  }
+  .prose-doc ul {
+    list-style: disc;
+    padding-left: 1.3rem;
+  }
+  .prose-doc ol {
+    list-style: decimal;
+    padding-left: 1.3rem;
+  }
+  .prose-doc li {
+    margin: 0.3rem 0;
+  }
+  .prose-doc strong {
+    color: var(--ink);
+  }
+  .prose-doc :not(pre) > code {
+    font-size: 0.875em;
+    background: var(--well);
+    padding: 0.1em 0.35em;
+    border-radius: 6px;
+    color: var(--ink);
+  }
+  .prose-doc pre {
+    background: var(--well);
+    border-radius: 14px;
+    padding: 1rem 1.1rem;
+    overflow-x: auto;
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    margin: 0 0 1.2rem;
+    color: var(--ink);
+  }
+  .prose-doc a {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}
