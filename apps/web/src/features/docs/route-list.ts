@@ -56,6 +56,7 @@ const GROUPS: [RouteGroupKey, Entry[]][] = [
       ['POST', 'appOrderAction', '{id}', 'cancel'],
       ['POST', 'appOrderAction', '{id}', 'dispute'],
       ['POST', 'appOrderTransactions', '{id}'],
+      ['POST', 'devSimulateTransfer', '{id}'],
     ],
   ],
   [
