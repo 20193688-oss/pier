@@ -36,7 +36,7 @@ export default function TradePage() {
   const loadMarket = useCallback(() => {
     setMarket(undefined);
     marketApi
-      .get()
+      .app()
       .then((m) => {
         // A market that runs on no network for this tier is "not available", not an error.
         setMarket(m.available ? m : null);

@@ -391,6 +391,33 @@ export function OrderPanel({
             <p className="mt-1 text-ink-2">{o.paidBody}</p>
           </div>
         )}
+        {/* The local development chain only: play the merchant's bot so a purchase can be
+            clicked through without a bank. */}
+        {buy &&
+          network?.chainId === 31337 &&
+          (order.status === 'awaiting_payment' || order.status === 'paid') && (
+            <button
+              type="button"
+              className="btn btn-line btn-sm self-start border-dashed"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError('');
+                try {
+                  await tradeApi.simulateTransfer(order.id);
+                  setNote(o.simulated);
+                  setPoke((x) => x + 1);
+                } catch (e) {
+                  setError(errorMessage(t.common, e, o.actionFailed));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              <Icon name="bolt" size={16} />
+              {o.simulate}
+            </button>
+          )}
         {!buy && order.status === 'awaiting_acceptance' && (
           <p className="text-ink-2" role="status">
             {o.waitingMerchant}

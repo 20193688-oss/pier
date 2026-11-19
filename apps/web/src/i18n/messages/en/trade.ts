@@ -143,6 +143,8 @@ const trade: typeof es = {
       'The fees of this order do not match the ones you saw in the price, so we do not ask you to sign it. Nothing was locked: open a new order.',
     signIn: 'Connect the wallet that opened this order to follow it.',
     timeBar: 'Time left to pay',
+    simulate: 'Simulate the bank transfer (development only)',
+    simulated: 'Transfer simulated: the test merchant releases it in a few seconds.',
   },
   history: {
     title: 'Your orders',

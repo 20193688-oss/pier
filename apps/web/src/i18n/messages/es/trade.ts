@@ -143,6 +143,8 @@ const trade = {
       'Las comisiones de esta orden no coinciden con las que viste en el precio, así que no te pedimos firmarla. No se bloqueó nada: abre una orden nueva.',
     signIn: 'Conecta la wallet que abrió esta orden para seguirla.',
     timeBar: 'Tiempo restante para pagar',
+    simulate: 'Simular la transferencia bancaria (solo en desarrollo)',
+    simulated: 'Transferencia simulada: el comerciante de prueba la libera en unos segundos.',
   },
   history: {
     title: 'Tus órdenes',

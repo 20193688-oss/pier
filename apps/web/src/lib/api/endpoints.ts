@@ -30,6 +30,7 @@ import {
 } from '@/lib/p2p/normalize';
 import { parseCheckoutCharge, parseCheckoutOrder, parseCreatedOrder } from '@/lib/p2p/checkout';
 import type { P2pChallenge, P2pMarket, P2pTransaction } from '@/lib/p2p/types';
+import { body as checked, type Body } from '@/lib/api/spec';
 
 /** A member's dashboard call: which organization, which tier (`live` or `test`). */
 export interface Scope {
@@ -49,9 +50,16 @@ const must = <T>(v: T | null): T => {
   return v;
 };
 
-/** The tier the public buy/sell app trades on: the API's APP_TIER (`live` unless the deployment
-    says otherwise; a local stack on the development chain uses `test`). */
-export const APP_TIER: Tier = import.meta.env.VITE_APP_TIER === 'test' ? 'test' : 'live';
+/** The tier the public buy/sell app trades on: the API's APP_TIER, `live` unless VITE_APP_TIER
+    says otherwise. A development server with no tier set falls back to `test` when `live` has no
+    market (the local stack runs the development chain on `test`); a production build never does. */
+const TIER_FROM_ENV: Tier | null =
+  import.meta.env.VITE_APP_TIER === 'test'
+    ? 'test'
+    : import.meta.env.VITE_APP_TIER === 'live'
+      ? 'live'
+      : null;
+export const APP_TIER: Tier = TIER_FROM_ENV ?? 'live';
 
 /* --- Sign-in with Ethereum --- */
 
@@ -70,7 +78,11 @@ export const auth = {
   /** Verify the signed message; the session arrives as an HttpOnly cookie (the token the body
       also carries, for non-browser clients, is never kept). Then read who is signed in. */
   verify: async (message: string, signature: string) => {
-    await request({ method: 'POST', path: ROUTES.authVerify, body: { message, signature } });
+    await request({
+      method: 'POST',
+      path: ROUTES.authVerify,
+      body: checked('SignIn', { message, signature }),
+    });
     const s = await auth.session();
     if (!s) throw bad();
     return s;
@@ -93,19 +105,45 @@ export const orgs = {
     listOf(await request({ method: 'GET', path: ROUTES.orgs })).map(normalizeOrganization),
   create: async (name: string) =>
     normalizeOrganization(
-      itemOf(await request({ method: 'POST', path: ROUTES.orgs, body: { name } })),
+      itemOf(
+        await request({
+          method: 'POST',
+          path: ROUTES.orgs,
+          body: checked('CreateOrganization', { name }),
+        }),
+      ),
     ),
   rename: async (org: string, name: string) =>
     normalizeOrganization(
-      itemOf(await request({ method: 'PATCH', path: ROUTES.org(org), body: { name } })),
+      itemOf(
+        await request({
+          method: 'PATCH',
+          path: ROUTES.org(org),
+          body: checked('UpdateOrganization', { name }),
+        }),
+      ),
     ),
   members: async (org: string) =>
     listOf(await request({ method: 'GET', path: ROUTES.members(org) })).map(normalizeMember),
   addMember: async (org: string, body: { address: string; role: Role }) =>
-    normalizeMember(itemOf(await request({ method: 'POST', path: ROUTES.members(org), body }))),
+    normalizeMember(
+      itemOf(
+        await request({
+          method: 'POST',
+          path: ROUTES.members(org),
+          body: checked('AddMember', body),
+        }),
+      ),
+    ),
   updateMember: async (org: string, memberId: string, body: { role: Role }) =>
     normalizeMember(
-      itemOf(await request({ method: 'PATCH', path: ROUTES.member(org, memberId), body })),
+      itemOf(
+        await request({
+          method: 'PATCH',
+          path: ROUTES.member(org, memberId),
+          body: checked('UpdateMember', body),
+        }),
+      ),
     ),
   removeMember: (org: string, memberId: string) =>
     request({ method: 'DELETE', path: ROUTES.member(org, memberId) }),
@@ -117,7 +155,13 @@ export const apiKeys = {
   create: async (org: string, body: { name: string; tier: Tier; scopes: ApiScope[] }) =>
     must(
       normalizeCreatedApiKey(
-        itemOf(await request({ method: 'POST', path: ROUTES.apiKeys(org), body })),
+        itemOf(
+          await request({
+            method: 'POST',
+            path: ROUTES.apiKeys(org),
+            body: checked('CreateApiKey', body),
+          }),
+        ),
       ),
     ),
   revoke: (org: string, id: string) => request({ method: 'DELETE', path: ROUTES.apiKey(org, id) }),
@@ -132,7 +176,12 @@ export const webhooks = {
     must(
       normalizeCreatedWebhook(
         itemOf(
-          await request({ method: 'POST', path: ROUTES.webhooks, body, headers: scoped(scope) }),
+          await request({
+            method: 'POST',
+            path: ROUTES.webhooks,
+            body: checked('CreateWebhookEndpoint', body),
+            headers: scoped(scope),
+          }),
         ),
       ),
     ),
@@ -143,7 +192,12 @@ export const webhooks = {
   ) =>
     normalizeWebhook(
       itemOf(
-        await request({ method: 'PATCH', path: ROUTES.webhook(id), body, headers: scoped(scope) }),
+        await request({
+          method: 'PATCH',
+          path: ROUTES.webhook(id),
+          body: checked('UpdateWebhookEndpoint', body),
+          headers: scoped(scope),
+        }),
       ),
     ),
   remove: (scope: Scope, id: string) =>
@@ -177,6 +231,12 @@ export const market = {
     if (hit) return hit;
     const m = await fetchMarket(tier);
     marketCache.set(tier, m);
+    return m;
+  },
+  /** The buy/sell app's market (see APP_TIER). */
+  app: async (): Promise<P2pMarket> => {
+    const m = await market.get(APP_TIER);
+    if (!m.available && !TIER_FROM_ENV && import.meta.env.DEV) return market.get('test');
     return m;
   },
   /** Forget the cached copies (tests; a market that changed its rules). */
@@ -221,7 +281,9 @@ export interface SellOrderInput {
 export const trade = {
   quote: async (input: QuoteInput, decimals: Decimals = null) =>
     normalizeQuote(
-      itemOf(await request({ method: 'POST', path: ROUTES.appQuotes, body: input })),
+      itemOf(
+        await request({ method: 'POST', path: ROUTES.appQuotes, body: checked('AppQuote', input) }),
+      ),
       decimals,
     ),
   createOrder: async (input: BuyOrderInput | SellOrderInput, decimals: Decimals = null) => {
@@ -231,7 +293,9 @@ export const trade = {
         ? { quoteId: input.quoteId, payer: input.payer }
         : { quoteId: input.quoteId, beneficiary: input.beneficiary };
     return normalizeOrder(
-      itemOf(await request({ method: 'POST', path: ROUTES.appOrders, body })),
+      itemOf(
+        await request({ method: 'POST', path: ROUTES.appOrders, body: checked('AppOrder', body) }),
+      ),
       decimals,
     );
   },
@@ -252,11 +316,15 @@ export const trade = {
         await request({
           method: 'POST',
           path: ROUTES.appOrderAction(id, action),
-          body: action === 'paid' ? body : undefined,
+          body: action === 'paid' ? checked('ReportPaidDto', body) : undefined,
         }),
       ),
       decimals,
     ),
+  /** Development only (the local chain, 31337): play the merchant's bot, mark the purchase's
+      transfer received and release it. The API refuses it anywhere else. */
+  simulateTransfer: (orderId: string) =>
+    request({ method: 'POST', path: ROUTES.devSimulateTransfer(orderId), body: {} }),
   /** An unsigned transaction for the seller's own wallet, on its own sale. */
   transaction: async (
     orderId: string,
@@ -266,7 +334,7 @@ export const trade = {
       await request({
         method: 'POST',
         path: ROUTES.appOrderTransactions(orderId),
-        body: { action },
+        body: checked('AppTransaction', { action }),
       }),
       action,
     ),
@@ -280,7 +348,7 @@ export const accounts = {
       await request({
         method: 'POST',
         path: ROUTES.accountChallenge,
-        body: { address },
+        body: checked('CreateChallengeDto', { address }),
         headers: scoped(scope),
       }),
     ) as Record<string, unknown>;
@@ -297,7 +365,12 @@ export const accounts = {
   ) =>
     normalizeAccount(
       itemOf(
-        await request({ method: 'POST', path: ROUTES.accounts, body, headers: scoped(scope) }),
+        await request({
+          method: 'POST',
+          path: ROUTES.accounts,
+          body: checked('RegisterAccountDto', body),
+          headers: scoped(scope),
+        }),
       ),
     ),
   list: async (scope: Scope) =>
@@ -320,7 +393,12 @@ export const accounts = {
   ) =>
     normalizeAccount(
       itemOf(
-        await request({ method: 'PATCH', path: ROUTES.account(id), body, headers: scoped(scope) }),
+        await request({
+          method: 'PATCH',
+          path: ROUTES.account(id),
+          body: checked('UpdateAccountDto', body),
+          headers: scoped(scope),
+        }),
       ),
     ),
   remove: (scope: Scope, id: string) =>
@@ -349,7 +427,14 @@ export const methods = {
     },
   ) =>
     normalizeMethod(
-      itemOf(await request({ method: 'POST', path: ROUTES.methods, body, headers: scoped(scope) })),
+      itemOf(
+        await request({
+          method: 'POST',
+          path: ROUTES.methods,
+          body: checked('CreatePaymentMethodDto', body),
+          headers: scoped(scope),
+        }),
+      ),
     ),
   update: async (
     scope: Scope,
@@ -363,7 +448,12 @@ export const methods = {
   ) =>
     normalizeMethod(
       itemOf(
-        await request({ method: 'PATCH', path: ROUTES.method(id), body, headers: scoped(scope) }),
+        await request({
+          method: 'PATCH',
+          path: ROUTES.method(id),
+          body: checked('UpdatePaymentMethodDto', body),
+          headers: scoped(scope),
+        }),
       ),
     ),
   remove: (scope: Scope, id: string) =>
@@ -396,7 +486,14 @@ export const offers = {
     ).map(normalizeOffer),
   create: async (scope: Scope, body: OfferInput) =>
     normalizeOffer(
-      itemOf(await request({ method: 'POST', path: ROUTES.offers, body, headers: scoped(scope) })),
+      itemOf(
+        await request({
+          method: 'POST',
+          path: ROUTES.offers,
+          body: checked('CreateOfferDto', body),
+          headers: scoped(scope),
+        }),
+      ),
     ),
   update: async (
     scope: Scope,
@@ -407,7 +504,12 @@ export const offers = {
   ) =>
     normalizeOffer(
       itemOf(
-        await request({ method: 'PATCH', path: ROUTES.offer(id), body, headers: scoped(scope) }),
+        await request({
+          method: 'PATCH',
+          path: ROUTES.offer(id),
+          body: checked('UpdateOfferDto', body),
+          headers: scoped(scope),
+        }),
       ),
     ),
   remove: (scope: Scope, id: string) =>
@@ -445,7 +547,12 @@ export const merchant = {
     },
   ) =>
     normalizeTransferMatches(
-      await request({ method: 'POST', path: ROUTES.transferMatches, body, headers: scoped(scope) }),
+      await request({
+        method: 'POST',
+        path: ROUTES.transferMatches,
+        body: checked('TransferMatchesDto', body),
+        headers: scoped(scope),
+      }),
     ),
 };
 
@@ -472,7 +579,7 @@ export const clientOrders = {
         await request({
           method: 'POST',
           path: ROUTES.orderAction(id, action),
-          body: action === 'paid' ? body : undefined,
+          body: action === 'paid' ? checked('ReportPaidDto', body) : undefined,
           headers: scoped(scope),
         }),
       ),
@@ -484,7 +591,12 @@ export const clientOrders = {
     body: { network: string; from: string; action: string; args: Record<string, unknown> },
   ) =>
     tx(
-      await request({ method: 'POST', path: ROUTES.transactions, body, headers: scoped(scope) }),
+      await request({
+        method: 'POST',
+        path: ROUTES.transactions,
+        body: checked('BuildTransactionDto', body),
+        headers: scoped(scope),
+      }),
       body.action,
     ),
 };
@@ -514,7 +626,14 @@ export const charges = {
     },
   ) =>
     normalizeCharge(
-      itemOf(await request({ method: 'POST', path: ROUTES.charges, body, headers: scoped(scope) })),
+      itemOf(
+        await request({
+          method: 'POST',
+          path: ROUTES.charges,
+          body: checked('CreateChargeDto', body),
+          headers: scoped(scope),
+        }),
+      ),
     ),
   remove: async (scope: Scope, id: string) =>
     request({ method: 'DELETE', path: ROUTES.charge(id), headers: scoped(scope) }),
@@ -537,11 +656,18 @@ export const payouts = {
     ),
   create: async (
     scope: Scope,
-    body: { accountId: string; network: string; token: string; items: unknown[] },
+    body: Body<'CreatePayoutDto'> & { accountId: string },
     decimals: Decimals = null,
   ) =>
     normalizePayoutBatch(
-      itemOf(await request({ method: 'POST', path: ROUTES.payouts, body, headers: scoped(scope) })),
+      itemOf(
+        await request({
+          method: 'POST',
+          path: ROUTES.payouts,
+          body: checked('CreatePayoutDto', body),
+          headers: scoped(scope),
+        }),
+      ),
       decimals,
     ),
 };
@@ -562,14 +688,14 @@ export const checkout = {
         await request({
           method: 'POST',
           path: ROUTES.checkoutChargeOrders(id),
-          body: {
+          body: checked('CreateCheckoutOrderDto', {
             rail: input.rail,
             payer: {
               name: input.name.trim(),
               document: input.document.trim(),
               email: input.email.trim(),
             },
-          },
+          }),
         }),
       ),
     ),

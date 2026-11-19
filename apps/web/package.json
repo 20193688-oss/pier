@@ -6,10 +6,10 @@
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
-    "dev": "vite --port 4321 --strictPort",
-    "dev:mock": "vite --port 4321 --strictPort --mode mock",
+    "dev": "vite",
+    "dev:mock": "vite --mode mock",
     "build": "tsc --noEmit -p tsconfig.json && vite build",
-    "preview": "vite preview --port 4321 --strictPort",
+    "preview": "vite preview",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint .",
     "test": "vitest run",

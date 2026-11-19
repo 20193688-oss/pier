@@ -49,6 +49,8 @@ export const ROUTES = {
   appOrderAction: (id: string, action: 'paid' | 'cancel' | 'dispute') =>
     `/v1/app/orders/${enc(id)}/${action}`,
   appOrderTransactions: (id: string) => `/v1/app/orders/${enc(id)}/transactions`,
+  // Development only (chain 31337): the merchant bot's part of a purchase, simulated.
+  devSimulateTransfer: (id: string) => `/v1/dev/orders/${enc(id)}/simulate-transfer`,
 
   // The dashboard's market (organization and tier headers)
   accountChallenge: '/v1/p2p/accounts/challenge',
