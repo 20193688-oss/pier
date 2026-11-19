@@ -191,7 +191,7 @@ async function main(): Promise<void> {
   console.log(`Deploy tx ${hash}`);
   const receipt = await client.waitForTransactionReceipt({ hash });
   if (receipt.status !== 'success' || !receipt.contractAddress) fail('the deployment reverted');
-  const contract = receipt.contractAddress;
+  const contract = getAddress(receipt.contractAddress);
   console.log(`P2PMarket at ${contract} (block ${receipt.blockNumber})`);
 
   if (live) {
