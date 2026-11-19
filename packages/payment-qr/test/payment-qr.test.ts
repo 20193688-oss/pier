@@ -1,0 +1,281 @@
+import { describe, expect, it } from 'vitest';
+import {
+  buildPaymentLink,
+  buildSep7Pay,
+  emvCrc,
+  isStellarAddress,
+  normalizeHandle,
+  normalizeRecipient,
+  parseChargeLink,
+  parseEmv,
+  parsePaymentLink,
+  parseScan,
+  parseSep7,
+  strKeyKind,
+} from '@/index';
+
+// SEP-23 test vectors.
+const ACCOUNT = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+const MUXED = 'MA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVAAAAAAAAAAAAAJLK';
+const CONTRACT = 'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE';
+const SECRET = 'SBU2RRGLXH3E5CQHTD3ODLDF2BWDCYUSSBLLZ5GNW7JXHDIYKXZWHOKR';
+// Circle's USDC issuer on the public network.
+const USDC_ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
+
+// The static BR Code example of the PIX manual (Banco Central do Brasil).
+const PIX =
+  '00020126580014br.gov.bcb.pix0136123e4567-e12b-12d1-a456-4266554400005204000053039865802BR5913Fulano de Tal6008BRASILIA62070503***63041D3D';
+
+const tlv = (id: string, value: string) => `${id}${String(value.length).padStart(2, '0')}${value}`;
+const withCrc = (body: string) => `${body}6304${emvCrc(`${body}6304`)}`;
+
+/** A dynamic Argentine interoperable QR for 1500.50 ARS. */
+const AR_QR = withCrc(
+  tlv('00', '01') +
+    tlv('01', '12') +
+    tlv('43', tlv('00', 'com.mercadolibre') + tlv('01', '0000003100012345678901')) +
+    tlv('52', '5812') +
+    tlv('53', '032') +
+    tlv('54', '1500.50') +
+    tlv('58', 'AR') +
+    tlv('59', 'Cafe El Molino') +
+    tlv('60', 'Salta') +
+    tlv('62', tlv('05', 'MESA-4')),
+);
+
+const ORIGINS = ['https://app.example'];
+
+describe('StrKey', () => {
+  it('recognises accounts, muxed accounts, contracts and secrets', () => {
+    expect(strKeyKind(ACCOUNT)).toBe('account');
+    expect(strKeyKind(MUXED)).toBe('muxed');
+    expect(strKeyKind(CONTRACT)).toBe('contract');
+    expect(strKeyKind(SECRET)).toBe('secret');
+    expect(strKeyKind(USDC_ISSUER)).toBe('account');
+  });
+
+  it('refuses a bad checksum, length, alphabet or case', () => {
+    expect(strKeyKind(`${ACCOUNT.slice(0, -1)}A`)).toBeNull();
+    expect(strKeyKind(ACCOUNT.slice(0, -1))).toBeNull();
+    expect(strKeyKind(ACCOUNT.toLowerCase())).toBeNull();
+    expect(strKeyKind(`${ACCOUNT.slice(0, 10)}1${ACCOUNT.slice(11)}`)).toBeNull();
+    expect(strKeyKind('')).toBeNull();
+  });
+
+  it('never treats a secret seed as an address', () => {
+    expect(isStellarAddress(SECRET)).toBe(false);
+    expect(isStellarAddress(CONTRACT, ['account'])).toBe(false);
+    expect(isStellarAddress(ACCOUNT)).toBe(true);
+  });
+});
+
+describe('EMV merchant QR', () => {
+  it('checks the PIX manual example and reads its key', () => {
+    expect(emvCrc(PIX.slice(0, -4))).toBe('1D3D');
+    const r = parseEmv(PIX);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.qr).toMatchObject({
+      standard: 'pix',
+      dynamic: false,
+      merchantName: 'Fulano de Tal',
+      merchantCity: 'BRASILIA',
+      countryCode: 'BR',
+      currency: 'BRL',
+      amount: null,
+      pixKey: '123e4567-e12b-12d1-a456-426655440000',
+      reference: '***',
+    });
+  });
+
+  it('reads an Argentine interoperable QR with its amount', () => {
+    const r = parseEmv(AR_QR);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.qr).toMatchObject({
+      standard: 'ar-interoperable',
+      dynamic: true,
+      currency: 'ARS',
+      countryCode: 'AR',
+      amount: '1500.50',
+      merchantName: 'Cafe El Molino',
+      merchantCity: 'Salta',
+      reference: 'MESA-4',
+      accounts: ['com.mercadolibre'],
+    });
+    expect(r.qr.payload).toBe(AR_QR);
+  });
+
+  it('refuses a changed payload, a broken TLV and non-EMV text', () => {
+    expect(parseEmv(AR_QR.replace('1500.50', '9500.50'))).toEqual({ ok: false, error: 'bad-crc' });
+    expect(parseEmv(`${AR_QR.slice(0, 20)}99`)).toEqual({ ok: false, error: 'malformed' });
+    expect(parseEmv('hello')).toEqual({ ok: false, error: 'not-emv' });
+    expect(parseEmv(withCrc(tlv('00', '01') + tlv('54', '12,50') + tlv('58', 'AR')))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+  });
+});
+
+describe('SEP-7', () => {
+  it('round-trips a payment request', () => {
+    const uri = buildSep7Pay({
+      destination: ACCOUNT,
+      amount: '12.5',
+      assetCode: 'USDC',
+      assetIssuer: USDC_ISSUER,
+      memo: 'almuerzo del viernes',
+      message: 'Gracias!',
+    });
+    expect(uri.startsWith('web+stellar:pay?')).toBe(true);
+    expect(uri).not.toContain('+del');
+    const r = parseSep7(uri);
+    expect(r).toEqual({
+      ok: true,
+      pay: {
+        destination: ACCOUNT,
+        amount: '12.5',
+        assetCode: 'USDC',
+        assetIssuer: USDC_ISSUER,
+        memo: 'almuerzo del viernes',
+        memoType: 'MEMO_TEXT',
+        message: 'Gracias!',
+        networkPassphrase: null,
+        originDomain: null,
+        signed: false,
+      },
+    });
+  });
+
+  it('refuses tx requests, bad amounts, an issuer alone and long text memos', () => {
+    expect(parseSep7('web+stellar:tx?xdr=AAAA')).toEqual({
+      ok: false,
+      error: 'unsupported-operation',
+    });
+    expect(parseSep7(`web+stellar:pay?destination=${ACCOUNT}&amount=1.12345678`).ok).toBe(false);
+    expect(parseSep7(`web+stellar:pay?destination=${ACCOUNT}&amount=0`).ok).toBe(false);
+    expect(parseSep7(`web+stellar:pay?destination=${ACCOUNT}&asset_issuer=${USDC_ISSUER}`).ok).toBe(
+      false,
+    );
+    expect(parseSep7(`web+stellar:pay?destination=${ACCOUNT}&memo=${'x'.repeat(29)}`).ok).toBe(
+      false,
+    );
+    expect(parseSep7(`web+stellar:pay?destination=${SECRET}`).ok).toBe(false);
+    expect(() => buildSep7Pay({ destination: SECRET })).toThrow();
+  });
+
+  it('reads XLM as the native coin', () => {
+    const r = parseSep7(`web+stellar:pay?destination=${ACCOUNT}&amount=3&asset_code=XLM`);
+    expect(r.ok && r.pay.assetCode).toBeNull();
+  });
+});
+
+describe('handles and app links', () => {
+  it('normalises handles and recipients', () => {
+    expect(normalizeHandle(' @Juan_Perez ')).toBe('juan_perez');
+    expect(normalizeHandle('ab')).toBeNull();
+    expect(normalizeHandle('juan.perez')).toBeNull();
+    expect(normalizeRecipient('@Ana')).toBe('@ana');
+    expect(normalizeRecipient(ACCOUNT)).toBe(ACCOUNT);
+    expect(normalizeRecipient('ana')).toBeNull();
+  });
+
+  it('round-trips a payment link on a trusted origin only', () => {
+    const link = buildPaymentLink('https://app.example/', {
+      to: '@Ana',
+      amount: '10',
+      asset: 'usdc',
+      note: 'pizza',
+    });
+    expect(link).toBe('https://app.example/app/send?to=%40ana&amount=10&asset=USDC&note=pizza');
+    expect(parsePaymentLink(link, ORIGINS)).toEqual({
+      to: '@ana',
+      amount: '10',
+      asset: 'USDC',
+      note: 'pizza',
+    });
+    expect(parsePaymentLink(link, ['https://evil.example'])).toBeNull();
+    expect(parsePaymentLink('https://app.example/app/send?to=%40ana&amount=-1', ORIGINS)).toEqual({
+      to: '@ana',
+      amount: null,
+      asset: null,
+      note: null,
+    });
+  });
+
+  it('reads charge links', () => {
+    expect(parseChargeLink('https://app.example/pay/ch_123456', ORIGINS)).toBe('ch_123456');
+    expect(parseChargeLink('https://app.example/c/ch_123456/', ORIGINS)).toBe('ch_123456');
+    expect(parseChargeLink('https://other.example/pay/ch_123456', ORIGINS)).toBeNull();
+  });
+});
+
+describe('parseScan', () => {
+  it('routes every kind of scanned text', () => {
+    expect(parseScan(ACCOUNT, { origins: ORIGINS })).toMatchObject({
+      kind: 'pay-to',
+      via: 'address',
+      to: ACCOUNT,
+    });
+    expect(parseScan('@ana', { origins: ORIGINS })).toMatchObject({
+      kind: 'pay-to',
+      via: 'handle',
+      to: '@ana',
+    });
+    expect(
+      parseScan('https://app.example/app/send?to=%40ana&amount=5', { origins: ORIGINS }),
+    ).toMatchObject({
+      kind: 'pay-to',
+      via: 'app-link',
+      to: '@ana',
+      amount: '5',
+    });
+    expect(
+      parseScan(
+        `web+stellar:pay?destination=${CONTRACT}&amount=2&asset_code=USDC&asset_issuer=${USDC_ISSUER}`,
+        {
+          origins: ORIGINS,
+        },
+      ),
+    ).toMatchObject({
+      kind: 'pay-to',
+      via: 'sep7',
+      to: CONTRACT,
+      asset: 'USDC',
+      assetIssuer: USDC_ISSUER,
+    });
+    expect(parseScan('https://app.example/pay/ch_123456', { origins: ORIGINS })).toEqual({
+      kind: 'charge',
+      chargeId: 'ch_123456',
+    });
+    expect(parseScan(AR_QR, { origins: ORIGINS })).toMatchObject({
+      kind: 'merchant-qr',
+      qr: { standard: 'ar-interoperable', amount: '1500.50' },
+    });
+    expect(parseScan(PIX, { origins: ORIGINS })).toMatchObject({
+      kind: 'merchant-qr',
+      qr: { standard: 'pix' },
+    });
+  });
+
+  it('warns on a secret key and refuses what it cannot pay', () => {
+    expect(parseScan(SECRET, { origins: ORIGINS })).toEqual({ kind: 'secret-key' });
+    expect(parseScan('web+stellar:tx?xdr=AAAA', { origins: ORIGINS })).toEqual({
+      kind: 'unsupported',
+      reason: 'sep7-tx',
+    });
+    expect(parseScan('https://evil.example/pay/ch_123456', { origins: ORIGINS })).toEqual({
+      kind: 'unsupported',
+      reason: 'foreign-link',
+    });
+    const badCrc = `${AR_QR.slice(0, -1)}${AR_QR.endsWith('0') ? '1' : '0'}`;
+    expect(parseScan(badCrc, { origins: ORIGINS })).toEqual({
+      kind: 'unsupported',
+      reason: 'emv-invalid',
+    });
+    expect(parseScan('hola', { origins: ORIGINS })).toEqual({
+      kind: 'unsupported',
+      reason: 'unknown',
+    });
+  });
+});

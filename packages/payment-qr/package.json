@@ -1,0 +1,31 @@
+{
+  "name": "@pedospe/payment-qr",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reads what a payments app scans or pastes (Stellar addresses, SEP-7 payment URIs, app payment links, charge links, EMVCo merchant QR codes such as PIX and Argentina's interoperable QR) and builds payment links",
+  "license": "UNLICENSED",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/check-dist.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src test --max-warnings=0 && prettier --check src test"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "tsc-alias": "1.9.10",
+    "vitest": "5.1.1"
+  }
+}
