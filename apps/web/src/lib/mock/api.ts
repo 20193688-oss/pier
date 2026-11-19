@@ -939,6 +939,10 @@ function quote(body: Wire): ApiResponse {
     integratorFee: '0',
     netAmount: (tokenUnits - fee).toString(),
     merchant,
+    merchantAddress: MERCHANT_SELLER,
+    ...(buy ? {} : { bond: ((tokenUnits * BigInt(MARKET.sellBondBps)) / 10000n).toString() }),
+    integrator: null,
+    integratorFeeBps: 0,
     expiresAt: iso(now() + 60_000),
   };
   db().quotes[q.id] = q;

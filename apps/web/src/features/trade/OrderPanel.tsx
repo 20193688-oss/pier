@@ -21,7 +21,8 @@ import {
 import { bpsOf, toBaseUnits, fromBaseUnits } from '@/lib/p2p/amounts';
 import { decimalsFrom, decimalsOf } from '@/lib/p2p/normalize';
 import { explorerTx } from '@/lib/p2p/tx-check';
-import { saveSteps, savedSteps } from '@/lib/p2p/steps';
+import { saveSteps, savedQuoteTerms, savedSteps } from '@/lib/p2p/steps';
+import { saleTerms } from '@/lib/p2p/tx-verify';
 import { amountOnly, money, plainAmount, units } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/Dialog';
 import { Field, Notice, Spinner } from '@/components/ui/controls';
@@ -167,6 +168,9 @@ export function OrderPanel({
   });
 
   const saleSteps: TxStep[] = (() => {
+    // The amount and terms the person accepted in the quote, not a later answer's.
+    const terms = savedQuoteTerms(order.id);
+    const saleUnits = terms.amountUnits ?? tokenUnits;
     const list = order.transactions ?? [];
     const approve = list.find((x) => x.action === 'approve' || x.description === 'approve');
     const open = list.find((x) => x !== approve);
@@ -182,7 +186,7 @@ export function OrderPanel({
           action: 'approve',
           token: order.token,
           spender: network.contract,
-          amountUnits: tokenUnits,
+          amountUnits: saleUnits,
         },
       },
       {
@@ -190,11 +194,14 @@ export function OrderPanel({
         build: async () => open,
         expect: {
           action: 'openWithDeposit',
-          seller: me,
-          token: order.token,
-          amountUnits: tokenUnits,
-          buyer: order.buyer,
-          ref: order.ref ?? null,
+          ...saleTerms({
+            ref: order.ref ?? '',
+            seller: me,
+            token: order.token,
+            amountUnits: saleUnits,
+            quote: terms,
+            market,
+          }),
         },
       },
     ];

@@ -166,6 +166,13 @@ export interface P2pQuote {
   netAmount: string;
   merchant: P2pMerchantSummary;
   expiresAt: string;
+  /* The terms a sale's transaction must carry, pinned from the quote the person accepts
+     (tx-verify.ts): the merchant's address when the quote names it, the bond in base units when
+     the quote states it, the integrator and its fee rate (none: null and 0). */
+  merchantAddress: string | null;
+  bondUnits: string | null;
+  integrator: string | null;
+  integratorFeeBps: number;
 }
 
 export type P2pOrderKind = 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';

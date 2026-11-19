@@ -51,7 +51,7 @@ export function TradeForm({
   market: P2pMarket;
   initialSide: P2pSide;
   onConnect: () => void;
-  onOpened: (o: P2pOrder) => void;
+  onOpened: (o: P2pOrder, quote: P2pQuote) => void;
 }) {
   const { t, lang } = useI18n();
   const a = t.trade;
@@ -196,7 +196,7 @@ export function TradeForm({
       const order = await tradeApi.createOrder(body, tokenDecimals);
       setAmount('');
       setStep('form');
-      onOpened(order);
+      onOpened(order, fresh);
     } catch (e) {
       if (isUnauthorized(e)) {
         expire();

@@ -47,6 +47,8 @@ const resolveDecimals = (o: Obj, d: Decimals): number | null =>
     : typeof d === 'function'
       ? d(String(o.network), String(o.tokenSymbol ?? o.token))
       : d;
+const address = (v: unknown): string | null =>
+  typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v) && !/^0x0{40}$/.test(v) ? v : null;
 /** A token amount as a decimal string: base units converted with the token's decimals, a value
     already in decimals (it has a point, or no decimals are known) kept. */
 function amount(v: unknown, decimals: number | null): string {
@@ -68,13 +70,11 @@ export function normalizeMarket(raw: unknown): P2pMarket | null {
       explorer: str(n.explorer ?? n.explorerUrl),
       rpcUrl: str(n.rpcUrl),
       nativeSymbol: str(n.nativeSymbol),
-      tokens: (Array.isArray(n.tokens) ? n.tokens : [])
-        .filter(isObj)
-        .map((t: Obj) => ({
-          symbol: String(t.symbol),
-          address: String(t.address),
-          decimals: Number(t.decimals),
-        })),
+      tokens: (Array.isArray(n.tokens) ? n.tokens : []).filter(isObj).map((t: Obj) => ({
+        symbol: String(t.symbol),
+        address: String(t.address),
+        decimals: Number(t.decimals),
+      })),
       paused: n.paused === true,
       protocolFeeBps: Number.isFinite(Number(n.protocolFeeBps)) ? Number(n.protocolFeeBps) : null,
     }))
@@ -153,12 +153,10 @@ function normalizeChains(raw: Obj): P2pAccountChain[] | undefined {
     const m = isObj(c.matcher) ? c.matcher : null;
     const cap = m ? (str(m.maxPerOrderUnits ?? m.maxPerOrder) ?? '0') : '0';
     const ops = Array.isArray(c.operators)
-      ? c.operators
-          .filter(isObj)
-          .map((o: Obj) => ({
-            address: String(o.address),
-            perms: Number(o.perms ?? o.permissions ?? 0),
-          }))
+      ? c.operators.filter(isObj).map((o: Obj) => ({
+          address: String(o.address),
+          perms: Number(o.perms ?? o.permissions ?? 0),
+        }))
       : isObj(c.operators)
         ? Object.entries(c.operators).map(([address, perms]) => ({ address, perms: Number(perms) }))
         : [];
@@ -295,6 +293,13 @@ export function normalizeQuote(raw: unknown, decimals: Decimals = null): P2pQuot
       medianReleaseSeconds: null,
     },
     expiresAt: iso(q.expiresAt) ?? '',
+    merchantAddress: address(q.merchantAddress ?? (isObj(q.merchant) ? q.merchant.address : null)),
+    bondUnits: typeof q.bond === 'string' && UNITS.test(q.bond) ? q.bond : null,
+    integrator: address(q.integrator),
+    integratorFeeBps:
+      Number.isInteger(Number(q.integratorFeeBps)) && Number(q.integratorFeeBps) > 0
+        ? Number(q.integratorFeeBps)
+        : 0,
   };
 }
 
