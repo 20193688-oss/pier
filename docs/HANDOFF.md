@@ -14,15 +14,15 @@ modelled on p2p.me but with a **public API**. The owner's original request (Span
 
 Owner decisions so far:
 
-| Topic | Decision |
-| --- | --- |
-| Product | Independent project named **pedospe** (not part of any other company's product) |
-| Chain | One EVM contract (`P2PMarket`) deployed per network |
-| Who confirms the fiat | The party that receives the local money (or its bot) releases; deadlines refund; disputes go to an arbiter |
-| Matching | The user types an amount and the market picks the merchant (no ads book, p2p.me style) |
-| Client tools | All three: merchant bots via API, embedded buy/sell for businesses, collections (charges) and payouts |
-| Repo | Private `Emanuel250YT/pedospe`, local folder `C:\Users\emanu\OneDrive\Desktop\pedospe`, npm workspaces monorepo |
-| UI languages | Spanish (default) and English |
+| Topic                 | Decision                                                                                                        |
+| --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Product               | Independent project named **pedospe** (not part of any other company's product)                                 |
+| Chain                 | One EVM contract (`P2PMarket`) deployed per network                                                             |
+| Who confirms the fiat | The party that receives the local money (or its bot) releases; deadlines refund; disputes go to an arbiter      |
+| Matching              | The user types an amount and the market picks the merchant (no ads book, p2p.me style)                          |
+| Client tools          | All three: merchant bots via API, embedded buy/sell for businesses, collections (charges) and payouts           |
+| Repo                  | Private `Emanuel250YT/pedospe`, local folder `C:\Users\emanu\OneDrive\Desktop\pedospe`, npm workspaces monorepo |
+| UI languages          | Spanish (default) and English                                                                                   |
 
 ## 2. History you should know
 
@@ -42,12 +42,12 @@ Owner decisions so far:
 
 ## 3. Layout and stack
 
-| Workspace | Stack | Docs |
-| --- | --- | --- |
-| `packages/contracts` (`@pedospe/contracts`) | Solidity 0.8.37 (`paris`), solc-js, Vitest; consumed from `dist/` | contract docblock in `contracts/P2PMarket.sol` |
-| `apps/api` (`@pedospe/api`) | NestJS 12, Prisma 7 + Postgres, viem, Vitest + SWC, ESM; OpenAPI at `apps/api/openapi.json` (72 operations) | [`apps/api/README.md`](../apps/api/README.md) |
-| `packages/sdk` (`@pedospe/sdk`) | openapi-fetch client typed from the spec, webhook verification, reference merchant bot | [`packages/sdk/README.md`](../packages/sdk/README.md) |
-| `apps/web` (`@pedospe/web`) | Vite 8 + React 19 + React Router 8 + Tailwind 4, viem with EIP-6963, Playwright | [`apps/web/README.md`](../apps/web/README.md) |
+| Workspace                                   | Stack                                                                                                       | Docs                                                  |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| `packages/contracts` (`@pedospe/contracts`) | Solidity 0.8.37 (`paris`), solc-js, Vitest; consumed from `dist/`                                           | contract docblock in `contracts/P2PMarket.sol`        |
+| `apps/api` (`@pedospe/api`)                 | NestJS 12, Prisma 7 + Postgres, viem, Vitest + SWC, ESM; OpenAPI at `apps/api/openapi.json` (72 operations) | [`apps/api/README.md`](../apps/api/README.md)         |
+| `packages/sdk` (`@pedospe/sdk`)             | openapi-fetch client typed from the spec, webhook verification, reference merchant bot                      | [`packages/sdk/README.md`](../packages/sdk/README.md) |
+| `apps/web` (`@pedospe/web`)                 | Vite 8 + React 19 + React Router 8 + Tailwind 4, viem with EIP-6963, Playwright                             | [`apps/web/README.md`](../apps/web/README.md)         |
 
 Tooling: Node 26, TypeScript **6.0.3** (not 7: Nest/ts tooling), ESLint (forbids relative imports in
 `src`/`test`), Prettier. Root scripts: `build`, `test`, `typecheck`, `lint` across workspaces
@@ -79,18 +79,18 @@ the `merchant` or `business` key.
 
 ## 5. Verification status
 
-| Check | Result | Where |
-| --- | --- | --- |
-| `npm run build`, `typecheck`, `lint` | pass | merged `main`, by the orchestrator |
-| Contracts tests | 37 pass (incl. artifact check, randomized conservation property; mutation-checked) | merged `main` |
-| SDK tests | 51 pass | merged `main` |
-| API unit tests | 78 pass | merged `main` |
-| API e2e (real Postgres + anvil) | 319 pass (306 wiring: every route vs wrong callers, scopes, roles, tiers, orgs, CSRF, revoked keys) | `feat/api` by its agent; **not re-run after the merge** |
-| Web tests | 117 pass (Vitest; incl. docs vs the real spec) | merged `main` |
-| Web Playwright | 16/16 (8 flows x phone/desktop, es/en), mock mode | `feat/web` by its agent |
-| Real local stack | BUY and SELL reached `completed`; charge paid; dashboard deposit; the SDK bot released a BUY from a bank line; restart resumed state | both agents; after the merge the orchestrator only confirmed the pages and `GET /v1/market` answer 200 |
-| `npm audit --omit=dev` | 0 vulnerabilities | merged `main` |
-| Licenses | no GPL. Weak copyleft: MPL-2.0 `@ethereumjs/*` (contracts testing export only), EPL-2.0 `elkjs` (Prisma CLI) | |
+| Check                                | Result                                                                                                                               | Where                                                                                                  |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `npm run build`, `typecheck`, `lint` | pass                                                                                                                                 | merged `main`, by the orchestrator                                                                     |
+| Contracts tests                      | 37 pass (incl. artifact check, randomized conservation property; mutation-checked)                                                   | merged `main`                                                                                          |
+| SDK tests                            | 51 pass                                                                                                                              | merged `main`                                                                                          |
+| API unit tests                       | 78 pass                                                                                                                              | merged `main`                                                                                          |
+| API e2e (real Postgres + anvil)      | 319 pass (306 wiring: every route vs wrong callers, scopes, roles, tiers, orgs, CSRF, revoked keys)                                  | `feat/api` by its agent; **not re-run after the merge**                                                |
+| Web tests                            | 117 pass (Vitest; incl. docs vs the real spec)                                                                                       | merged `main`                                                                                          |
+| Web Playwright                       | 16/16 (8 flows x phone/desktop, es/en), mock mode                                                                                    | `feat/web` by its agent                                                                                |
+| Real local stack                     | BUY and SELL reached `completed`; charge paid; dashboard deposit; the SDK bot released a BUY from a bank line; restart resumed state | both agents; after the merge the orchestrator only confirmed the pages and `GET /v1/market` answer 200 |
+| `npm audit --omit=dev`               | 0 vulnerabilities                                                                                                                    | merged `main`                                                                                          |
+| Licenses                             | no GPL. Weak copyleft: MPL-2.0 `@ethereumjs/*` (contracts testing export only), EPL-2.0 `elkjs` (Prisma CLI)                         |                                                                                                        |
 
 **Never verified:** any real network (testnet or mainnet), a real bank, smart-contract wallets.
 
@@ -122,12 +122,12 @@ the `merchant` or `business` key.
 
 ### 6.2 Roles and keys
 
-| Role | Holder | Key location |
-| --- | --- | --- |
-| owner, arbiter | the operator (multisigs on mainnet) | outside the server; the API only builds unsigned `resolve` calldata |
-| treasury | address only | |
-| matcher | the API | `P2P_MATCHER_PRIVATE_KEY`: gas + matcher authority only |
-| merchants, businesses, users, bots | themselves | their wallets; the API builds unsigned transactions |
+| Role                               | Holder                              | Key location                                                        |
+| ---------------------------------- | ----------------------------------- | ------------------------------------------------------------------- |
+| owner, arbiter                     | the operator (multisigs on mainnet) | outside the server; the API only builds unsigned `resolve` calldata |
+| treasury                           | address only                        |                                                                     |
+| matcher                            | the API                             | `P2P_MATCHER_PRIVATE_KEY`: gas + matcher authority only             |
+| merchants, businesses, users, bots | themselves                          | their wallets; the API builds unsigned transactions                 |
 
 **Trust edge:** a leaked matcher key plus a leaked arbiter key could drain merchant liquidity
 through fake disputes; a leaked matcher alone can only lock liquidity until deadlines (and release

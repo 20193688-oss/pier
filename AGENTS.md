@@ -11,12 +11,12 @@ Keep it current when a session changes any of those.
 
 ## Layout (npm workspaces)
 
-| Path | What |
-| --- | --- |
-| `packages/contracts` | `P2PMarket.sol`, its committed artifact (ABI + bytecode) and an in-process EVM to test it |
-| `apps/api` | the public API (NestJS + Prisma + Postgres): accounts, offers, matching, orders, charges, payouts, webhooks, the indexer and the matcher |
-| `apps/web` | the web app: the public buy/sell app, the merchant dashboard, the hosted charge page and the docs |
-| `packages/sdk` | TypeScript client for the API and helpers for merchant bots |
+| Path                 | What                                                                                                                                     |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/contracts` | `P2PMarket.sol`, its committed artifact (ABI + bytecode) and an in-process EVM to test it                                                |
+| `apps/api`           | the public API (NestJS + Prisma + Postgres): accounts, offers, matching, orders, charges, payouts, webhooks, the indexer and the matcher |
+| `apps/web`           | the web app: the public buy/sell app, the merchant dashboard, the hosted charge page and the docs                                        |
+| `packages/sdk`       | TypeScript client for the API and helpers for merchant bots                                                                              |
 
 ## Non-negotiables
 
@@ -44,12 +44,12 @@ Keep it current when a session changes any of those.
 
 ## Commands
 
-| Command | What it does |
-| --- | --- |
-| `npm install` | installs every workspace |
-| `npm run build` | builds every workspace (contracts first) |
-| `npm test` | every workspace's tests |
-| `npm run typecheck` | every workspace's type check |
+| Command                                 | What it does                                                                                                           |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `npm install`                           | installs every workspace                                                                                               |
+| `npm run build`                         | builds every workspace (contracts first)                                                                               |
+| `npm test`                              | every workspace's tests                                                                                                |
+| `npm run typecheck`                     | every workspace's type check                                                                                           |
 | `npm run compile -w @pedospe/contracts` | recompiles `P2PMarket.sol` into `src/p2p-market.artifact.ts` (the artifact test fails if source and artifact disagree) |
 
 Before finishing a task: run the type check, lint and tests of every workspace you touched, and say
