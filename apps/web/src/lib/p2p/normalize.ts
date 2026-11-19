@@ -464,6 +464,8 @@ export function normalizePayoutBatch(raw: unknown, decimals: Decimals = null): P
           ),
           externalReference: order.externalReference ?? null,
           error: null,
+          onchainId: order.onchainId ?? null,
+          seller: order.seller,
         } as P2pPayoutItem;
       });
     const failed = (Array.isArray(b.failedItems) ? b.failedItems : [])

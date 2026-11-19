@@ -422,6 +422,8 @@ test('transfer matches, charges and payout batches', () => {
         merchantSide: 'buyer',
         beneficiary: { holderName: 'Ana', details: {} },
         externalReference: 'inv-1',
+        onchainId: '4107',
+        sellerAddress: '0xb05e000000000000000000000000000000007e11',
         createdAt: '2026-11-19T12:00:00Z',
       },
     ],
@@ -437,6 +439,11 @@ test('transfer matches, charges and payout batches', () => {
     createdAt: '2026-11-19T12:00:00Z',
   });
   assert.equal(b.status, 'partial');
+  assert.deepEqual(
+    [b.items[0].onchainId, b.items[0].seller, b.items[1].onchainId ?? null],
+    ['4107', '0xb05e000000000000000000000000000000007e11', null],
+    'an opened payout carries what its release is checked against',
+  );
   assert.equal(b.itemCount, 3);
   assert.deepEqual(
     b.items.map((i) => [i.status, i.beneficiaryName, i.error]),

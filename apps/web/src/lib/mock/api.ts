@@ -295,7 +295,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       };
       db().webhooks.push(w);
       save();
-      return ok({ ...pub(w), secret: rid('whsec', 24) }, 201);
+      return ok({ ...pub(w), tier: 'test', updatedAt: w.createdAt, secret: rid('whsec', 24) }, 201);
     }),
   ],
   [

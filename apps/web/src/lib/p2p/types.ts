@@ -302,6 +302,9 @@ export interface P2pPayoutItem {
   beneficiaryName: string;
   externalReference: string | null;
   error?: string | null;
+  /* The order's on-chain id and its seller (the paying wallet), for its release. */
+  onchainId?: string | null;
+  seller?: string | null;
 }
 
 export type P2pPayoutBatchStatus = 'processing' | 'completed' | 'partial' | 'failed';

@@ -36,7 +36,7 @@ export interface MockState {
   nextOnchainId: number;
 }
 
-const VERSION = 4;
+const VERSION = 5;
 const STORAGE_KEY = 'pedospe.mock';
 
 export const now = () => Date.now();
@@ -525,40 +525,45 @@ function seed(): MockState {
       {
         id: 'dlv_1',
         _endpoint: 'wh_bot',
-        event: 'P2P_ORDER_PAID',
+        type: 'P2P_ORDER_PAID',
+        eventId: 'evt_demo_1',
         status: 'delivered',
         attempts: 1,
-        responseStatus: 200,
+        lastStatus: 200,
         createdAt: iso(t - 6 * MIN),
         nextAttemptAt: null,
       },
       {
         id: 'dlv_2',
         _endpoint: 'wh_bot',
-        event: 'P2P_ORDER_CREATED',
+        type: 'P2P_ORDER_CREATED',
+        eventId: 'evt_demo_2',
         status: 'delivered',
         attempts: 1,
-        responseStatus: 200,
+        lastStatus: 200,
         createdAt: iso(t - 9 * MIN),
         nextAttemptAt: null,
       },
       {
         id: 'dlv_3',
         _endpoint: 'wh_bot',
-        event: 'P2P_ORDER_COMPLETED',
+        type: 'P2P_ORDER_COMPLETED',
+        eventId: 'evt_demo_3',
         status: 'failed',
         attempts: 3,
-        responseStatus: 502,
+        lastStatus: 502,
+        lastError: 'Bad Gateway',
         createdAt: iso(t - 70 * MIN),
         nextAttemptAt: iso(t + 8 * MIN),
       },
       {
         id: 'dlv_4',
         _endpoint: 'wh_shop',
-        event: 'P2P_CHARGE_SUCCEEDED',
+        type: 'P2P_CHARGE_SUCCEEDED',
+        eventId: 'evt_demo_4',
         status: 'delivered',
         attempts: 1,
-        responseStatus: 204,
+        lastStatus: 204,
         createdAt: iso(t - 26 * 60 * MIN),
         nextAttemptAt: null,
       },
@@ -866,8 +871,9 @@ export function tick(o: Wire): Wire {
   // A sale or a payout: the merchant accepts, pays the beneficiary and marks it paid.
   if (o.status === 'awaiting_acceptance' && T.opened && t - T.opened > 4000) {
     o.status = 'awaiting_payment';
-    T.accepted = t;
-    o.paymentDeadline = at(t + w.sellPaymentSeconds * 1000);
+    // Time-based, not read-based: the merchant accepted four seconds after the order opened.
+    T.accepted = Math.min(t, T.opened + 4000);
+    o.paymentDeadline = at(T.accepted + w.sellPaymentSeconds * 1000);
     o.txHashes = { ...o.txHashes, accept: hash32() };
     touch();
   }
