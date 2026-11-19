@@ -11,6 +11,7 @@ import {
   bearer,
   bootApp,
   organization,
+  quietMarket,
   randomWallet,
   registerWallet,
   type Harness,
@@ -65,6 +66,7 @@ beforeAll(async () => {
   await fundDevWallet(infra.rpcUrl, infra.deployment.token, merchantWallet.address, 200_000n * U);
   await fundDevWallet(infra.rpcUrl, infra.deployment.token, userWallet.address, 10_000n * U);
 
+  await quietMarket(h);
   merchant = await organization(h, merchantWallet);
   business = await organization(h);
   const account = await registerWallet(h, merchant.testKey, merchantWallet, 'Pampa Cambio');

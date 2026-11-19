@@ -8,6 +8,7 @@ export {
   anvilBinary,
   freePort,
   migrate,
+  resetDatabase,
   startAnvil,
   startEmbeddedPostgres,
   stopProcess,

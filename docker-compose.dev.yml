@@ -1,0 +1,21 @@
+# Postgres for `npm run dev:stack` when a Docker daemon is running. Without
+# Docker, dev:stack starts an embedded Postgres from npm instead (same port).
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: pedospe
+      POSTGRES_PASSWORD: pedospe
+      POSTGRES_DB: pedospe
+    ports:
+      - '127.0.0.1:54329:5432'
+    volumes:
+      - pedospe-dev-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U pedospe']
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+volumes:
+  pedospe-dev-pg:

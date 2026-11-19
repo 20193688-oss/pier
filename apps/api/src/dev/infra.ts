@@ -181,3 +181,15 @@ export function migrate(databaseUrl: string): void {
     throw new Error(`prisma migrate deploy failed:\n${result.stdout}\n${result.stderr}`);
   }
 }
+
+/** Drops every table of a dev database (`public` schema), before migrating it again. */
+export async function resetDatabase(databaseUrl: string): Promise<void> {
+  const { default: pg } = await import('pg');
+  const db = new pg.Client({ connectionString: databaseUrl });
+  await db.connect();
+  try {
+    await db.query('DROP SCHEMA IF EXISTS public CASCADE; CREATE SCHEMA public;');
+  } finally {
+    await db.end();
+  }
+}

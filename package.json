@@ -17,7 +17,8 @@
     "typecheck": "npm run typecheck --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",
-    "dev:stack": "node scripts/dev-stack.ts"
+    "dev:stack": "node scripts/dev-stack.ts",
+    "dev:simulate": "npm run dev:simulate-transfer -w @pedospe/api --"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

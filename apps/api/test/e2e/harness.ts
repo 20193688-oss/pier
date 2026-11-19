@@ -6,7 +6,14 @@ import { createSiweMessage } from 'viem/siwe';
 import { inject } from 'vitest';
 import { createApp } from '@/app.factory';
 import { loadConfig, type AppConfig } from '@/config/env';
-import { devWallet, localApiEnv, type DevRole, type DevWallet } from '@/dev/index';
+import {
+  devSend,
+  devWallet,
+  fundDevWallet,
+  localApiEnv,
+  type DevRole,
+  type DevWallet,
+} from '@/dev/index';
 import { PrismaService } from '@/prisma/prisma.service';
 
 export const WEB_ORIGIN = 'http://localhost:3000';
@@ -136,3 +143,87 @@ export async function registerWallet(
 }
 
 export const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+
+export interface Merchant {
+  org: Awaited<ReturnType<typeof organization>>;
+  wallet: DevWallet;
+  accountId: string;
+}
+
+/**
+ * A funded merchant with an ARS payment method, ARS offers on both sides,
+ * 100 000 tUSD deposited and the matcher authorised up to 5 000 per order,
+ * all through the API's routes and transaction builder.
+ */
+export async function setupMerchant(
+  h: Harness,
+  name: string,
+  prices: { sell: string; buy: string } = { sell: '1250', buy: '1180' },
+): Promise<Merchant> {
+  const infra = inject('infra');
+  const U = 1_000_000n;
+  const w = randomWallet();
+  await fundDevWallet(infra.rpcUrl, infra.deployment.token, w.address, 200_000n * U);
+  const org = await organization(h, w);
+  const account = await registerWallet(h, org.testKey, w, name);
+  await h
+    .http()
+    .post('/v1/p2p/payment-methods')
+    .set(bearer(org.testKey))
+    .send({
+      accountId: account.id,
+      currency: 'ARS',
+      rail: 'ar_bank_transfer',
+      holderName: `${name} SRL`,
+      details: { alias: 'merchant.alias', cuit: '20123456786' },
+    })
+    .expect(201);
+  for (const offer of [
+    { side: 'SELL_TOKEN', price: prices.sell },
+    { side: 'BUY_TOKEN', price: prices.buy },
+  ]) {
+    await h
+      .http()
+      .post('/v1/p2p/offers')
+      .set(bearer(org.testKey))
+      .send({
+        accountId: account.id,
+        network: 'local',
+        token: 'tUSD',
+        currency: 'ARS',
+        rails: ['ar_bank_transfer'],
+        minFiat: '1000',
+        maxFiat: '5000000',
+        priceTtlSeconds: 3600,
+        ...offer,
+      })
+      .expect(201);
+  }
+  for (const [action, args] of [
+    ['approve', { token: 'tUSD', amount: (100_000n * U).toString() }],
+    ['deposit', { token: 'tUSD', amount: (100_000n * U).toString() }],
+    ['setMatcher', { maxPerOrder: (5_000n * U).toString(), autoSettle: false }],
+  ] as const) {
+    const tx = await h
+      .http()
+      .post('/v1/p2p/transactions')
+      .set(bearer(org.testKey))
+      .send({ network: 'local', from: account.id, action, args })
+      .expect(200);
+    await devSend(infra.rpcUrl, w.privateKey, tx.body);
+  }
+  return { org, wallet: w, accountId: account.id };
+}
+
+/** Moves every matcher transaction and indexed event forward once. */
+export async function tickChain(h: Harness): Promise<void> {
+  const { IndexerJob } = await import('@/p2p/indexer.job');
+  const { MatcherFollowerJob } = await import('@/p2p/matcher-follower.job');
+  await h.app.get(MatcherFollowerJob).tick();
+  await h.app.get(IndexerJob).tick();
+}
+
+/** Test files share one database: each behaviour file starts with no other merchant's offers. */
+export async function quietMarket(h: Harness): Promise<void> {
+  await h.prisma.p2pOffer.updateMany({ data: { active: false } });
+}

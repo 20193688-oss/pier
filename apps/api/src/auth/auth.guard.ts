@@ -59,11 +59,11 @@ export class AuthGuard implements CanActivate {
       throw ApiError.unauthorized('Send credentials as `Authorization: Bearer <token>`.');
 
     if (bearer && tierOfApiKey(bearer)) {
+      const org = await this.apiKeys.resolve(bearer);
+      if (!org) throw ApiError.unauthorized('This API key is not valid or was revoked.');
       if (policy.kind !== 'org') {
         throw ApiError.forbidden('This route takes a wallet session, not an API key.');
       }
-      const org = await this.apiKeys.resolve(bearer);
-      if (!org) throw ApiError.unauthorized('This API key is not valid or was revoked.');
       if (!org.scopes.includes(policy.scope)) {
         throw ApiError.forbidden(`This API key lacks the ${policy.scope} scope.`);
       }

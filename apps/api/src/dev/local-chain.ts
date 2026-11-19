@@ -4,6 +4,7 @@ import {
   createPublicClient,
   createWalletClient,
   defineChain,
+  getAddress,
   http,
   toHex,
   type Abi,
@@ -155,16 +156,20 @@ export async function deployLocalMarket(
     bytecode: P2P_MARKET_ARTIFACT.bytecode as Hex,
     args: [owner.address, devWallet('treasury').address, devWallet('arbiter').address, feeBps],
   });
-  const market = (await client.waitForTransactionReceipt({ hash: marketHash, pollingInterval: 50 }))
-    .contractAddress as Hex;
+  const market = getAddress(
+    (await client.waitForTransactionReceipt({ hash: marketHash, pollingInterval: 50 }))
+      .contractAddress as Hex,
+  );
 
   const tokenSource = compileContract('test/P2PTestToken.sol', 'P2PTestToken');
   const tokenHash = await wallet.deployContract({
     abi: tokenSource.abi,
     bytecode: tokenSource.bytecode,
   });
-  const token = (await client.waitForTransactionReceipt({ hash: tokenHash, pollingInterval: 50 }))
-    .contractAddress as Hex;
+  const token = getAddress(
+    (await client.waitForTransactionReceipt({ hash: tokenHash, pollingInterval: 50 }))
+      .contractAddress as Hex,
+  );
 
   const { p2pCalldata } = await import('@/chain/market-codec');
   await devSend(rpcUrl, owner.privateKey, { to: market, data: p2pCalldata.setToken(token, true) });
