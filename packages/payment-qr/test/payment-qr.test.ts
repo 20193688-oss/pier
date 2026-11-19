@@ -106,6 +106,43 @@ describe('EMV merchant QR', () => {
     expect(r.qr.payload).toBe(AR_QR);
   });
 
+  it('refuses repeated fields, a second PIX account and an amount in an unknown currency', () => {
+    const base = tlv('00', '01') + tlv('01', '12');
+    const tail = tlv('58', 'AR') + tlv('59', 'Cafe') + tlv('60', 'Salta');
+    // Two amounts: a banking app might pay the other one.
+    expect(
+      parseEmv(withCrc(base + tlv('53', '032') + tlv('54', '10.00') + tlv('54', '9999.00') + tail)),
+    ).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+    // A repeated sub-field inside a template.
+    const pixTwice = tlv(
+      '26',
+      tlv('00', 'br.gov.bcb.pix') + tlv('01', 'a@b.com') + tlv('01', 'c@d.com'),
+    );
+    expect(parseEmv(withCrc(base + pixTwice + tlv('53', '986') + tlv('58', 'BR')))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+    // Two PIX merchant-account templates.
+    const pixA = tlv('26', tlv('00', 'br.gov.bcb.pix') + tlv('01', 'a@b.com'));
+    const pixB = tlv('27', tlv('00', 'BR.GOV.BCB.PIX') + tlv('01', 'c@d.com'));
+    expect(parseEmv(withCrc(base + pixA + pixB + tlv('53', '986') + tlv('58', 'BR')))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+    // An amount whose currency is missing or unknown.
+    expect(parseEmv(withCrc(base + tlv('54', '10.00') + tail))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+    expect(parseEmv(withCrc(base + tlv('53', '978') + tlv('54', '10.00') + tail))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+  });
+
   it('refuses a changed payload, a broken TLV and non-EMV text', () => {
     expect(parseEmv(AR_QR.replace('1500.50', '9500.50'))).toEqual({ ok: false, error: 'bad-crc' });
     expect(parseEmv(`${AR_QR.slice(0, 20)}99`)).toEqual({ ok: false, error: 'malformed' });

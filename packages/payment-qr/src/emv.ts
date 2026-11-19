@@ -98,7 +98,15 @@ export function parseTlv(text: string): EmvField[] | null {
 
 const field = (fields: EmvField[], id: string) => fields.find((f) => f.id === id) ?? null;
 
-/** Reads a merchant-presented EMV QR payload and checks its CRC. */
+const hasDuplicateIds = (fields: EmvField[]) =>
+  new Set(fields.map((f) => f.id)).size !== fields.length;
+
+/** Reads a merchant-presented EMV QR payload and checks its CRC.
+
+    A repeated field (at the top level or inside a template), a second PIX account, or an amount
+    in a currency this package does not know is refused: whoever pays the QR (a merchant's banking
+    app) might read a different copy of the field than this parser did, and the person would agree
+    to one amount or payee while another is paid. */
 export function parseEmv(input: string): EmvResult {
   const payload = typeof input === 'string' ? input.trim() : '';
   if (!payload.startsWith('000201')) return { ok: false, error: 'not-emv' };
@@ -111,15 +119,20 @@ export function parseEmv(input: string): EmvResult {
   if (emvCrc(payload.slice(0, -4)) !== last.value.toUpperCase())
     return { ok: false, error: 'bad-crc' };
 
+  if (hasDuplicateIds(fields)) return { ok: false, error: 'malformed' };
+
   for (const f of fields) {
     if (!isTemplate(Number(f.id))) continue;
     const children = parseTlv(f.value);
-    if (children) f.children = children;
+    if (!children) continue;
+    if (hasDuplicateIds(children)) return { ok: false, error: 'malformed' };
+    f.children = children;
   }
 
   const accounts: string[] = [];
   let pixKey: string | null = null;
   let pixUrl: string | null = null;
+  let pixAccounts = 0;
   for (const f of fields) {
     const id = Number(f.id);
     if (id < 26 || id > 51 || !f.children) continue;
@@ -127,13 +140,18 @@ export function parseEmv(input: string): EmvResult {
     if (!gui) continue;
     accounts.push(gui);
     if (gui.toLowerCase() === PIX_GUI) {
+      pixAccounts += 1;
       pixKey = field(f.children, '01')?.value ?? null;
       pixUrl = field(f.children, '25')?.value ?? null;
     }
   }
+  if (pixAccounts > 1) return { ok: false, error: 'malformed' };
 
   const amount = field(fields, '54')?.value ?? null;
   if (amount !== null && !AMOUNT_RE.test(amount)) return { ok: false, error: 'malformed' };
+  if (amount !== null && !CURRENCIES[field(fields, '53')?.value ?? '']) {
+    return { ok: false, error: 'malformed' };
+  }
   const initiation = field(fields, '01')?.value ?? null;
   if (initiation !== null && initiation !== '11' && initiation !== '12') {
     return { ok: false, error: 'malformed' };
