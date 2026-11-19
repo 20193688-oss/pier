@@ -104,6 +104,32 @@ const dash: typeof es = {
     revokedToast: 'Key revoked',
     ownersOnly: 'Only owners and admins create and revoke keys.',
   },
+  liq: {
+    lede: "Your organization's wallets: their balance in the market contract, the limit pedospe may open orders with on it, and the bots you authorised. You sign every move yourself, in your wallet.",
+    empty: 'You have not registered a wallet yet.',
+    emptyBody:
+      'Register one to deposit liquidity, publish offers as a merchant or receive charges.',
+    account: 'Wallet account',
+    network: 'Network',
+    token: 'Token',
+    noBalance: 'No balance in the market yet.',
+    noMatcher: 'This environment has no published order matcher.',
+    depositStep: 'Deposit {amount} {token}',
+    approveStep: 'Allow the market to take {amount} {token}',
+    withdrawStep: 'Withdraw {amount} {token} to this wallet',
+    matcherStep: 'Authorise pedospe up to {amount} {token} per order',
+    botStep: 'Give the bot {address} its permissions',
+    revokeStep: 'Take every permission from the bot {address}',
+    pause: 'Pause orders',
+    resume: 'Take orders',
+    paused: 'The merchant takes no orders',
+    resumed: 'The merchant takes orders',
+    sent: 'Done. The balance updates in a few seconds.',
+    registered: 'Wallet registered',
+    alreadyRegistered: 'That account is already registered. Pick another one in your wallet.',
+    pickAccount: 'Pick the account you want to register',
+    sign: 'Sign and register',
+  },
 };
 
 export default dash;

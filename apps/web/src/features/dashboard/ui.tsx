@@ -121,7 +121,9 @@ export function Figures({
       {items.map((f) => (
         <div key={f.label} className="rounded-[18px] border border-line bg-sheet p-4">
           <dt className="text-[0.8125rem] font-semibold text-ink-3">{f.label}</dt>
-          <dd className="figure mt-2 text-[1.45rem]">{f.value}</dd>
+          <dd className="figure mt-2 text-[clamp(1.05rem,4.4vw,1.45rem)] [overflow-wrap:anywhere]">
+            {f.value}
+          </dd>
           {f.sub && <dd className="mt-1 text-[0.8125rem] text-ink-3">{f.sub}</dd>}
         </div>
       ))}

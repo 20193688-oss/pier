@@ -104,6 +104,32 @@ const dash = {
     revokedToast: 'Clave revocada',
     ownersOnly: 'Solo dueños y administradores crean y revocan claves.',
   },
+  liq: {
+    lede: 'Las billeteras de tu organización: su saldo en el contrato del mercado, el límite con el que pedospe puede abrir órdenes sobre él y los bots que autorizaste. Cada movimiento lo firmas tú, en tu wallet.',
+    empty: 'Todavía no registraste ninguna billetera.',
+    emptyBody:
+      'Registra una para depositar liquidez, publicar ofertas como comerciante o recibir cobros.',
+    account: 'Cuenta de la wallet',
+    network: 'Red',
+    token: 'Token',
+    noBalance: 'Sin saldo en el mercado todavía.',
+    noMatcher: 'Este entorno no tiene un asignador de órdenes publicado.',
+    depositStep: 'Depositar {amount} {token}',
+    approveStep: 'Permitir que el mercado tome {amount} {token}',
+    withdrawStep: 'Retirar {amount} {token} a esta billetera',
+    matcherStep: 'Autorizar a pedospe hasta {amount} {token} por orden',
+    botStep: 'Dar permisos al bot {address}',
+    revokeStep: 'Quitarle todos los permisos al bot {address}',
+    pause: 'Pausar órdenes',
+    resume: 'Recibir órdenes',
+    paused: 'El comerciante no recibe órdenes',
+    resumed: 'El comerciante recibe órdenes',
+    sent: 'Listo. El saldo se actualiza en unos segundos.',
+    registered: 'Billetera registrada',
+    alreadyRegistered: 'Esa cuenta ya está registrada. Elige otra en tu wallet.',
+    pickAccount: 'Elige la cuenta que quieres registrar',
+    sign: 'Firmar y registrar',
+  },
 };
 
 export default dash;
