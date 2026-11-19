@@ -153,3 +153,13 @@ export function Empty({
     </div>
   );
 }
+
+/** The banknote figure's size for a text of this length, so a long amount never overflows a
+    phone: the longer the text, the smaller the cut. */
+export function figureSize(text: string): string {
+  const n = text.length;
+  if (n <= 11) return 'text-[clamp(1.9rem,8.4vw,2.6rem)]';
+  if (n <= 14) return 'text-[clamp(1.6rem,7vw,2.3rem)]';
+  if (n <= 17) return 'text-[clamp(1.35rem,5.8vw,2rem)]';
+  return 'text-[clamp(1.15rem,4.8vw,1.75rem)]';
+}

@@ -3,7 +3,9 @@ import common from '@/i18n/messages/en/common';
 import p2p from '@/i18n/messages/en/p2p';
 import landing from '@/i18n/messages/en/landing';
 import trade from '@/i18n/messages/en/trade';
+import docs from '@/i18n/messages/en/docs';
+import charge from '@/i18n/messages/en/charge';
 
-const en = { common, p2p, landing, trade };
+const en = { common, p2p, landing, trade, docs, charge };
 
 export default en;
