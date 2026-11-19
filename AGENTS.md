@@ -5,6 +5,10 @@ transfers, PIX, SPEI...), with a public API. A user types an amount; the matchin
 merchant (no ads book). Merchants keep liquidity in an on-chain contract; the contract locks each
 order's tokens until the party receiving the local money releases them.
 
+**Start here: [`docs/HANDOFF.md`](docs/HANDOFF.md)**: the project's history, current state, how to
+run the local test server, the design and security invariants, open decisions and the backlog.
+Keep it current when a session changes any of those.
+
 ## Layout (npm workspaces)
 
 | Path | What |

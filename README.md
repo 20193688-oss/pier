@@ -9,7 +9,7 @@ A peer-to-peer market for stablecoins against local money, with a public API.
 - **Public API and bots**: merchants automate prices, acceptance and release with API keys, webhooks and
   delegated bot keys; businesses embed buy/sell, collect payments in local money and send payouts.
 
-See [AGENTS.md](AGENTS.md) for the layout and conventions.
+See [AGENTS.md](AGENTS.md) for the layout and conventions, and [docs/HANDOFF.md](docs/HANDOFF.md) for the project's state, design and open decisions.
 
 ## Workspaces
 
