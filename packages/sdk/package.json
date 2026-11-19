@@ -1,0 +1,50 @@
+{
+  "name": "@pedospe/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript client for the pedospe API, webhook verification and a reference merchant bot",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./webhooks": {
+      "types": "./dist/webhooks.d.ts",
+      "default": "./dist/webhooks.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=24.9.0"
+  },
+  "scripts": {
+    "generate": "openapi-typescript ../../apps/api/openapi.json --output src/generated/schema.ts && prettier --write src/generated/schema.ts",
+    "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json && node scripts/check-dist.mjs",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint src test --max-warnings=0 && prettier --check src test",
+    "bot": "node dist/bot/auto-release.js"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  },
+  "peerDependencies": {
+    "viem": "^2.58.1"
+  },
+  "peerDependenciesMeta": {
+    "viem": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "openapi-typescript": "7.13.0",
+    "tsc-alias": "1.9.10",
+    "viem": "2.58.1",
+    "vitest": "5.1.1"
+  }
+}
