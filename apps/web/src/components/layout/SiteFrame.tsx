@@ -13,7 +13,7 @@ import { MOCK } from '@/lib/env';
 
 export function MockBanner() {
   const { t } = useI18n();
-  if (!MOCK) return null;
+  if (!(import.meta.env.DEV || import.meta.env.VITE_MOCK === '1') || !MOCK) return null;
   return (
     <div className="bg-marker px-4 py-1.5 text-center text-[0.8125rem] font-semibold text-marker-ink">
       {t.common.mock.banner}{' '}

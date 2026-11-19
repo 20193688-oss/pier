@@ -2,11 +2,11 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import '@/styles/global.css';
-import { MOCK } from '@/lib/env';
+import { MOCK, MOCK_BUILD } from '@/lib/env';
 import { App } from '@/app/App';
 
 async function start() {
-  if (MOCK) {
+  if ((import.meta.env.DEV || import.meta.env.VITE_MOCK === '1') && MOCK_BUILD && MOCK) {
     const { installMock } = await import('@/lib/mock');
     installMock();
   }

@@ -19,7 +19,12 @@ function detectMock(): boolean {
   }
 }
 
-export const MOCK = detectMock();
+/** Whether this build can run mock mode at all: a development server or a VITE_MOCK=1 build. A
+    production build replaces both with constants, so the mock API and the demo wallet are
+    compiled out of it, not merely unused. */
+export const MOCK_BUILD = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
+
+export const MOCK = MOCK_BUILD && detectMock();
 
 /** The wallet the mock mode announces; in mock mode only it is offered. */
 export const DEMO_WALLET_RDNS = 'com.pedospe.demo';
