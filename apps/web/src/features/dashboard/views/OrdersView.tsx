@@ -3,7 +3,7 @@
    opened as a client (report a transfer, cancel, dispute, release a payout), each with its
    running deadline. On-chain actions are signed by the order's own wallet of this organization,
    after the check in SignFlow; the reconciliation helper finds the orders a bank transfer settles. */
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { fmt, useI18n } from '@/i18n';
 import {
   accounts as accountsApi,
@@ -74,6 +74,18 @@ export function OrdersView() {
     return { mine, client, accounts };
   }, [scope.org, scope.tier, market]);
   const now = useNow(true);
+  // Orders move as the indexer reads the chain: read them again every few seconds while any is
+  // live and the page is in view.
+  const hasLive =
+    !!load.data && [...load.data.mine, ...load.data.client].some((x) => !isTerminal(x.status));
+  const { reload } = load;
+  useEffect(() => {
+    if (!hasLive) return;
+    const id = setInterval(() => {
+      if (!document.hidden) reload();
+    }, 5000);
+    return () => clearInterval(id);
+  }, [hasLive, reload]);
   const [signing, setSigning] = useState<Signing | null>(null);
   const [confirm, setConfirm] = useState<{
     order: P2pOrder;

@@ -313,6 +313,9 @@ function Chains({
   if (!chains.length)
     return <p className="mt-3 text-[0.9375rem] text-ink-3">{t.dash.liq.noBalance}</p>;
   const nameOf = (id: string) => market?.networks.find((n) => n.id === id)?.name ?? id;
+  /* The matcher's cap is in base units of the network's tokens (the stablecoins share 6). */
+  const tokenOf = (id: string) =>
+    market?.networks.find((n) => n.id === id)?.tokens[0] ?? { symbol: 'USDC', decimals: 6 };
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       {chains.map((c: P2pAccountChain) => (
@@ -346,7 +349,11 @@ function Chains({
               <dd className="num">
                 {c.matcher
                   ? fmt(l.balances.capValue, {
-                      amount: units(lang, fromBaseUnits(c.matcher.maxPerOrderUnits, 6), 'USDC'),
+                      amount: units(
+                        lang,
+                        fromBaseUnits(c.matcher.maxPerOrderUnits, tokenOf(c.network).decimals),
+                        tokenOf(c.network).symbol,
+                      ),
                     })
                   : l.balances.noMatcher}
               </dd>
