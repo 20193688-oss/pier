@@ -18,6 +18,7 @@ import { useSession } from '@/lib/session';
 import { useAppData } from '@/features/app/data';
 import { Screen } from '@/features/app/shell';
 import { Facts, useUsd } from '@/features/app/parts';
+import { balancePrice, chargeExpectation } from '@/lib/app/charge';
 import type { ChargePayment, PayerCharge } from '@/lib/app/types';
 
 export default function PayCharge() {
@@ -42,7 +43,8 @@ export default function PayCharge() {
   }, [id]);
   useEffect(load, [load]);
 
-  const price = charge?.payWithBalance ?? null;
+  // The price only in the token the app pays with; any other asset is no price at all.
+  const price = charge ? balancePrice(charge, token) : null;
   const expired = !!price && Date.parse(price.expiresAt) <= now;
   useEffect(() => {
     if (expired && !paid) load();
@@ -127,20 +129,8 @@ export default function PayCharge() {
                       return r.transaction;
                     },
                     expect: null,
-                    // The amount and the receiving account shown on this screen: nothing else.
-                    expectFor: () => {
-                      const p = payment.current;
-                      if (!p || p.amount !== price.amount || p.chargeId !== charge.id) return null;
-                      return {
-                        action: 'payment',
-                        to: price.recipient,
-                        // The asset the charge is priced in; one the market does not list is
-                        // refused by the check.
-                        token: price.tokenContract ?? price.token,
-                        amountUnits: price.amount,
-                        memo: null,
-                      };
-                    },
+                    // The token the app pays with, to the account and for the amount shown here.
+                    expectFor: () => chargeExpectation(charge, price, token, payment.current),
                   },
                 ]}
                 onError={(e) => {
