@@ -349,6 +349,8 @@ async function main(): Promise<void> {
           API_URL,
           VITE_API_URL: API_URL,
           PUBLIC_API_URL: API_URL,
+          // The local stack serves only the test tier: the web (and Pollar's network) follow it.
+          VITE_APP_TIER: process.env.VITE_APP_TIER || 'test',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: process.platform === 'win32',

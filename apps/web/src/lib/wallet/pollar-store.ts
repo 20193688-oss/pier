@@ -50,3 +50,13 @@ export function usePollarApi(): PollarApi | null {
 
 /** The publishable key this build was given; empty: no Pollar (mock mode or the dev-key wallet). */
 export const POLLAR_KEY = String(import.meta.env.VITE_POLLAR_PUBLISHABLE_KEY ?? '').trim();
+
+/** The Stellar network a Pollar publishable key works on. A key belongs to one environment
+    (`pub_testnet_…` / `pub_mainnet_…`), so its prefix decides: a testnet key started on mainnet
+    gives a wallet whose network never matches the market's. The tier decides only for a key
+    without that prefix. */
+export function pollarNetworkFor(key: string, tier: 'live' | 'test'): 'testnet' | 'mainnet' {
+  if (key.startsWith('pub_testnet_')) return 'testnet';
+  if (key.startsWith('pub_mainnet_')) return 'mainnet';
+  return tier === 'live' ? 'mainnet' : 'testnet';
+}
