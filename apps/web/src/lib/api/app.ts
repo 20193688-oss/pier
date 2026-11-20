@@ -7,6 +7,7 @@ import { ROUTES } from '@/lib/api/routes';
 import { readSubmit, tx } from '@/lib/api/endpoints';
 import { normalizeOrder, type Decimals } from '@/lib/p2p/normalize';
 import { normalizeHandle } from '@pedospe/payment-qr';
+import { body as checked } from '@/lib/api/spec';
 import type {
   ActivityItem,
   ActivityPage,
@@ -125,11 +126,15 @@ export function readPayerCharge(raw: unknown): PayerCharge | null {
     token: String(o.tokenSymbol ?? o.token ?? ''),
     expiresAt: iso(o.expiresAt),
     payWithBalance:
-      p && /^\d+$/.test(String(p.amount ?? '')) && BigInt(String(p.amount)) > 0n
+      p &&
+      /^\d+$/.test(String(p.amount ?? '')) &&
+      BigInt(String(p.amount)) > 0n &&
+      isDestination(p.recipient)
         ? {
             token: String(p.token ?? p.tokenSymbol ?? ''),
             amount: String(p.amount),
             expiresAt: iso(p.expiresAt) ?? '',
+            recipient: p.recipient,
           }
         : null,
   };
@@ -137,14 +142,14 @@ export function readPayerCharge(raw: unknown): PayerCharge | null {
 
 export function readChargePayment(raw: unknown): ChargePayment | null {
   const o = isObj(raw) ? raw : null;
-  if (!o || typeof o.id !== 'string' || !isDestination(o.to)) return null;
+  if (!o || typeof o.id !== 'string') return null;
   return {
     id: o.id,
     chargeId: String(o.chargeId ?? ''),
     network: String(o.network ?? ''),
     token: String(o.token ?? o.tokenSymbol ?? ''),
     amount: units(o.amount),
-    to: o.to,
+    hash: typeof o.hash === 'string' && o.hash ? o.hash : null,
     status: String(o.status ?? ''),
     expiresAt: iso(o.expiresAt),
   };
@@ -157,7 +162,15 @@ export const app = {
     must(readProfile(await request({ method: 'GET', path: ROUTES.appProfile }))),
   /** Claim or change the handle; 409 `handle_taken` when someone has it. */
   claimHandle: async (handle: string): Promise<AppProfile> =>
-    must(readProfile(await request({ method: 'PUT', path: ROUTES.appProfile, body: { handle } }))),
+    must(
+      readProfile(
+        await request({
+          method: 'PUT',
+          path: ROUTES.appProfile,
+          body: checked('UpdateProfile', { handle }),
+        }),
+      ),
+    ),
   /** Who `@handle` is, or null when nobody has it. */
   resolveHandle: async (handle: string): Promise<{ handle: string; address: string } | null> => {
     const h = normalizeHandle(handle);
@@ -175,7 +188,11 @@ export const app = {
   /** The sponsored activation for `token`, or null when there is nothing to do. */
   activate: async (network: string, token: string): Promise<P2pTransaction | null> => {
     const o = itemOf(
-      await request({ method: 'POST', path: ROUTES.appActivate, body: { network, token } }),
+      await request({
+        method: 'POST',
+        path: ROUTES.appActivate,
+        body: checked('Activate', { network, token }),
+      }),
     );
     if (isObj(o) && o.transaction === null) return null;
     return tx(o, 'activate');
@@ -187,7 +204,13 @@ export const app = {
     amount: string;
     note?: string;
   }): Promise<{ transfer: AppTransfer; transaction: P2pTransaction }> => {
-    const o = itemOf(await request({ method: 'POST', path: ROUTES.appTransfers, body }));
+    const o = itemOf(
+      await request({
+        method: 'POST',
+        path: ROUTES.appTransfers,
+        body: checked('CreateTransfer', body),
+      }),
+    );
     if (!isObj(o)) throw bad();
     return { transfer: must(readTransfer(o.transfer)), transaction: tx(o.transaction, 'payment') };
   },
@@ -212,7 +235,13 @@ export const app = {
     id: string,
     body: { network: string; token: string },
   ): Promise<{ payment: ChargePayment; transaction: P2pTransaction }> => {
-    const o = itemOf(await request({ method: 'POST', path: ROUTES.appChargePayments(id), body }));
+    const o = itemOf(
+      await request({
+        method: 'POST',
+        path: ROUTES.appChargePayments(id),
+        body: checked('PayCharge', body),
+      }),
+    );
     if (!isObj(o)) throw bad();
     return {
       payment: must(readChargePayment(o.payment)),
@@ -220,7 +249,11 @@ export const app = {
     };
   },
   submit: async (xdr: string): Promise<SubmitResult> =>
-    must(readSubmit(await request({ method: 'POST', path: ROUTES.appSubmit, body: { xdr } }))),
+    must(
+      readSubmit(
+        await request({ method: 'POST', path: ROUTES.appSubmit, body: checked('Submit', { xdr }) }),
+      ),
+    ),
   submission: async (hash: string): Promise<SubmitResult> =>
     must(readSubmit(await request({ method: 'GET', path: ROUTES.appSubmission(hash) }))),
 };

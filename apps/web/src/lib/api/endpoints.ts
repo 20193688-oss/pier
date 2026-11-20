@@ -79,7 +79,7 @@ export const auth = {
   /** Verify the signed challenge; the session arrives as an HttpOnly cookie (the token the body
       also carries, for non-browser clients, is never kept). Then read who is signed in. */
   verify: async (transaction: string) => {
-    await request({ method: 'POST', path: ROUTES.authVerify, body: { transaction } });
+    await request({ method: 'POST', path: ROUTES.authVerify, body: checked('SignIn', { transaction }) });
     const s = await auth.session();
     if (!s) throw bad();
     return s;
@@ -248,15 +248,22 @@ export const tx = (raw: unknown, action?: string): P2pTransaction => {
   return t;
 };
 
-/** The API's names for the actions on one's own order (the contract's names differ). */
-const ORDER_ACTION = {
+/** The API's names for the transaction builder's actions (the contract's function names
+    differ in case: `mark_paid` is `markPaid`). */
+const API_ACTION: Record<string, string> = {
   accept: 'accept',
   mark_paid: 'markPaid',
   release: 'release',
   cancel: 'cancel',
   dispute: 'dispute',
-} as const;
-export type OrderTxAction = keyof typeof ORDER_ACTION;
+  deposit: 'deposit',
+  withdraw: 'withdraw',
+  set_operator: 'setOperator',
+  set_matcher: 'setMatcher',
+};
+/** An API action name for a contract function (unknown names pass as they are). */
+export const apiAction = (fn: string) => API_ACTION[fn] ?? fn;
+export type OrderTxAction = 'accept' | 'mark_paid' | 'release' | 'cancel' | 'dispute';
 
 export interface QrQuoteInput {
   kind: 'QR_PAY';
@@ -300,7 +307,9 @@ export const trade = {
     ),
   qrQuote: async (input: QrQuoteInput, decimals: Decimals = null) =>
     normalizeQuote(
-      itemOf(await request({ method: 'POST', path: ROUTES.appQuotes, body: input })),
+      itemOf(
+        await request({ method: 'POST', path: ROUTES.appQuotes, body: checked('AppQuote', input) }),
+      ),
       decimals,
     ),
   /** A QR payment's order: a sale to the matched merchant, with its unsigned
@@ -311,7 +320,7 @@ export const trade = {
         await request({
           method: 'POST',
           path: ROUTES.appOrders,
-          body: { kind: 'QR_PAY', quoteId: input.quoteId, qr: input.qr },
+          body: checked('AppOrder', { kind: 'QR_PAY', quoteId: input.quoteId, qr: input.qr }),
         }),
       ),
       decimals,
@@ -361,7 +370,7 @@ export const trade = {
       await request({
         method: 'POST',
         path: ROUTES.appOrderTransactions(orderId),
-        body: { action: ORDER_ACTION[action] },
+        body: checked('AppTransaction', { action: apiAction(action) }),
       }),
       action,
     ),
@@ -376,7 +385,7 @@ export const accounts = {
       await request({
         method: 'POST',
         path: ROUTES.accountChallenge,
-        body: { address },
+        body: checked('CreateChallengeDto', { address }),
         headers: scoped(scope),
       }),
     ) as Record<string, unknown>;
@@ -389,7 +398,7 @@ export const accounts = {
       expiresAt: String(o.expiresAt ?? ''),
     };
   },
-  /** Register the wallet with its signed challenge. */
+  /** Register the wallet with its signed challenge (the API reads the address from it). */
   register: async (
     scope: Scope,
     body: { address: string; transaction: string; label?: string; displayName?: string },
@@ -399,7 +408,11 @@ export const accounts = {
         await request({
           method: 'POST',
           path: ROUTES.accounts,
-          body,
+          body: checked('RegisterAccountDto', {
+            transaction: body.transaction,
+            ...(body.label ? { label: body.label } : {}),
+            ...(body.displayName ? { displayName: body.displayName } : {}),
+          }),
           headers: scoped(scope),
         }),
       ),
@@ -625,7 +638,7 @@ export const clientOrders = {
       await request({
         method: 'POST',
         path: ROUTES.transactions,
-        body,
+        body: checked('BuildTransactionDto', { ...body, action: apiAction(body.action) }),
         headers: scoped(scope),
       }),
       body.action,
@@ -634,7 +647,12 @@ export const clientOrders = {
   submit: async (scope: Scope, xdr: string) =>
     must(
       readSubmit(
-        await request({ method: 'POST', path: ROUTES.submit, body: { xdr }, headers: scoped(scope) }),
+        await request({
+          method: 'POST',
+          path: ROUTES.submit,
+          body: checked('Submit', { xdr }),
+          headers: scoped(scope),
+        }),
       ),
     ),
   submission: async (scope: Scope, hash: string) =>

@@ -342,12 +342,22 @@ test("the app's readers: profile, balances, transfers, activity, charges, submis
     'nothing to pay is no price',
   );
   assert.equal(
-    readPayerCharge({ id: 'ch', payWithBalance: { token: 'USDC', amount: '5', expiresAt: '2026-11-19T12:01:00Z' } })
-      ?.payWithBalance?.amount,
-    '5',
+    readPayerCharge({
+      id: 'ch',
+      payWithBalance: { token: 'USDC', amount: '5', expiresAt: '2026-11-19T12:01:00Z', recipient: G2 },
+    })?.payWithBalance?.recipient,
+    G2,
   );
-  assert.equal(readChargePayment({ id: 'p', to: '0xabc' }), null, 'no Stellar destination');
-  assert.equal(readChargePayment({ id: 'p', to: G2, amount: '5' })?.to, G2);
+  assert.equal(readChargePayment({ amount: '5' }), null, 'no id');
+  assert.equal(readChargePayment({ id: 'p', amount: '5', hash: 'ab' })?.amount, '5');
+  assert.equal(
+    readPayerCharge({
+      id: 'ch',
+      payWithBalance: { token: 'USDC', amount: '5', expiresAt: '2026-11-19T12:01:00Z', recipient: '0xabc' },
+    })?.payWithBalance,
+    null,
+    'a price with no Stellar recipient is no price',
+  );
   assert.deepEqual(readSubmit({ hash: 'h', status: 'SUCCESS' }), { hash: 'h', status: 'SUCCESS', error: null });
   assert.equal(readSubmit({ hash: 'h', status: '??' })?.status, 'PENDING');
   assert.equal(readSubmit({ status: 'SUCCESS' }), null);

@@ -74,11 +74,13 @@ export interface PayerCharge {
   network: string;
   token: string;
   expiresAt: string | null;
-  /* Null when the balance cannot pay it now (no quote, the charge is closed...). */
-  payWithBalance: { token: string; amount: string; expiresAt: string } | null;
+  /* Null when the balance cannot pay it now (no quote, the charge is closed...). `recipient` is
+     the charge's receiving account (G or C): what the payment must pay. */
+  payWithBalance: { token: string; amount: string; expiresAt: string; recipient: string } | null;
 }
 
-/** A payment of a charge from the balance: a token transfer to the charge's receiving account. */
+/** A payment of a charge from the balance: a token transfer to the charge's receiving account
+    (the `recipient` its payer was shown). */
 export interface ChargePayment {
   id: string;
   chargeId: string;
@@ -86,8 +88,8 @@ export interface ChargePayment {
   token: string;
   /* Base units. */
   amount: string;
-  /* The charge's receiving account: what the transaction must pay. */
-  to: string;
+  /* The transaction's hash. */
+  hash: string | null;
   status: string;
   expiresAt: string | null;
 }

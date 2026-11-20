@@ -341,10 +341,12 @@ export function transaction(raw: unknown, action?: string): P2pTransaction | nul
   };
 }
 
+/** A QR payment's QR: the merchant's view carries the payload to pay; the payer's only its summary
+    (an empty payload). */
 function orderQr(raw: unknown): P2pOrder['qr'] {
-  if (!isObj(raw) || typeof raw.payload !== 'string' || !raw.payload) return null;
+  if (!isObj(raw) || (!raw.payload && !raw.merchantName && !raw.standard)) return null;
   return {
-    payload: raw.payload,
+    payload: typeof raw.payload === 'string' ? raw.payload : '',
     standard: String(raw.standard ?? ''),
     merchantName: str(raw.merchantName),
     merchantCity: str(raw.merchantCity),

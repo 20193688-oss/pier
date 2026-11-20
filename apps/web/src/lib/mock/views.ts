@@ -28,7 +28,24 @@ export function orderView(o: Wire, role: 'client' | 'merchant') {
       merchantAccountId: 'acc_norte_treasury',
       ...(o.kind === 'QR_PAY' ? { qr: qrView(o) } : {}),
     };
-  // The client side never sees the beneficiary of someone else's account details.
+  // The client side never sees the beneficiary of someone else's account details; a QR payment's
+  // payer sees its QR's summary, not the payload.
+  if (o.kind === 'QR_PAY') {
+    const q = qrView({ ...o, status: 'paid' });
+    return {
+      ...v,
+      role: 'client',
+      qr: q
+        ? {
+            standard: q.standard,
+            merchantName: q.merchantName,
+            merchantCity: q.merchantCity,
+            amount: q.amount,
+            currency: q.currency,
+          }
+        : null,
+    };
+  }
   return { ...v, role: 'client' };
 }
 

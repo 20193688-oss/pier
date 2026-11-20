@@ -12,7 +12,7 @@ import { SignFlow } from '@/components/wallet/SignFlow';
 import { app, appSubmitter } from '@/lib/api/app';
 import { ApiError } from '@/lib/api/client';
 import { isNotFound } from '@/lib/api/messages';
-import { money } from '@/lib/format';
+import { money, shortAddress } from '@/lib/format';
 import { countdown, msLeft } from '@/lib/p2p/orders';
 import { useSession } from '@/lib/session';
 import { useAppData } from '@/features/app/data';
@@ -98,6 +98,7 @@ export default function PayCharge() {
             <Facts
               rows={[
                 [c.inUsd, fmtUsd(price.amount)],
+                [c.to, shortAddress(price.recipient)],
                 [t.app.send.fee, market.sponsor.enabled ? t.app.send.free : '-'],
               ]}
             />
@@ -126,13 +127,13 @@ export default function PayCharge() {
                       return r.transaction;
                     },
                     expect: null,
-                    // The amount shown, to the receiving account this payment names: nothing else.
+                    // The amount and the receiving account shown on this screen: nothing else.
                     expectFor: () => {
                       const p = payment.current;
                       if (!p || p.amount !== price.amount || p.chargeId !== charge.id) return null;
                       return {
                         action: 'payment',
-                        to: p.to,
+                        to: price.recipient,
                         token: token.symbol,
                         amountUnits: price.amount,
                         memo: null,

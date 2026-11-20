@@ -437,7 +437,7 @@ function afterSuccess(hash: string) {
   }
   for (const p of Object.values(s.chargePayments)) {
     if (p._hash !== hash) continue;
-    p.status = 'completed';
+    p.status = 'COMPLETED';
     const c = s.charges.find((x) => x.id === p.chargeId);
     if (c) {
       c.orders = Number(c.orders ?? 0) + 1;

@@ -387,7 +387,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       // A sale's unsigned open_with_deposit, while its seller has not sent it.
       return ok(
         (o.kind === 'SELL' || o.kind === 'QR_PAY') && o.status === 'pending'
-          ? { ...v, transaction: saleOpen(o) }
+          ? { ...v, transactions: [saleOpen(o)] }
           : v,
       );
     },
@@ -453,9 +453,9 @@ const routes: [ApiRequest['method'], string, Handler][] = [
     'POST',
     '/v1/p2p/accounts',
     withOrg(({ body }, org) => {
+      // The address is the one the signed challenge proves; the body names none.
       const address = sep10Verify(String(body.transaction ?? ''), org);
-      if (!address || address !== body.address)
-        return fail(401, 'invalid_signature', 'The challenge is not signed by this wallet.');
+      if (!address) return fail(401, 'invalid_signature', 'The challenge is not signed by this wallet.');
       if (db().accounts.some((a) => a.address === address))
         return fail(409, 'address_taken', 'This wallet is already registered.');
       const displayName = body.displayName ? String(body.displayName) : null;
@@ -1011,7 +1011,7 @@ function createOrder(body: Wire): ApiResponse {
   db().orders.push(o);
   save();
   const v = orderView(o, 'client');
-  return ok(buy ? v : { ...v, transaction: saleOpen(o) }, 201);
+  return ok(buy ? v : { ...v, transactions: [saleOpen(o)] }, 201);
 }
 
 function buyerAction(id: string, action: 'paid' | 'cancel' | 'dispute', body: Wire): ApiResponse {

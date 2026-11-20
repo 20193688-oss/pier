@@ -312,7 +312,7 @@ export function OrdersView() {
                             </StatusPill>
                           </div>
                         </div>
-                        {tab === 'merchant' && order.kind === 'QR_PAY' && order.qr && (
+                        {tab === 'merchant' && order.kind === 'QR_PAY' && order.qr?.payload && (
                           <QrToPay qr={order.qr} />
                         )}
                         {canWrite && actions.length > 0 && (

@@ -406,7 +406,12 @@ test("an order, from the client's and the merchant's views", () => {
     currency: 'ARS',
     reference: 'MESA-4',
   });
-  assert.equal(normalizeOrder({ ...base, qr: { standard: 'pix' } }).qr, null, 'no payload, no QR');
+  // The payer's view: the QR's summary, never a payload to pay.
+  assert.deepEqual(
+    normalizeOrder({ ...base, qr: { standard: 'pix', merchantName: 'Padaria' } }).qr?.payload,
+    '',
+  );
+  assert.equal(normalizeOrder({ ...base, qr: {} }).qr, null, 'nothing to show, no QR');
 });
 
 test('transfer matches, charges and payout batches', () => {

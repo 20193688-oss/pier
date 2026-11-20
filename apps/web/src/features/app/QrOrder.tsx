@@ -91,7 +91,9 @@ export default function QrOrder() {
       </Screen>
     );
 
-  const shop = shopOf(order.id);
+  const shop = order.qr?.merchantName
+    ? { name: order.qr.merchantName, city: order.qr.merchantCity }
+    : shopOf(order.id);
   const merchant = order.merchant?.displayName || q.title;
   const local = money(lang, order.fiatAmount, order.currency);
   const units = toBaseUnits(order.tokenAmount, token.decimals) ?? '0';

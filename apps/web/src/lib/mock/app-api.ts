@@ -171,7 +171,7 @@ export function qrOrder(body: Wire) {
   o.bond = q.bond;
   db().orders.push(o);
   save();
-  return ok({ ...orderView(o, 'client'), transaction: saleOpen(o) }, 201);
+  return ok({ ...orderView(o, 'client'), transactions: [saleOpen(o)] }, 201);
 }
 
 /* --- The app's own routes --- */
@@ -225,7 +225,13 @@ function payerCharge(c: Wire) {
     expiresAt: c.expiresAt,
     payWithBalance:
       c.status === 'open' && amount
-        ? { token: 'USDC', amount, expiresAt: iso(now() + 60_000) }
+        ? {
+            token: 'USDC',
+            tokenContract: USDC.contract,
+            amount,
+            expiresAt: iso(now() + 60_000),
+            recipient: c.recipientAddress,
+          }
         : null,
   };
 }
@@ -420,8 +426,8 @@ export const appRoutes: [ApiRequest['method'], string, Handler][] = [
         network: NETWORK.id,
         token: 'USDC',
         amount,
-        to: c.recipientAddress,
-        status: 'pending',
+        hash: tx.hash,
+        status: 'PENDING',
         expiresAt: view.payWithBalance.expiresAt,
         _hash: tx.hash,
       };

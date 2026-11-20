@@ -216,6 +216,7 @@ const app = {
     title: 'Pay a charge',
     from: 'Charged by',
     amount: 'Amount',
+    to: 'Receiving account',
     inUsd: 'With your balance',
     payWithBalance: 'Pay {amount} from my balance',
     payInPesos: 'Pay in {currency} by transfer',

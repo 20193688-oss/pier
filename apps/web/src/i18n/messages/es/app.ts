@@ -217,6 +217,7 @@ const app = {
     title: 'Pagar un cobro',
     from: 'Te cobra',
     amount: 'Monto',
+    to: 'Cuenta que cobra',
     inUsd: 'Con tu saldo',
     payWithBalance: 'Pagar {amount} con mi saldo',
     payInPesos: 'Pagar en {currency} con transferencia',
