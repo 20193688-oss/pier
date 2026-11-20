@@ -14,7 +14,7 @@ import {
 } from '@stellar/stellar-sdk';
 import { ChainCallReverted, ChainClient } from '@/chain/chain-client.service';
 import { DeploymentsService, type StellarNetwork } from '@/chain/deployments.service';
-import { marketErrorName } from '@/chain/market-codec';
+import { refusalName } from '@/chain/market-codec';
 import type { Token } from '@/chain/networks';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { formatUnits } from '@/p2p/domain/pricing';
@@ -143,7 +143,10 @@ export class TxBuilder {
         .build();
       const sim = await this.chain.simulate(n, tx);
       if (rpc.Api.isSimulationError(sim)) {
-        throw new ChainCallReverted(marketErrorName(sim.error), sim.error);
+        throw new ChainCallReverted(
+          refusalName(sim, (id) => this.deployments.isMarket(id)),
+          sim.error,
+        );
       }
       if (rpc.Api.isSimulationRestore(sim) && attempt === 0) {
         await this.restore(n, sim.restorePreamble);

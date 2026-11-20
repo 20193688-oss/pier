@@ -5,14 +5,22 @@ import { describe, expect, it } from 'vitest';
 import {
   MARKET,
   decodeMarketEvent,
+  contractErrorOrigin,
   marketErrorName,
   p2pCall,
+  refusalName,
   snakeCase,
   toChainOrder,
   type P2pOpenParams,
 } from '@/chain/market-codec';
 import { openParamsOf, orderRef } from '@/p2p/domain/order-ref';
 import { call } from '@test/unit/helpers/ops';
+import {
+  MARKET_ID,
+  TOKEN_ID,
+  marketRefusal,
+  tokenRefusal,
+} from '@test/unit/helpers/simulation-refusals';
 
 const CONTRACT = StrKey.encodeContract(Buffer.alloc(32, 3));
 const TOKEN = StrKey.encodeContract(Buffer.alloc(32, 4));
@@ -215,5 +223,32 @@ describe('the market codec (contract.Spec over MARKET_SPEC)', () => {
     expect(snakeCase('OrderOpened')).toBe('order_opened');
     expect(snakeCase('order_paid')).toBe('order_paid');
     expect(snakeCase('OwnershipTransferStarted')).toBe('ownership_transfer_started');
+  });
+});
+
+describe('refusal attribution', () => {
+  const decode = (events: string[]) => events.map((e) => xdr.DiagnosticEvent.fromXDR(e, 'base64'));
+  const isMarket = (id: string) => id === MARKET_ID;
+
+  it('names a token refusal inside a market call as the token’s, not the market’s code', () => {
+    const events = decode(tokenRefusal.events);
+    expect(contractErrorOrigin(events)).toEqual({ contract: TOKEN_ID, code: 13 });
+    expect(refusalName({ error: tokenRefusal.error, events }, isMarket)).toBe(
+      'TokenTrustlineMissing',
+    );
+    // The old text-only reading took #13 for the market's EmptyRef.
+    expect(marketErrorName(tokenRefusal.error)).toBe('EmptyRef');
+  });
+
+  it('names the market’s own refusal from its error table', () => {
+    const events = decode(marketRefusal.events);
+    expect(contractErrorOrigin(events)).toEqual({ contract: MARKET_ID, code: 16 });
+    expect(refusalName({ error: marketRefusal.error, events }, isMarket)).toBe('UnknownOrder');
+  });
+
+  it('falls back to the market table only when there are no events to tell', () => {
+    expect(refusalName({ error: marketRefusal.error, events: [] }, isMarket)).toBe('UnknownOrder');
+    expect(refusalName({ error: 'HostError: Error(Auth, InvalidAction)' }, isMarket)).toBeNull();
+    expect(contractErrorOrigin([{}, { event: { body: { v0: { topics: [] } } } }])).toBeNull();
   });
 });
