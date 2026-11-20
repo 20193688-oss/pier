@@ -1,5 +1,7 @@
 /* snippets.ts: the docs' code samples, shared by every language (code is not translated; its
-   comments are in English like all code). A catalog block '@@code <name>' places one. */
+   comments are in English like all code). A catalog block '@@code <name>' places one. Addresses
+   in them are placeholders (G... for accounts, C... for contracts); amounts are base units of a
+   7-decimal Stellar asset. */
 
 export interface Snippet {
   lang: 'bash' | 'ts' | 'json' | 'csv';
@@ -16,48 +18,98 @@ export const SNIPPETS: Record<string, Snippet> = {
     lang: 'bash',
     code: `curl "$PEDOSPE_API_URL/v1/market?tier=test"
 # -> { "available": true, "tier": "test",
-#      "networks": [ { "id": "base", "chainId": 84532, "contract": "0x...", "paused": false,
-#        "protocolFeeBps": 30, "tokens": [ { "symbol": "USDC", "address": "0x...", "decimals": 6 } ] } ],
-#      "currencies": [ { "code": "ARS", "decimals": 2, "rails": [ { "id": "ar_bank_transfer", "fields": [...] } ] } ],
-#      "bondBps": 1000, "maxIntegratorFeeBps": 500, "matcher": "0x...",
+#      "networks": [ { "id": "testnet", "name": "Stellar Testnet",
+#        "networkPassphrase": "Test SDF Network ; September 2015",
+#        "rpcUrl": "https://soroban-testnet.stellar.org", "horizonUrl": "https://horizon-testnet.stellar.org",
+#        "explorerUrl": "https://stellar.expert/explorer/testnet",
+#        "contract": "C...", "protocolFeeBps": 30, "paused": false,
+#        "tokens": [ { "symbol": "USDC", "code": "USDC", "issuer": "G...", "contract": "C...", "decimals": 7 } ] } ],
+#      "currencies": [ { "code": "ARS", "decimals": 2,
+#        "rails": [ { "id": "ar_bank_transfer", "fields": [...] }, { "id": "ar_qr", "fields": [] } ] } ],
+#      "bondBps": 1000, "maxIntegratorFeeBps": 500, "matcher": "G...", "sponsor": { "enabled": true },
 #      "windows": { "buyPaymentWindow": 1800, "sellAcceptWindow": 300,
 #                   "sellPaymentWindow": 1800, "sellSettleWindow": 21600 } }`,
+  },
+
+  signIn: {
+    lang: 'ts',
+    code: `import { Keypair, TransactionBuilder } from '@stellar/stellar-sdk';
+
+// SEP-10: the API answers a challenge transaction for the account; the wallet signs it (it can
+// never be submitted: its sequence number is 0) and the API answers a session.
+const account = keypair.publicKey(); // G...
+const { transaction, network_passphrase } = await (
+  await fetch(\`\${BASE}/v1/auth/challenge?account=\${account}\`)
+).json();
+
+// Check it before signing: only manage_data operations, the first one "<home domain> auth"
+// for this account, signed by the SIGNING_KEY of the site's /.well-known/stellar.toml.
+const tx = TransactionBuilder.fromXDR(transaction, network_passphrase);
+tx.sign(keypair);
+
+const { token } = await (
+  await fetch(\`\${BASE}/v1/auth/verify\`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transaction: tx.toXDR() }),
+  })
+).json(); // token: "ps_sess_..." (a browser gets an HttpOnly cookie instead)`,
   },
 
   registerWallet: {
     lang: 'bash',
     code: `curl -X POST $API/accounts/challenge -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "address": "0xYourWallet" }'
-# -> { "id": "chl_...", "message": "pedospe wallet registration ...", "expiresAt": "..." }
+  -d '{ "address": "GYOURWALLET..." }'
+# -> { "transaction": "AAAAAgAAAA...", "networkPassphrase": "Test SDF Network ; September 2015",
+#      "expiresAt": "..." }
+# A SEP-10-shaped challenge bound to your organization: sign it with the wallet (never submit it).
 
-# Sign "message" with personal_sign in the wallet, then:
 curl -X POST $API/accounts -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "challengeId": "chl_...", "signature": "0x...", "label": "Treasury",
-        "merchant": { "displayName": "Norte Cambios" } }'`,
+  -d '{ "address": "GYOURWALLET...", "transaction": "AAAAAgAAAA...(signed)",
+        "label": "Treasury", "displayName": "Norte Cambios" }'`,
   },
 
   merchantProfile: {
     lang: 'bash',
     code: `curl -X PATCH $API/accounts/ACCOUNT_ID -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "merchant": { "displayName": "Norte Cambios", "status": "PAUSED" } }'`,
+  -d '{ "displayName": "Norte Cambios", "merchantStatus": "PAUSED" }'`,
   },
 
-  approveDeposit: {
+  deposit: {
     lang: 'bash',
     code: `curl -X POST $API/transactions -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "network": "base", "from": "0xYourWallet", "action": "approve",
-        "args": { "token": "USDC", "amount": "5000000000" } }'
-# -> { "chainId": 8453, "to": "0x...", "data": "0x095ea7b3...", "value": "0",
-#      "description": "approve" }
+  -d '{ "network": "testnet", "from": "ACCOUNT_ID", "action": "deposit",
+        "args": { "token": "USDC", "amount": "50000000000" } }'
+# -> { "network": "testnet", "action": "deposit", "description": "...",
+#      "xdr": "AAAAAgAAAA...", "hash": "9f2c...", "expiresAt": "..." }
 
-# Send it from the wallet, wait until it is mined, then the same with "action": "deposit".`,
+# Decode and check the XDR, sign it with the wallet, then hand it back (see "Submit").`,
+  },
+
+  submit: {
+    lang: 'ts',
+    code: `import { TransactionBuilder } from '@stellar/stellar-sdk';
+
+// The API built an unsigned, prepared envelope; the wallet signs it and the API submits it,
+// wrapped in a fee-bump from its sponsor account: the wallet never needs XLM for fees.
+const tx = TransactionBuilder.fromXDR(built.xdr, networkPassphrase);
+// ...check tx: source, one operation, the market contract, the function and every argument...
+tx.sign(walletKeypair);
+
+let r = await (
+  await fetch(\`\${API}/submit\`, { method: 'POST', headers, body: JSON.stringify({ xdr: tx.toXDR() }) })
+).json(); // { hash, status: "PENDING" | "SUCCESS" | "FAILED", error }
+while (r.status === 'PENDING') {
+  await new Promise((ok) => setTimeout(ok, 1500));
+  r = await (await fetch(\`\${API}/submissions/\${r.hash}\`, { headers })).json();
+}`,
   },
 
   setMatcher: {
     lang: 'bash',
     code: `curl -X POST $API/transactions -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "network": "base", "from": "0xYourWallet", "action": "setMatcher",
-        "args": { "maxPerOrder": "1000000000", "autoSettle": false } }'`,
+  -d '{ "network": "testnet", "from": "ACCOUNT_ID", "action": "set_matcher",
+        "args": { "maxPerOrder": "10000000000", "autoSettle": false } }'`,
   },
 
   paymentMethod: {
@@ -78,7 +130,7 @@ curl -X POST $API/accounts -H "$AUTH" -H "Content-Type: application/json" \\
   -d '{
     "accountId": "ACCOUNT_ID",
     "side": "SELL_TOKEN",
-    "network": "base",
+    "network": "testnet",
     "token": "USDC",
     "currency": "ARS",
     "rails": ["ar_bank_transfer"],
@@ -90,27 +142,40 @@ curl -X POST $API/accounts -H "$AUTH" -H "Content-Type: application/json" \\
   }'`,
   },
 
+  qrOffer: {
+    lang: 'bash',
+    code: `# Pay shops' QRs for people (QR_PAY): a BUY_TOKEN offer on the QR rails.
+curl -X POST $API/offers -H "$AUTH" -H "Content-Type: application/json" \\
+  -d '{ "accountId": "ACCOUNT_ID", "side": "BUY_TOKEN", "network": "testnet", "token": "USDC",
+        "currency": "ARS", "rails": ["ar_qr"], "price": "1452", "priceTtlSeconds": 600,
+        "minFiat": "1000", "maxFiat": "500000", "active": true }'`,
+  },
+
   release: {
     lang: 'bash',
     code: `curl -X POST $API/transactions -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "network": "base", "from": "0xYourWallet", "action": "release",
-        "args": { "orderId": "ORDER_ID" } }'`,
+  -d '{ "network": "testnet", "from": "ACCOUNT_ID", "action": "release",
+        "args": { "orderId": "ORDER_ID" } }'
+# Then sign the XDR with the wallet and POST it to $API/submit.`,
   },
 
   setOperator: {
     lang: 'bash',
     code: `curl -X POST $API/transactions -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "network": "base", "from": "0xMerchantWallet", "action": "setOperator",
-        "args": { "operator": "0xBotWallet", "permissions": 6 } }'`,
+  -d '{ "network": "testnet", "from": "ACCOUNT_ID", "action": "set_operator",
+        "args": { "operator": "GBOTWALLET...", "permissions": 6 } }'`,
   },
 
   botMatches: {
     lang: 'ts',
-    code: `const API = \`\${process.env.PEDOSPE_API_URL}/v1\`;
+    code: `import { Keypair, TransactionBuilder } from '@stellar/stellar-sdk';
+
+const API = \`\${process.env.PEDOSPE_API_URL}/v1/p2p\`;
 const headers = {
   Authorization: \`Bearer \${process.env.PEDOSPE_API_KEY}\`,
   'Content-Type': 'application/json',
 };
+const bot = Keypair.fromSecret(process.env.BOT_SECRET!); // the bot's own key, never the merchant's
 
 interface BankTransfer {
   currency: string; // ISO 4217, e.g. "ARS"
@@ -121,10 +186,7 @@ interface BankTransfer {
 }
 
 // Called by your bank integration for every incoming transfer.
-export async function onBankTransfer(
-  transfer: BankTransfer,
-  wallet: { sendTransaction(tx: object): Promise<string> },
-) {
+export async function onBankTransfer(transfer: BankTransfer, networkPassphrase: string) {
   const res = await fetch(\`\${API}/merchant/transfer-matches\`, {
     method: 'POST',
     headers,
@@ -137,9 +199,12 @@ export async function onBankTransfer(
   // Release on its own only when amount, name and document all match; leave the rest to a person.
   if (!best || best.score < 3) return;
 
-  // The bot's wallet signs; its release permission lets it release the merchant's order.
-  const hash = await wallet.sendTransaction(best.transaction);
-  console.log(\`released order \${best.order.id} (\${best.matchedOn.join(', ')}) in \${hash}\`);
+  // The release is a Stellar transaction; the bot's key signs it (its release permission lets it
+  // release the merchant's order) and the API submits it.
+  const tx = TransactionBuilder.fromXDR(best.transaction.xdr, networkPassphrase);
+  tx.sign(bot);
+  await fetch(\`\${API}/submit\`, { method: 'POST', headers, body: JSON.stringify({ xdr: tx.toXDR() }) });
+  console.log(\`released order \${best.order.id} (\${best.matchedOn.join(', ')})\`);
 }`,
   },
 
@@ -155,14 +220,14 @@ export async function onBankTransfer(
   buy: {
     lang: 'bash',
     code: `curl -X POST $API/quotes -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "side": "BUY", "network": "base", "token": "USDC", "currency": "ARS",
+  -d '{ "side": "BUY", "network": "testnet", "token": "USDC", "currency": "ARS",
         "rail": "ar_bank_transfer", "fiatAmount": "50000" }'
 
 curl -X POST $API/orders -H "$AUTH" -H "Content-Type: application/json" \\
   -d '{
     "kind": "BUY",
     "quoteId": "QUOTE_ID",
-    "recipient": "0xUserWallet",
+    "recipient": "GUSERWALLET...",
     "payer": { "name": "Ana Gómez", "document": "20329642330" },
     "externalReference": "order-881"
   }'
@@ -178,19 +243,40 @@ curl -X POST $API/orders -H "$AUTH" -H "Content-Type: application/json" \\
   sell: {
     lang: 'bash',
     code: `curl -X POST $API/quotes -H "$AUTH" -H "Content-Type: application/json" \\
-  -d '{ "side": "SELL", "network": "base", "token": "USDC", "currency": "ARS",
-        "rail": "ar_bank_transfer", "tokenAmount": "25000000" }'
+  -d '{ "side": "SELL", "network": "testnet", "token": "USDC", "currency": "ARS",
+        "rail": "ar_bank_transfer", "tokenAmount": "250000000" }'
 
 curl -X POST $API/orders -H "$AUTH" -H "Content-Type: application/json" \\
   -d '{
     "kind": "SELL",
     "quoteId": "QUOTE_ID",
-    "seller": "0xUserWallet",
+    "seller": "GUSERWALLET...",
     "beneficiary": { "holderName": "Ana Gómez", "document": "20329642330",
                      "details": { "alias": "ana.gomez.mp", "cuit": "20329642330" } }
   }'
 # -> { "id": "...", "status": "pending",
-#      "transactions": [ { "action": "approve", ... }, { "action": "openWithDeposit", ... } ] }`,
+#      "transactions": [ { "action": "open_with_deposit", "xdr": "AAAAAgAAAA...", "hash": "...", ... } ] }`,
+  },
+
+  qrPay: {
+    lang: 'bash',
+    code: `# The person scanned a shop's QR (EMV payload, CRC checked). Session routes: the app's own.
+curl -X POST "$PEDOSPE_API_URL/v1/app/quotes" -b session.txt -H "Content-Type: application/json" \\
+  -d '{ "kind": "QR_PAY", "network": "testnet", "token": "USDC",
+        "qr": "00020101021243...6304ABCD", "fiatAmount": "12500.00" }'
+
+curl -X POST "$PEDOSPE_API_URL/v1/app/orders" -b session.txt -H "Content-Type: application/json" \\
+  -d '{ "kind": "QR_PAY", "quoteId": "QUOTE_ID", "qr": "00020101021243...6304ABCD" }'
+# -> the order and its unsigned open_with_deposit: accept 2 min, payment 10 min, settle 1 h.`,
+  },
+
+  appTransfer: {
+    lang: 'bash',
+    code: `curl -X POST "$PEDOSPE_API_URL/v1/app/transfers" -b session.txt -H "Content-Type: application/json" \\
+  -d '{ "network": "testnet", "to": "@lucia", "token": "USDC", "amount": "125000000",
+        "note": "Asado" }'
+# -> { "transfer": { "id": "...", "to": "G...", "toHandle": "lucia", "status": "PENDING", ... },
+#      "transaction": { "xdr": "AAAAAgAAAA...", ... } }   # a payment; sign it, then POST /v1/app/submit`,
   },
 
   charge: {
@@ -199,7 +285,7 @@ curl -X POST $API/orders -H "$AUTH" -H "Content-Type: application/json" \\
   -d '{
     "currency": "ARS",
     "fiatAmount": "25000",
-    "network": "base",
+    "network": "testnet",
     "token": "USDC",
     "recipient": "ACCOUNT_ID",
     "description": "Order #1042",
@@ -207,7 +293,7 @@ curl -X POST $API/orders -H "$AUTH" -H "Content-Type: application/json" \\
     "expiresAt": "2026-12-01T00:00:00Z",
     "multiUse": false
   }'
-# -> { "id": "ch_...", "url": "https://<pedospe web>/pay/ch_...", "status": "open", ... }`,
+# -> { "id": "ch_...", "url": "https://<web>/pay/ch_...", "status": "open", ... }`,
   },
 
   checkout: {
@@ -228,7 +314,7 @@ curl "$PEDOSPE_API_URL/v1/p2p-checkout/orders/ORDER_ID" -H "X-Payer-Token: PAYER
     lang: 'bash',
     code: `curl -X POST $API/payouts -H "$AUTH" -H "Content-Type: application/json" \\
   -d '{
-    "network": "base",
+    "network": "testnet",
     "token": "USDC",
     "accountId": "ACCOUNT_ID",
     "items": [
@@ -257,7 +343,7 @@ MXN,2500,mx_spei,María López,GODE561231GR8,,,,,,002010077777777771,inv-1003`,
 
   apiKey: {
     lang: 'bash',
-    code: `# A test key trades on test networks, a live key on mainnets.
+    code: `# A test key trades on Stellar testnet, a live key on mainnet.
 curl "$PEDOSPE_API_URL/v1/p2p/orders" -H "Authorization: Bearer pk_test_..."`,
   },
 
@@ -272,14 +358,14 @@ curl "$PEDOSPE_API_URL/v1/p2p/orders" -H "Authorization: Bearer pk_test_..."`,
     "id": "ord_...",
     "kind": "BUY",
     "status": "paid",
-    "network": "base",
-    "token": "0x...",
+    "network": "testnet",
+    "token": "C...",
     "tokenSymbol": "USDC",
-    "tokenDecimals": 6,
+    "tokenDecimals": 7,
     "currency": "ARS",
     "rail": "ar_bank_transfer",
     "fiatAmount": "150000.00",
-    "tokenAmount": "100771000",
+    "tokenAmount": "1007710000",
     "paymentDeadline": "2026-11-19T14:30:02.000Z",
     "paidReference": "TRX-88421"
   }

@@ -1,5 +1,5 @@
-/* The merchant / business dashboard (/dashboard/*): signed in with the wallet (SIWE), scoped to
-   one organization and one tier (test or live). A sidebar on wide screens, a sheet of sections on
+/* The merchant / business dashboard (/dashboard/*): signed in with a Stellar wallet (SEP-10),
+   scoped to one organization and one tier (test or live). A sidebar on wide screens, a sheet of sections on
    phones; the market views, charges and payouts, the developer tools and the team. */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router';

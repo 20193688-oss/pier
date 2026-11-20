@@ -1,7 +1,7 @@
-/* checkout.test.ts: the hosted charge page's trust boundary (src/lib/p2p/checkout.ts) and the shape
-   check a transaction passes before a wallet is asked to send it (tx-check.ts). The page tells
-   people where to send money: a malformed answer is an error, never half-shown, and a transaction
-   aimed anywhere but the order's network and contract is never sent. */
+/* checkout.test.ts: the hosted charge page's trust boundary (src/lib/p2p/checkout.ts) and the
+   explorer links every screen shows (src/lib/stellar/network.ts). The page tells people where to
+   send money: a malformed answer is an error, never half-shown, and a link goes only to the
+   network's https explorer, for a real Stellar hash, account or contract. */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
@@ -10,12 +10,12 @@ import {
   parseCheckoutOrder,
   parseCreatedOrder,
 } from '@/lib/p2p/checkout';
-import { checkTransaction, evmChainOf, explorerTx } from '@/lib/p2p/tx-check';
+import { addressKind, explorerLink } from '@/lib/stellar/network';
 
 /* The checkout routes' charge and order, as the API answers them. */
 const CHARGE = {
   id: 'cm3p2pchg0001l70g8v5q3z2w',
-  network: 'base',
+  network: 'testnet',
   tokenSymbol: 'USDC',
   currency: 'ARS',
   fiatAmount: '85000.00',
@@ -46,7 +46,7 @@ const ORDER = {
 test('a charge: every field checked, the symbol from tokenSymbol, rails possibly none', () => {
   assert.deepEqual(parseCheckoutCharge(CHARGE), {
     id: CHARGE.id,
-    network: 'base',
+    network: 'testnet',
     token: 'USDC',
     currency: 'ARS',
     fiatAmount: '85000.00',
@@ -133,74 +133,36 @@ test("the payer's order and the account to pay into: plain short strings under p
 });
 
 const NETWORK = {
-  id: 'base',
-  name: 'Base',
-  chainId: 8453,
-  contract: '0x00000000000000000000000000000000000000c0',
-  tokens: [{ symbol: 'USDC', address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 }],
-  explorer: 'https://basescan.org',
-  rpcUrl: 'https://mainnet.base.org',
-  nativeSymbol: 'ETH',
+  explorerUrl: 'https://stellar.expert/explorer/testnet',
 };
-const word = (hex: string) => hex.replace(/^0x/, '').padStart(64, '0');
+const HASH = 'a'.repeat(64);
+const ACCOUNT = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+const CONTRACT = 'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE';
 
-test("a transaction is sent only to the order's network and contract (or, to approve, the token)", () => {
-  const release = {
-    chainId: 8453,
-    to: NETWORK.contract,
-    data: `0x37bdc99b${word('1')}`,
-    value: '0',
-    action: 'release',
-  };
-  assert.equal(checkTransaction(release, NETWORK), null);
-  assert.equal(checkTransaction({ ...release, chainId: 1 }, NETWORK), 'chain');
+test('explorer links: https only, and only for a real hash, account or contract', () => {
   assert.equal(
-    checkTransaction({ ...release, to: '0x00000000000000000000000000000000000000c1' }, NETWORK),
-    'target',
-  );
-  assert.equal(checkTransaction({ ...release, value: '1000' }, NETWORK), 'value');
-  assert.equal(checkTransaction({ ...release, data: '0x' }, NETWORK), 'shape');
-  assert.equal(checkTransaction(null, NETWORK), 'shape');
-  const approve = {
-    chainId: 8453,
-    to: NETWORK.tokens[0].address,
-    data: `0x095ea7b3${word(NETWORK.contract)}${word('ff')}`,
-    value: '0',
-    action: 'approve',
-  };
-  assert.equal(checkTransaction(approve, NETWORK, 'USDC'), null);
-  assert.equal(
-    checkTransaction(approve, NETWORK),
-    'target',
-    'an approval needs the token it may approve',
+    explorerLink(NETWORK, 'tx', HASH),
+    `https://stellar.expert/explorer/testnet/tx/${HASH}`,
   );
   assert.equal(
-    checkTransaction(
-      {
-        ...approve,
-        data: `0x095ea7b3${word('0x00000000000000000000000000000000000000ee')}${word('ff')}`,
-      },
-      NETWORK,
-      'USDC',
-    ),
-    'target',
-    'the spender must be the market',
+    explorerLink({ explorerUrl: 'https://stellar.expert/explorer/testnet/' }, 'account', ACCOUNT),
+    `https://stellar.expert/explorer/testnet/account/${ACCOUNT}`,
+    'a trailing slash is not doubled',
   );
-  assert.equal(checkTransaction({ ...approve, to: NETWORK.contract }, NETWORK, 'USDC'), 'target');
-  assert.deepEqual(evmChainOf(NETWORK), {
-    chainId: 8453,
-    chainName: 'Base',
-    nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
-    rpcUrls: ['https://mainnet.base.org'],
-    blockExplorerUrls: ['https://basescan.org'],
-  });
-  assert.equal(evmChainOf({ ...NETWORK, rpcUrl: 'http://x' }), undefined);
   assert.equal(
-    explorerTx(NETWORK, `0x${'a'.repeat(64)}`),
-    `https://basescan.org/tx/0x${'a'.repeat(64)}`,
+    explorerLink(NETWORK, 'contract', CONTRACT),
+    `https://stellar.expert/explorer/testnet/contract/${CONTRACT}`,
   );
-  assert.equal(explorerTx(NETWORK, '0x1'), null);
-  assert.equal(explorerTx({ explorer: 'javascript:alert(1)' }, `0x${'a'.repeat(64)}`), null);
+  assert.equal(explorerLink(NETWORK, 'tx', `0x${HASH}`), null, 'an EVM hash is not one');
+  assert.equal(explorerLink(NETWORK, 'tx', 'abc'), null);
+  assert.equal(explorerLink(NETWORK, 'contract', ACCOUNT), null, 'an account is no contract');
+  assert.equal(explorerLink(NETWORK, 'account', ACCOUNT.toLowerCase()), null, 'StrKeys keep case');
+  assert.equal(explorerLink({ explorerUrl: 'javascript:alert(1)' }, 'tx', HASH), null);
+  assert.equal(explorerLink({ explorerUrl: 'http://stellar.expert' }, 'tx', HASH), null);
+  assert.equal(explorerLink({ explorerUrl: null }, 'tx', HASH), null);
+  assert.equal(explorerLink(null, 'tx', HASH), null);
+  assert.equal(addressKind(CONTRACT), 'contract');
+  assert.equal(addressKind(ACCOUNT), 'account');
 });
 
 test('the payee may come as payeeName; ids may use underscores', () => {
@@ -210,17 +172,4 @@ test('the payee may come as payeeName; ids may use underscores', () => {
     'Tienda Lerma',
   );
   assert.equal(parseCheckoutCharge({ ...CHARGE, id: 'ch_pedido1042' })?.id, 'ch_pedido1042');
-});
-
-test('the local development chain may use an http RPC on this machine, nothing else may', () => {
-  const local = {
-    ...NETWORK,
-    chainId: 31337,
-    name: 'Local',
-    rpcUrl: 'http://127.0.0.1:8545',
-    explorer: null,
-  };
-  assert.equal(evmChainOf(local)?.rpcUrls[0], 'http://127.0.0.1:8545');
-  assert.equal(evmChainOf({ ...local, rpcUrl: 'http://10.0.0.2:8545' }), undefined);
-  assert.equal(evmChainOf({ ...local, chainId: 1 }), undefined);
 });

@@ -2,6 +2,7 @@
    the components so they can be tested: a charge's expiry, the figures of each list, a payout
    batch's progress, what a webhook URL and a member address must look like, and which roles a
    member may grant. Pure; tests/unit/admin.test.ts. */
+import { isAccount } from '@/lib/stellar/network';
 import type { Role } from '@/lib/api/types';
 import type { P2pCharge, P2pPayoutBatch } from '@/lib/p2p/types';
 
@@ -62,7 +63,8 @@ export function isWebhookUrl(value: string): boolean {
   }
 }
 
-export const isEvmAddress = (value: string) => /^0x[0-9a-fA-F]{40}$/.test(value.trim());
+/** A member's wallet: a Stellar account (G...), written exactly (StrKeys have one spelling). */
+export const isMemberAddress = (value: string) => isAccount(value.trim());
 
 /** The roles a member with `mine` may give: owners any, admins admin and member, members none. */
 export function grantableRoles(mine: Role): Role[] {

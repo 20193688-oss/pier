@@ -106,8 +106,8 @@ const admin = {
     add: 'Agregar miembro',
     addTitle: 'Agregar un miembro',
     address: 'Dirección de su wallet',
-    addressPlaceholder: '0x…',
-    addressError: 'Escribe una dirección EVM: 0x y 40 caracteres hexadecimales',
+    addressPlaceholder: 'G…',
+    addressError: 'Escribe una dirección de Stellar: empieza con G y tiene 56 caracteres',
     addressHint: 'La persona entra al panel firmando con esa wallet.',
     role: 'Rol',
     roleHints: {

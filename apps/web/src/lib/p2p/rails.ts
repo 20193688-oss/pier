@@ -5,7 +5,9 @@
    typo never becomes an order that cannot be paid.
 
    One entry per rail. A field is `{ key, kind }`; `kind` names the check and the label the
-   screens use (the `p2p.fields` translations). A rail the market lists that this table does not
+   screens use (the `p2p.fields` translations). The QR rails (`ar_qr`, Argentina's interoperable
+   QR, and `br_pix_qr`, a PIX BR Code) take no account at all: the destination is the merchant QR
+   the person scanned, which the market merchant pays from its own banking app (QR_PAY orders). A rail the market lists that this table does not
    know is still offered: its fields come from the market and are checked as plain required text.
 
    Pure (no DOM): tests/unit/rails.test.ts covers every check. */
@@ -16,7 +18,9 @@ export type RailId =
   | 'mx_spei'
   | 'co_bank_transfer'
   | 'pe_bank_transfer'
-  | 'cl_bank_transfer';
+  | 'cl_bank_transfer'
+  | 'ar_qr'
+  | 'br_pix_qr';
 
 /** What a field holds, which also picks its check and its label. */
 export type FieldKind =
@@ -63,6 +67,8 @@ export interface Rail {
   fields: readonly RailField[];
   /* The detail that holds the holder's document, when the rail has one. */
   documentKey?: string;
+  /* A QR rail: no account fields, paid by scanning a merchant QR (QR_PAY orders only). */
+  qr?: boolean;
 }
 
 export const PIX_KEY_TYPES = ['cpf', 'cnpj', 'email', 'phone', 'evp'] as const;
@@ -135,9 +141,20 @@ export const RAILS: Record<RailId, Rail> = {
     ],
     documentKey: 'rut',
   },
+  ar_qr: { id: 'ar_qr', currency: 'ARS', country: 'ar', fields: [], qr: true },
+  br_pix_qr: { id: 'br_pix_qr', currency: 'BRL', country: 'br', fields: [], qr: true },
 };
 
 export const RAIL_IDS = Object.keys(RAILS) as RailId[];
+
+/** Whether `rail` is a QR rail (paid by scanning a merchant QR, no account). */
+export function isQrRailId(rail: string): boolean {
+  return isRailId(rail) && RAILS[rail].qr === true;
+}
+
+/** The rails an account (a payment method, a payout's or a sale's beneficiary) can be on: every
+    rail but the QR ones. */
+export const accountRails = (rails: readonly string[]) => rails.filter((r) => !isQrRailId(r));
 
 export function isRailId(value: unknown): value is RailId {
   return typeof value === 'string' && Object.hasOwn(RAILS, value);

@@ -11,11 +11,12 @@ import {
 import { bpsLabel, fromBaseUnits } from '@/lib/p2p/amounts';
 import { decimalsFrom } from '@/lib/p2p/normalize';
 import { isTerminal, merchantActions } from '@/lib/p2p/orders';
+import { STELLAR_DECIMALS } from '@/lib/stellar/network';
 import { duration, money, units } from '@/lib/format';
 import { Notice } from '@/components/ui/controls';
 import { StatusPill } from '@/components/ui/misc';
 import { useDash } from '@/features/dashboard/context';
-import { Figures, LoadState, PageHead, useLoad } from '@/features/dashboard/ui';
+import { AddressLink, Figures, LoadState, PageHead, useLoad } from '@/features/dashboard/ui';
 import { isStale } from '@/features/dashboard/views/OffersView';
 
 export function OverviewView() {
@@ -65,7 +66,8 @@ export function OverviewView() {
           for (const a of d.accounts)
             for (const c of a.chains ?? []) {
               if (c.matcher) authorised += 1;
-              for (const b of c.balances) if (b.decimals === 6) free += BigInt(b.freeUnits || '0');
+              for (const b of c.balances)
+                if (b.decimals === STELLAR_DECIMALS) free += BigInt(b.freeUnits || '0');
             }
           const toAct = d.mine.filter((x) => merchantActions(x).some((a) => a !== 'cancel'));
           return (
@@ -134,7 +136,7 @@ export function OverviewView() {
                     </Link>
                   </div>
                   <p className="figure mt-4 text-[1.9rem]">
-                    {units(lang, fromBaseUnits(free.toString(), 6), 'USD')}
+                    {units(lang, fromBaseUnits(free.toString(), STELLAR_DECIMALS), 'USD')}
                   </p>
                   <p className="mt-1 text-ink-3">
                     {d.accounts.length === 1
@@ -157,6 +159,14 @@ export function OverviewView() {
                       <dd className="mt-1">
                         {market.networks.map((n) => n.name).join(', ') || '-'}
                       </dd>
+                      {market.networks.map((n) => (
+                        <dd key={n.id} className="mt-1 text-[0.8125rem] text-ink-3">
+                          {v.market.contract}: <AddressLink value={n.contract} network={n} />
+                        </dd>
+                      ))}
+                      {market.sponsor.enabled && (
+                        <dd className="mt-1 text-[0.8125rem] text-ink-3">{v.market.sponsored}</dd>
+                      )}
                     </div>
                     <div>
                       <dt className="text-[0.8125rem] font-semibold text-ink-3">

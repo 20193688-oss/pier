@@ -61,7 +61,12 @@ const charge: typeof es = {
   },
   startAgain: 'Start again',
   poweredBy:
-    'Payment protected by {brand}: the money goes to the merchant, who releases the payment in a smart contract.',
+    'Payment protected by {brand}: the money goes to the merchant, who releases the payment in a smart contract on the Stellar network.',
+  app: {
+    title: 'Have dollars in {brand}?',
+    body: 'Pay with your balance from the app, with no bank transfer.',
+    cta: 'Pay with my balance',
+  },
 };
 
 export default charge;

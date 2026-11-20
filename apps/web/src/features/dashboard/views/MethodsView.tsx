@@ -5,7 +5,7 @@ import { useMemo, useState } from 'react';
 import { fmt, useI18n } from '@/i18n';
 import { accounts as accountsApi, methods as methodsApi } from '@/lib/api/endpoints';
 import { errorMessage } from '@/lib/api/messages';
-import { checkAccount, normalizeDetails } from '@/lib/p2p/rails';
+import { accountRails, checkAccount, normalizeDetails } from '@/lib/p2p/rails';
 import { dateOnly } from '@/lib/format';
 import { Field, Notice, SelectField, Spinner, Switch } from '@/components/ui/controls';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
@@ -218,7 +218,8 @@ function MethodDialog({
     (accounts.find((a) => a.merchant) ?? accounts[0])?.id ?? '',
   );
   const [currency, setCurrency] = useState(market.currencies[0]?.code ?? 'ARS');
-  const rails = market.currencies.find((c) => c.code === currency)?.rails ?? [];
+  // A payment method is an account the merchant is paid into: never a QR rail.
+  const rails = accountRails(market.currencies.find((c) => c.code === currency)?.rails ?? []);
   const [rail, setRail] = useState(rails[0] ?? '');
   const [label, setLabel] = useState('');
   const [account, setAccount] = useState<AccountDraft>(emptyAccount(rails[0] ?? ''));
@@ -280,7 +281,10 @@ function MethodDialog({
             label={t.p2p.offers.currency}
             value={currency}
             onChange={(e) => {
-              const next = market.currencies.find((c) => c.code === e.target.value)?.rails[0] ?? '';
+              const next =
+                accountRails(
+                  market.currencies.find((c) => c.code === e.target.value)?.rails ?? [],
+                )[0] ?? '';
               setCurrency(e.target.value);
               setRail(next);
               setAccount(emptyAccount(next));

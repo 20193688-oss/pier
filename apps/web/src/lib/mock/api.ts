@@ -800,7 +800,8 @@ const routes: [ApiRequest['method'], string, Handler][] = [
         description: c.description,
         merchantName: c.payeeName,
         status: c.status,
-        rails: cur?.rails.map((r) => r.id) ?? [],
+        // The checkout pays a merchant's account: never a QR rail.
+        rails: cur?.rails.filter((r) => r.fields.length).map((r) => r.id) ?? [],
         expiresAt: c.expiresAt,
       });
     },

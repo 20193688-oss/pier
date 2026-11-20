@@ -310,3 +310,26 @@ test.skipIf(!existsSync(API_SPEC))("the API's published document flattens", () =
   for (const g of view.groups)
     for (const op of g.operations) assert.ok(op.path.startsWith('/'), op.path);
 });
+
+// Once the API's document has the Stellar routes (SEP-10 sign-in is the marker), every route the
+// web app calls must be in it, method and path (parameter names aside). Until the API branch is
+// merged the committed document is the EVM one and this is skipped.
+const apiDoc = existsSync(API_SPEC) ? JSON.parse(readFileSync(API_SPEC, 'utf8')) : null;
+const stellarDoc = !!apiDoc?.paths?.['/v1/auth/challenge'];
+test.skipIf(!stellarDoc)("every route the app calls is in the API's document", () => {
+  const shape = (path: string) => path.replace(/\{[^}]+\}/g, '{}');
+  const ops = new Set(
+    Object.entries(apiDoc.paths as Record<string, Record<string, unknown>>).flatMap(
+      ([path, item]) =>
+        Object.keys(item)
+          .filter((m) => ['get', 'post', 'put', 'patch', 'delete'].includes(m))
+          .map((m) => `${m.toUpperCase()} ${shape(path)}`),
+    ),
+  );
+  // The dev-only simulation is not part of the public document.
+  const missing = ROUTE_GROUPS.flatMap((g) => g.routes)
+    .filter((r) => r.key !== 'devSimulateTransfer')
+    .map((r) => `${r.method} ${shape(r.path)}`)
+    .filter((op) => !ops.has(op));
+  assert.deepEqual(missing, []);
+});

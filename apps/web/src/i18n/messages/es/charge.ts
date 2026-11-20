@@ -61,7 +61,12 @@ const charge = {
   },
   startAgain: 'Empezar de nuevo',
   poweredBy:
-    'Pago protegido por {brand}: el dinero llega al comerciante y el comerciante libera el pago en un contrato inteligente.',
+    'Pago protegido por {brand}: el dinero llega al comerciante y el comerciante libera el pago en un contrato inteligente de la red Stellar.',
+  app: {
+    title: '¿Tienes dólares en {brand}?',
+    body: 'Paga con tu saldo desde la app, sin transferencia bancaria.',
+    cta: 'Pagar con mi saldo',
+  },
 };
 
 export default charge;

@@ -2,12 +2,13 @@
    deadline is running) and which actions each side may take on it, as the contract allows them.
    Pure; tests/unit/orders.test.ts.
 
-   The contract's rules (design section 1): `release` from Active or Paid by the seller (or its
-   PERM_RELEASE bot); `markPaid` by the buyer side before the payment deadline; `accept` by the
+   The contract's rules (docs/STELLAR.md section 4): `release` from Active or Paid by the seller (or
+   its PERM_RELEASE bot); `mark_paid` by the buyer side before the payment deadline; `accept` by the
    buyer of a bonded order; `cancel` while Offered by either side, while Active by the buyer side,
    while Paid only by the buyer; `dispute` from Paid by the buyer side, or by the seller inside a
-   settle window. On a purchase (BUY, CHARGE) the merchant is the seller and pedospe's matcher acts for
-   the buyer; on a sale or a payout (SELL, PAYOUT) the merchant is the buyer. */
+   settle window. On a purchase (BUY, CHARGE) the merchant is the seller and the market's matcher
+   acts for the buyer; on a sale, a QR payment or a payout (SELL, QR_PAY, PAYOUT) the merchant is
+   the buyer. Action names are the contract's function names. */
 import type { P2pOrder, P2pOrderKind, P2pOrderStatus } from '@/lib/p2p/types';
 
 export type OrderTone = 'ok' | 'fail' | 'wait' | 'off';
@@ -71,7 +72,7 @@ export function countdown(ms: number): string {
 /** Whether the merchant is the seller of an order of this kind (it sold tokens for local money). */
 export const merchantSells = (kind: P2pOrderKind) => kind === 'BUY' || kind === 'CHARGE';
 
-export type MerchantAction = 'accept' | 'markPaid' | 'release' | 'cancel' | 'dispute';
+export type MerchantAction = 'accept' | 'mark_paid' | 'release' | 'cancel' | 'dispute';
 
 /** What the merchant can do on its order now, signed with its wallet. On a purchase it releases
     once the money arrived (also before the matcher marks it paid); on a sale or payout it accepts,
@@ -95,7 +96,7 @@ export function merchantActions(
     case 'awaiting_acceptance':
       return live(order.deadlines?.acceptBy ?? null) ? ['accept', 'cancel'] : ['cancel'];
     case 'awaiting_payment':
-      return live(order.deadlines?.payBy ?? null) ? ['markPaid', 'cancel'] : ['cancel'];
+      return live(order.deadlines?.payBy ?? null) ? ['mark_paid', 'cancel'] : ['cancel'];
     case 'paid':
       return ['dispute'];
     default:
@@ -122,7 +123,8 @@ export function clientActions(
     if (order.status === 'paid') return ['dispute'];
     return [];
   }
-  if (order.kind === 'SELL') return [];
+  // A sale or a QR payment is its user's own: the client only follows it.
+  if (order.kind === 'SELL' || order.kind === 'QR_PAY') return [];
   switch (order.status) {
     case 'awaiting_acceptance':
       return ['cancel'];

@@ -6,6 +6,8 @@ import assert from 'node:assert/strict';
 import {
   RAILS,
   RAIL_IDS,
+  accountRails,
+  isQrRailId,
   railsFor,
   fiatDecimals,
   checkCbu,
@@ -34,9 +36,11 @@ import {
 } from '@/lib/p2p/rails';
 
 test('the rail table names each rail once, with its currency and a document', () => {
-  assert.deepEqual(RAIL_IDS.sort(), [
+  assert.deepEqual([...RAIL_IDS].sort(), [
     'ar_bank_transfer',
+    'ar_qr',
     'br_pix',
+    'br_pix_qr',
     'cl_bank_transfer',
     'co_bank_transfer',
     'mx_spei',
@@ -45,11 +49,12 @@ test('the rail table names each rail once, with its currency and a document', ()
   for (const id of RAIL_IDS) {
     assert.equal(RAILS[id].id, id);
     assert.match(RAILS[id].currency, /^[A-Z]{3}$/);
-    assert.ok(RAILS[id].fields.length > 0, id);
+    // An account rail asks for an account; a QR rail asks for nothing (the QR is the destination).
+    assert.equal(RAILS[id].fields.length > 0, !RAILS[id].qr, id);
   }
   assert.deepEqual(
     railsFor('ARS').map((r) => r.id),
-    ['ar_bank_transfer'],
+    ['ar_bank_transfer', 'ar_qr'],
   );
   assert.deepEqual(railsFor('EUR'), []);
   assert.equal(fiatDecimals('CLP'), 0);
@@ -272,4 +277,14 @@ test("the payer's document follows the currency", () => {
   assert.equal(checkEmail('ana@'), 'format');
   assert.equal(checkHolderName('12345'), 'format', 'a name has letters');
   assert.equal(checkHolderName('Ana'), null);
+});
+
+test('the QR rails: ARS and BRL, never an account, kept out of account pickers', () => {
+  assert.deepEqual([RAILS.ar_qr.currency, RAILS.br_pix_qr.currency], ['ARS', 'BRL']);
+  assert.ok(isQrRailId('ar_qr') && isQrRailId('br_pix_qr'));
+  assert.ok(!isQrRailId('ar_bank_transfer') && !isQrRailId('br_pix') && !isQrRailId('nope'));
+  assert.deepEqual(accountRails(['ar_bank_transfer', 'ar_qr', 'br_pix_qr', 'br_pix']), [
+    'ar_bank_transfer',
+    'br_pix',
+  ]);
 });

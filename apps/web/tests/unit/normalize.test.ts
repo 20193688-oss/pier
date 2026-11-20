@@ -1,5 +1,7 @@
 /* normalize.test.ts: the API's answers, in its wire shapes, become what the screens read
-   (src/lib/p2p/normalize.ts), and the screens' requests become the bodies the API takes. */
+   (src/lib/p2p/normalize.ts), and the screens' requests become the bodies the API takes. The
+   market is on Stellar: networks with a passphrase and a Soroban contract, tokens as assets with
+   their SAC contract and 7 decimals, unsigned transactions as XDR. */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
@@ -16,32 +18,43 @@ import {
   matchConfidence,
 } from '@/lib/p2p/normalize';
 
+const ISSUER = 'GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN';
+const USDC_SAC = 'CCW67TSZV3SSS2HXMBQ5JFGCKJNXKZM7UQUWUZPUTHXSTZLEO7SJMI75';
+const MARKET_C = 'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE';
+const MERCHANT = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
 const MARKET = {
   available: true,
   tier: 'public',
   networks: [
     {
-      id: 'base',
-      name: 'Base',
-      chainId: 8453,
-      contract: '0x1111111111111111111111111111111111111111',
-      tokens: [
-        { symbol: 'USDC', address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', decimals: 6 },
-      ],
+      id: 'mainnet',
+      name: 'Stellar',
+      networkPassphrase: 'Public Global Stellar Network ; September 2015',
+      contract: MARKET_C,
+      tokens: [{ symbol: 'USDC', code: 'USDC', issuer: ISSUER, contract: USDC_SAC, decimals: 7 }],
       protocolFeeBps: 30,
       paused: false,
-      nativeSymbol: 'ETH',
-      explorerUrl: 'https://basescan.org',
-      rpcUrl: 'https://mainnet.base.org',
+      explorerUrl: 'https://stellar.expert/explorer/public',
+      rpcUrl: 'https://rpc.example',
+      horizonUrl: null,
     },
     {
-      id: 'arb',
-      name: 'Arbitrum',
-      chainId: 42161,
-      contract: '0x2222222222222222222222222222222222222222',
+      id: 'testnet',
+      name: 'Stellar Testnet',
+      networkPassphrase: 'Test SDF Network ; September 2015',
+      contract: MARKET_C,
       tokens: [],
       protocolFeeBps: 25,
       paused: true,
+    },
+    {
+      id: 'evm',
+      name: 'An EVM network',
+      chainId: 8453,
+      contract: '0x1111111111111111111111111111111111111111',
+      tokens: [],
+      protocolFeeBps: 30,
+      paused: false,
     },
   ],
   currencies: [
@@ -69,14 +82,16 @@ const MARKET = {
   bondBps: 1000,
   matcher: null,
   maxIntegratorFeeBps: 500,
+  sponsor: { enabled: true },
 };
 
-test('the market: flat rails, windows and fee, paused networks left out', () => {
+test('the market: flat rails, windows and fee, paused (and non-Stellar) networks left out', () => {
   const m = normalizeMarket(MARKET)!;
   assert.equal(m.tier, 'mainnet');
   assert.deepEqual(
     m.networks.map((n) => n.id),
-    ['base'],
+    ['mainnet'],
+    'a network without a passphrase is not a Stellar network',
   );
   assert.deepEqual(m.currencies, [{ code: 'ARS', rails: ['ar_bank_transfer'] }]);
   assert.deepEqual(m.rails, [
@@ -98,21 +113,32 @@ test('the market: flat rails, windows and fee, paused networks left out', () => 
   assert.equal(m.sellBondBps, 1000);
   assert.equal(m.protocolFeeBps, 30);
   assert.equal(m.matcher, '');
-  assert.deepEqual(
-    [m.networks[0].explorer, m.networks[0].rpcUrl, m.networks[0].nativeSymbol],
-    ['https://basescan.org', 'https://mainnet.base.org', 'ETH'],
-    'what a wallet needs to add the chain, and its explorer',
-  );
+  assert.deepEqual(m.networks[0], {
+    id: 'mainnet',
+    name: 'Stellar',
+    networkPassphrase: 'Public Global Stellar Network ; September 2015',
+    rpcUrl: 'https://rpc.example',
+    horizonUrl: null,
+    explorerUrl: 'https://stellar.expert/explorer/public',
+    contract: MARKET_C,
+    protocolFeeBps: 30,
+    tokens: [{ symbol: 'USDC', code: 'USDC', issuer: ISSUER, contract: USDC_SAC, decimals: 7 }],
+  });
+  assert.deepEqual(m.sponsor, { enabled: true });
+  assert.deepEqual(normalizeMarket({ ...MARKET, sponsor: undefined })!.sponsor, {
+    enabled: false,
+  });
   assert.equal(normalizeMarket({ nope: 1 }), null);
   assert.deepEqual(normalizeMarket(m), m, "the screens' own shape stays as it is");
-  assert.equal(decimalsOf(m, 'base', 'USDC'), 6);
-  assert.equal(decimalsOf(m, 'base', '0x833589fcd6edb6e08f4c7c32d4f71b54bda02913'), 6);
+  assert.equal(decimalsOf(m, 'mainnet', 'USDC'), 7);
+  assert.equal(decimalsOf(m, 'mainnet', USDC_SAC), 7, 'by the token contract too');
+  assert.equal(decimalsOf(m, 'mainnet', 'EURC'), 7, "an unknown token: Stellar's 7");
 });
 
 test('an account: the merchant profile and the chain state', () => {
   const a = normalizeAccount({
     id: 'acc',
-    address: '0xabc',
+    address: MERCHANT,
     label: 'Treasury',
     displayName: 'Lumio',
     merchantStatus: 'PAUSED',
@@ -129,15 +155,15 @@ test('an account: the merchant profile and the chain state', () => {
     updatedAt: '2026-11-02T00:00:00Z',
     networks: [
       {
-        network: 'base',
+        network: 'mainnet',
         balances: [
-          { symbol: 'USDC', token: '0xusdc', amount: '1500000', locked: '250000', decimals: 6 },
+          { symbol: 'USDC', token: USDC_SAC, amount: '15000000', locked: '2500000', decimals: 7 },
         ],
         matcher: { maxPerOrder: '0', autoSettle: false },
-        operators: { '0xbot': 6, '0xold': 0 },
+        operators: { GBOT: 6, GOLD: 0 },
       },
       {
-        network: 'arb',
+        network: 'testnet',
         balances: [],
         matcher: { maxPerOrder: '1000000000', autoSettle: true },
         operators: {},
@@ -155,15 +181,15 @@ test('an account: the merchant profile and the chain state', () => {
       lastActiveAt: '2026-11-19T10:00:00.000Z',
     },
   });
-  assert.equal(a.chains![0].balances[0].freeUnits, '1500000');
-  assert.equal(a.chains![0].balances[0].lockedUnits, '250000');
+  assert.equal(a.chains![0].balances[0].freeUnits, '15000000');
+  assert.equal(a.chains![0].balances[0].lockedUnits, '2500000');
   assert.equal(a.chains![0].matcher, null, '"0" is not authorised');
-  assert.deepEqual(a.chains![0].operators, [{ address: '0xbot', perms: 6 }]);
+  assert.deepEqual(a.chains![0].operators, [{ address: 'GBOT', perms: 6 }]);
   assert.deepEqual(a.chains![1].matcher, { maxPerOrderUnits: '1000000000', autoSettle: true });
   assert.equal(
     normalizeAccount({
       id: 'x',
-      address: '0x1',
+      address: MERCHANT,
       displayName: null,
       merchantStatus: 'ACTIVE',
       createdAt: '2026-11-01T00:00:00Z',
@@ -179,8 +205,8 @@ test("an offer and a quote: the token's symbol and decimal amounts", () => {
       id: 'o',
       accountId: 'a',
       side: 'BUY_TOKEN',
-      network: 'base',
-      token: '0xusdc',
+      network: 'mainnet',
+      token: USDC_SAC,
       tokenSymbol: 'USDC',
       currency: 'ARS',
       rails: ['ar_bank_transfer'],
@@ -198,18 +224,18 @@ test("an offer and a quote: the token's symbol and decimal amounts", () => {
   const q = normalizeQuote({
     id: 'q',
     side: 'BUY',
-    network: 'base',
-    token: '0xusdc',
+    network: 'mainnet',
+    token: USDC_SAC,
     tokenSymbol: 'USDC',
-    tokenDecimals: 6,
+    tokenDecimals: 7,
     currency: 'ARS',
     rail: 'ar_bank_transfer',
     price: '1431.98',
     fiatAmount: '50000',
-    tokenAmount: '34916800',
-    protocolFee: '104750',
+    tokenAmount: '349168000',
+    protocolFee: '1047500',
     integratorFee: '0',
-    netAmount: '34812050',
+    netAmount: '348120500',
     merchant: {
       displayName: 'Lumio',
       completedOrders: 312,
@@ -232,30 +258,29 @@ test("an order, from the client's and the merchant's views", () => {
     kind: 'SALE',
     status: 'awaiting_payment',
     tier: 'public',
-    network: 'base',
-    chainId: 8453,
-    contract: '0x1',
-    token: '0xusdc',
+    network: 'mainnet',
+    contract: MARKET_C,
+    token: USDC_SAC,
     tokenSymbol: 'USDC',
-    tokenDecimals: 6,
+    tokenDecimals: 7,
     currency: 'ARS',
     rail: 'ar_bank_transfer',
     price: '1400',
     fiatAmount: '140000',
-    tokenAmount: '100000000',
-    netAmount: '99700000',
+    tokenAmount: '1000000000',
+    netAmount: '997000000',
     protocolFeeBps: 30,
     integratorFeeBps: 0,
     bond: '0',
-    sellerAddress: '0xs',
-    buyerAddress: '0xb',
+    sellerAddress: 'GSELLER',
+    buyerAddress: MERCHANT,
     onchainId: '7',
     acceptDeadline: null,
     paymentDeadline: '2026-11-19T12:30:00Z',
     paidAt: null,
     endedAt: null,
     txHashes: {
-      open: '0xopen',
+      open: 'a1'.repeat(32),
       accept: null,
       paid: null,
       release: null,
@@ -281,13 +306,13 @@ test("an order, from the client's and the merchant's views", () => {
   assert.equal(client.role, 'client');
   assert.equal(client.tokenAmount, '100');
   assert.equal(client.bond, null);
-  assert.equal(client.buyer, '0xb');
+  assert.equal(client.buyer, MERCHANT);
   assert.deepEqual(client.deadlines, {
     acceptBy: null,
     payBy: '2026-11-19T12:30:00.000Z',
     settleBy: null,
   });
-  assert.deepEqual(client.txs, { open: '0xopen' });
+  assert.deepEqual(client.txs, { open: 'a1'.repeat(32) });
   assert.equal(client.paymentDetails?.holderName, 'Lumio SRL');
   assert.equal(
     normalizeOrder({
@@ -302,7 +327,7 @@ test("an order, from the client's and the merchant's views", () => {
   const merchant = normalizeOrder({
     ...base,
     kind: 'PAYOUT',
-    bond: '10000000',
+    bond: '100000000',
     merchantAccountId: 'acc',
     merchantSide: 'buyer',
     beneficiary: {
@@ -320,19 +345,68 @@ test("an order, from the client's and the merchant's views", () => {
     '20329642330',
     "the merchant pays the beneficiary's account",
   );
+  const unsigned = {
+    network: 'mainnet',
+    description: 'Lock 100 USDC in the order',
+    xdr: 'AAAAAgAAAAA=',
+    hash: 'b2'.repeat(32),
+    expiresAt: '2026-11-19T12:05:00Z',
+  };
   const sale = normalizeOrder({
     ...base,
     kind: 'SELL',
     status: 'pending',
-    transactions: [
-      { chainId: 8453, to: '0xusdc', data: '0x095ea7b3', value: '0', description: 'Approve' },
-      { chainId: 8453, to: '0x1', data: '0xabcdef', value: '0', description: 'Open' },
-    ],
+    transactions: [unsigned],
   });
+  assert.deepEqual(sale.transactions, [
+    { ...unsigned, action: 'open_with_deposit', expiresAt: '2026-11-19T12:05:00.000Z' },
+  ]);
   assert.deepEqual(
-    sale.transactions?.map((t) => t.action),
-    ['approve', 'openWithDeposit'],
+    normalizeOrder({
+      ...base,
+      kind: 'QR_PAY',
+      status: 'pending',
+      transaction: unsigned,
+    }).transactions?.map((t) => t.action),
+    ['open_with_deposit'],
+    'a single `transaction` is read too',
   );
+  assert.equal(
+    normalizeOrder({
+      ...base,
+      kind: 'SELL',
+      status: 'pending',
+      transactions: [{ chainId: 8453, to: '0x1', data: '0xabcdef', value: '0' }],
+    }).transactions,
+    undefined,
+    'EVM calldata is no transaction',
+  );
+  const qr = normalizeOrder({
+    ...base,
+    kind: 'QR_PAY',
+    rail: 'ar_qr',
+    merchantSide: 'buyer',
+    qr: {
+      payload: '000201010212',
+      standard: 'ar-interoperable',
+      merchantName: 'Cafe El Molino',
+      merchantCity: 'Salta',
+      amount: '12500.00',
+      currency: 'ARS',
+      reference: 'MESA-4',
+    },
+  });
+  assert.equal(qr.kind, 'QR_PAY');
+  assert.deepEqual(qr.qr, {
+    payload: '000201010212',
+    standard: 'ar-interoperable',
+    merchantName: 'Cafe El Molino',
+    merchantCity: 'Salta',
+    amount: '12500.00',
+    currency: 'ARS',
+    reference: 'MESA-4',
+  });
+  assert.equal(normalizeOrder({ ...base, qr: { standard: 'pix' } }).qr, null, 'no payload, no QR');
 });
 
 test('transfer matches, charges and payout batches', () => {
@@ -343,10 +417,10 @@ test('transfer matches, charges and payout batches', () => {
           id: 'o',
           kind: 'BUY',
           status: 'paid',
-          network: 'base',
+          network: 'mainnet',
           tokenSymbol: 'USDC',
-          tokenDecimals: 6,
-          tokenAmount: '1000000',
+          tokenDecimals: 7,
+          tokenAmount: '10000000',
           merchantSide: 'seller',
           fiatAmount: '1400',
           currency: 'ARS',
@@ -357,11 +431,11 @@ test('transfer matches, charges and payout batches', () => {
         score: 3,
         matchedOn: ['amount', 'name', 'document'],
         transaction: {
-          chainId: 8453,
-          to: '0x1',
-          data: '0x37bdc99b',
-          value: '0',
+          network: 'mainnet',
           description: 'Release',
+          xdr: 'AAAAAgAAAAA=',
+          hash: 'c3'.repeat(32),
+          expiresAt: '2026-11-19T12:05:00Z',
         },
       },
     ],
@@ -374,11 +448,11 @@ test('transfer matches, charges and payout batches', () => {
     id: 'c',
     currency: 'ARS',
     fiatAmount: '85000',
-    network: 'base',
-    token: '0xusdc',
+    network: 'mainnet',
+    token: USDC_SAC,
     tokenSymbol: 'USDC',
     recipientAccountId: 'acc',
-    recipientAddress: '0xr',
+    recipientAddress: MERCHANT,
     description: null,
     status: 'open',
     url: 'https://pedospe.example/c/c',
@@ -389,7 +463,7 @@ test('transfer matches, charges and payout batches', () => {
     createdAt: '2026-11-19T12:00:00Z',
   });
   assert.equal(c.token, 'USDC');
-  assert.equal(c.recipient, '0xr');
+  assert.equal(c.recipient, MERCHANT);
   assert.equal(c.qr, null);
   const withQr = normalizeCharge({
     id: 'c',
@@ -403,8 +477,8 @@ test('transfer matches, charges and payout batches', () => {
   );
   const b = normalizePayoutBatch({
     id: 'b',
-    network: 'base',
-    token: '0xusdc',
+    network: 'mainnet',
+    token: USDC_SAC,
     accountId: 'acc',
     status: 'partially_completed',
     itemCount: 3,
@@ -413,7 +487,7 @@ test('transfer matches, charges and payout batches', () => {
         id: 'o1',
         kind: 'PAYOUT',
         status: 'completed',
-        tokenDecimals: 6,
+        tokenDecimals: 7,
         tokenAmount: '1',
         currency: 'ARS',
         fiatAmount: '1000',
@@ -423,7 +497,7 @@ test('transfer matches, charges and payout batches', () => {
         beneficiary: { holderName: 'Ana', details: {} },
         externalReference: 'inv-1',
         onchainId: '4107',
-        sellerAddress: '0xb05e000000000000000000000000000000007e11',
+        sellerAddress: MERCHANT,
         createdAt: '2026-11-19T12:00:00Z',
       },
     ],
@@ -441,7 +515,7 @@ test('transfer matches, charges and payout batches', () => {
   assert.equal(b.status, 'partial');
   assert.deepEqual(
     [b.items[0].onchainId, b.items[0].seller, b.items[1].onchainId ?? null],
-    ['4107', '0xb05e000000000000000000000000000000007e11', null],
+    ['4107', MERCHANT, null],
     'an opened payout carries what its release is checked against',
   );
   assert.equal(b.itemCount, 3);
@@ -466,20 +540,20 @@ test('transfer matches, charges and payout batches', () => {
 });
 
 test("requests: base units and the server's argument names", () => {
-  assert.deepEqual(txArgs('deposit', { token: 'USDC', amount: '250.5' }, 6), {
+  assert.deepEqual(txArgs('deposit', { token: 'USDC', amount: '250.5' }, 7), {
     token: 'USDC',
-    amount: '250500000',
+    amount: '2505000000',
   });
-  assert.deepEqual(txArgs('setMatcher', { maxPerOrder: '1000', autoSettle: false }, 6), {
-    maxPerOrder: '1000000000',
+  assert.deepEqual(txArgs('set_matcher', { maxPerOrder: '1000', autoSettle: false }, 7), {
+    maxPerOrder: '10000000000',
     autoSettle: false,
   });
-  assert.deepEqual(txArgs('setOperator', { operator: '0xbot', perms: 6 }, 6), {
-    operator: '0xbot',
+  assert.deepEqual(txArgs('set_operator', { operator: MERCHANT, perms: 6 }, 7), {
+    operator: MERCHANT,
     permissions: 6,
   });
-  assert.deepEqual(txArgs('release', { orderId: 'o', reference: 'x' }, 6), { orderId: 'o' });
-  assert.deepEqual(txArgs('markPaid', { orderId: 'o', reference: 'x' }, 6), {
+  assert.deepEqual(txArgs('release', { orderId: 'o', reference: 'x' }, 7), { orderId: 'o' });
+  assert.deepEqual(txArgs('mark_paid', { orderId: 'o', reference: 'x' }, 7), {
     orderId: 'o',
     reference: 'x',
   });

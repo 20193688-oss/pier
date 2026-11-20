@@ -8,7 +8,7 @@ import {
   CHARGE_EXPIRIES,
   expiryIso,
   grantableRoles,
-  isEvmAddress,
+  isMemberAddress,
   isWebhookUrl,
   payoutFigures,
 } from '@/features/dashboard/views/admin-model';
@@ -87,10 +87,17 @@ test('a webhook URL is https with a host and no credentials', () => {
     assert.equal(isWebhookUrl(bad), false, bad);
 });
 
-test('a member address is an EVM address', () => {
-  assert.ok(isEvmAddress('0xde3000000000000000000000000000000000a11e'));
-  assert.ok(!isEvmAddress('0xde30'));
-  assert.ok(!isEvmAddress('de3000000000000000000000000000000000a11e00'));
+test('a member address is a Stellar account, written exactly', () => {
+  const g = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+  assert.ok(isMemberAddress(g));
+  assert.ok(isMemberAddress(` ${g} `), 'surrounding spaces are ignored');
+  assert.ok(!isMemberAddress(g.toLowerCase()), 'a StrKey keeps its case');
+  assert.ok(!isMemberAddress(`${g.slice(0, -1)}A`), 'a bad checksum');
+  assert.ok(
+    !isMemberAddress('CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE'),
+    'a contract signs nothing in',
+  );
+  assert.ok(!isMemberAddress('0xde3000000000000000000000000000000000a11e'), 'not an EVM address');
 });
 
 test('only an owner names another owner; members grant nothing', () => {

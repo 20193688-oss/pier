@@ -13,6 +13,7 @@ import {
   checkBeneficiary,
   documentOf,
   fiatDecimals,
+  isQrRailId,
   isRailId,
   RAILS,
   normalizeDetails,
@@ -167,7 +168,8 @@ export function parsePayoutCsv(text: string, allowedCurrencies?: readonly string
       externalReference: get('reference'),
       errors: {},
     };
-    if (!isRailId(rail)) row.errors.rail = rail ? 'rail' : 'required';
+    // A payout pays a beneficiary's account: a QR rail (paid by scanning a shop's QR) has none.
+    if (!isRailId(rail) || isQrRailId(rail)) row.errors.rail = rail ? 'rail' : 'required';
     if (!currency) row.errors.currency = 'required';
     else if (
       (isRailId(rail) && RAILS[rail].currency !== currency) ||

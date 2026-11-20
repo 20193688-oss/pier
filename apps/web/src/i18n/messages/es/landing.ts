@@ -1,13 +1,13 @@
 /* The public home page. */
 const landing = {
-  metaTitle: '{brand}: compra y vende USDC con transferencia bancaria',
+  metaTitle: '{brand}: USDC por transferencia bancaria y pagos en dólares',
   metaDescription:
-    'Escribe un monto, transfiere desde tu banco y recibe USDC en tu wallet. Los fondos quedan bloqueados en un contrato hasta que el pago se confirma.',
+    'Escribe un monto, transfiere desde tu banco y recibe USDC en tu wallet de Stellar. Envía, recibe y paga con QR desde la app. Los fondos quedan bloqueados en un contrato hasta que el pago se confirma.',
   hero: {
     title: 'USDC por transferencia bancaria, de persona a persona',
-    body: 'Escribe cuánto quieres comprar, transfiere desde tu banco a la cuenta que te mostramos y los USDC llegan a tu wallet. Mientras tanto quedan bloqueados en un contrato inteligente, no en manos de nadie.',
-    buy: 'Comprar USDC',
-    sell: 'Vender USDC',
+    body: 'Escribe cuánto quieres comprar, transfiere desde tu banco a la cuenta que te mostramos y los USDC llegan a tu wallet en la red Stellar. Mientras tanto quedan bloqueados en un contrato inteligente, no en manos de nadie.',
+    open: 'Abrir la app',
+    merchant: 'Soy comerciante',
     rails:
       'Transferencia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia, Perú y Chile.',
   },
@@ -37,10 +37,33 @@ const landing = {
       },
       {
         title: 'Recibe los USDC',
-        body: 'El comerciante ve tu transferencia y libera la orden. El contrato envía los USDC a tu wallet, en la red que elegiste.',
+        body: 'El comerciante ve tu transferencia y libera la orden. El contrato envía los USDC a tu wallet de Stellar, sin comisión de red para ti.',
       },
     ],
     sell: 'Vender es lo mismo al revés: bloqueas tus USDC en la orden, el comerciante te transfiere a tu cuenta y tú liberas los USDC cuando ves el dinero.',
+  },
+  app: {
+    title: 'Una app de pagos en dólares',
+    body: 'Instálala en tu teléfono desde el navegador. Tu saldo en USDC vive en tu wallet de la red Stellar y las comisiones de red las paga {brand}.',
+    points: [
+      {
+        title: 'Envía y recibe',
+        body: 'A un @usuario, a una dirección de Stellar o con un enlace. Llega en segundos.',
+      },
+      {
+        title: 'Paga con QR',
+        body: 'Escanea el QR de un comercio en Argentina o un PIX en Brasil: un comerciante del mercado lo paga por ti en pesos o reales.',
+      },
+      {
+        title: 'Carga y retira',
+        body: 'Compra USDC con una transferencia desde tu banco y véndelos cuando necesites moneda local.',
+      },
+      {
+        title: 'Paga cobros',
+        body: 'Paga el enlace de cobro de un negocio con tu saldo, sin transferencia.',
+      },
+    ],
+    cta: 'Abrir la app',
   },
   trust: {
     title: 'Nadie se queda con tus fondos',
@@ -103,7 +126,11 @@ const landing = {
       },
       {
         q: '¿Necesito crear una cuenta?',
-        a: 'No. Conectas tu wallet y firmas un mensaje que demuestra que es tuya. Esa firma no mueve fondos ni tiene costo.',
+        a: 'No hace falta contraseña: entras con tu email o tu cuenta de Google y tu wallet de Stellar se crea al instante. Si ya tienes una wallet de Stellar, puedes usarla en el panel.',
+      },
+      {
+        q: '¿En qué red funciona?',
+        a: 'En Stellar. Las comisiones de red las paga {brand}: no necesitas tener XLM.',
       },
       {
         q: '¿Qué pasa si transfiero y el comerciante no libera?',
@@ -125,7 +152,7 @@ const landing = {
   },
   closing: {
     title: 'Empieza con el monto que quieras',
-    body: 'Conecta tu wallet, escribe un monto y mira el precio antes de decidir.',
+    body: 'Entra con tu email, escribe un monto y mira el precio antes de decidir.',
   },
 };
 

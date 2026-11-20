@@ -105,8 +105,8 @@ const admin: typeof es = {
     add: 'Add member',
     addTitle: 'Add a member',
     address: 'Their wallet address',
-    addressPlaceholder: '0x…',
-    addressError: 'Write an EVM address: 0x and 40 hexadecimal characters',
+    addressPlaceholder: 'G…',
+    addressError: 'Write a Stellar address: it starts with G and has 56 characters',
     addressHint: 'They sign in to the dashboard with that wallet.',
     role: 'Role',
     roleHints: {
