@@ -8,24 +8,31 @@
 
 export type P2pTier = 'mainnet' | 'testnet';
 
-/** One token the market trades on a network. */
+/** One token the market trades on a network: a classic Stellar asset (code and issuer) used
+    on-chain through its Stellar Asset Contract (`contract`, a C address). */
 export interface P2pToken {
   symbol: string;
-  address: string;
+  code: string;
+  /* Null only for the native coin, which the market never trades. */
+  issuer: string | null;
+  contract: string;
   decimals: number;
 }
 
-/** One EVM network the market contract is deployed on. */
+/** One Stellar network the market contract is deployed on. */
 export interface P2pNetwork {
-  /* The network id the API uses (base, arbitrum, local...). */
+  /* The network id the API uses: local, testnet or mainnet. */
   id: string;
   name: string;
-  chainId: number;
+  networkPassphrase: string;
+  /* Public endpoints (Horizon may be null). */
+  rpcUrl: string | null;
+  horizonUrl: string | null;
+  /* stellar.expert style: append /tx/<hash>, /account/<G> or /contract/<C>. Null: none. */
+  explorerUrl: string | null;
+  /* The market contract (C address). */
   contract: string;
-  explorer?: string | null;
-  /* What a wallet needs to add the network when it does not know it. */
-  rpcUrl?: string | null;
-  nativeSymbol?: string | null;
+  protocolFeeBps: number;
   tokens: P2pToken[];
 }
 
@@ -58,6 +65,8 @@ export interface P2pMarket {
   /* pedospe's matcher: the address a merchant authorises to open orders on its balance. */
   matcher: string;
   maxPayoutItems?: number;
+  /* Whether the API pays network fees and reserves (a fee-bump from its sponsor account). */
+  sponsor: { enabled: boolean };
 }
 
 export type P2pMerchantStatus = 'ACTIVE' | 'PAUSED' | 'SUSPENDED';
@@ -109,9 +118,11 @@ export interface P2pAccount {
   chains?: P2pAccountChain[];
 }
 
+/** A wallet proof's challenge: a SEP-10-shaped transaction that binds the organization, which
+    the wallet signs and never submits. */
 export interface P2pChallenge {
-  id: string;
-  message: string;
+  transaction: string;
+  networkPassphrase: string;
   expiresAt: string;
 }
 
@@ -184,7 +195,7 @@ export interface P2pQuote {
   integratorFeeBps: number;
 }
 
-export type P2pOrderKind = 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';
+export type P2pOrderKind = 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT' | 'QR_PAY';
 
 export const P2P_ORDER_STATUSES = [
   'pending',
@@ -208,15 +219,30 @@ export interface P2pBankAccount {
   details: Record<string, string>;
 }
 
-/** An unsigned transaction for the person's own wallet: it signs and sends it. */
+/** An unsigned, prepared transaction the API built for the person's own wallet: it signs the
+    envelope and the API submits it (with a fee-bump from its sponsor when sponsorship is on). */
 export interface P2pTransaction {
-  chainId: number;
-  to: string;
-  data: string;
-  value: string;
-  description?: string;
-  /* Which step it is, when a response carries several (`approve`, `openWithDeposit`). */
-  action?: string;
+  /* The network id (its passphrase comes from the market, never from here). */
+  network: string;
+  action: string;
+  description: string;
+  /* Base64 `TransactionEnvelope`, unsigned. */
+  xdr: string;
+  /* Hex hash of the inner transaction. */
+  hash: string;
+  /* The transaction's upper time bound. */
+  expiresAt: string;
+}
+
+/** A merchant QR as the merchant sees it on a QR_PAY order (only while it is live). */
+export interface P2pOrderQr {
+  payload: string;
+  standard: string;
+  merchantName: string | null;
+  merchantCity: string | null;
+  amount: string | null;
+  currency: string | null;
+  reference: string | null;
 }
 
 export interface P2pOrder {
@@ -250,8 +276,10 @@ export interface P2pOrder {
   txs?: Partial<
     Record<'open' | 'accept' | 'paid' | 'release' | 'cancel' | 'dispute' | 'resolve', string>
   >;
-  /* A sale's unsigned steps (approve, openWithDeposit), while the seller has not sent them. */
+  /* A sale's unsigned `open_with_deposit`, while the seller has not sent it. */
   transactions?: P2pTransaction[];
+  /* A QR_PAY order's merchant QR, for its merchant only. */
+  qr?: P2pOrderQr | null;
   chargeId?: string | null;
   payoutBatchId?: string | null;
   externalReference?: string | null;
@@ -337,15 +365,15 @@ export const P2P_WEBHOOK_EVENTS = [
 ] as const;
 export type P2pWebhookEvent = (typeof P2P_WEBHOOK_EVENTS)[number];
 
-/** The on-chain actions the transaction builder makes (`POST /v1/p2p/transactions`). */
+/** The on-chain actions the transaction builder makes (`POST /v1/p2p/transactions`), by the
+    market contract's function names. */
 export const P2P_TX_ACTIONS = [
-  'approve',
   'deposit',
   'withdraw',
-  'setOperator',
-  'setMatcher',
+  'set_operator',
+  'set_matcher',
   'accept',
-  'markPaid',
+  'mark_paid',
   'release',
   'cancel',
   'dispute',

@@ -102,8 +102,7 @@ const trade = {
     sign: 'Bloquea tus USDC en la orden',
     signBody:
       'Tu wallet primero permite que el mercado tome este monto exacto y después lo bloquea en la orden. Son dos firmas.',
-    stepApprove: 'Permitir {amount} {token}',
-    stepOpen: 'Bloquearlo en la orden',
+    stepOpen: 'Bloquear {amount} {token} en la orden',
     stepRelease: 'Liberar {amount} {token} al comerciante',
     sent: 'Enviado. La orden se actualiza en unos segundos.',
     clock: {

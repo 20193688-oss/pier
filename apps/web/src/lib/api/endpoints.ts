@@ -26,10 +26,12 @@ import {
   normalizePayoutBatch,
   normalizeQuote,
   normalizeTransferMatches,
+  transaction,
   type Decimals,
 } from '@/lib/p2p/normalize';
 import { parseCheckoutCharge, parseCheckoutOrder, parseCreatedOrder } from '@/lib/p2p/checkout';
 import type { P2pChallenge, P2pMarket, P2pTransaction } from '@/lib/p2p/types';
+import type { SubmitResult } from '@/lib/app/types';
 import { body as checked, type Body } from '@/lib/api/spec';
 
 /** A member's dashboard call: which organization, which tier (`live` or `test`). */
@@ -61,28 +63,23 @@ const TIER_FROM_ENV: Tier | null =
       : null;
 export const APP_TIER: Tier = TIER_FROM_ENV ?? 'live';
 
-/* --- Sign-in with Ethereum --- */
+/* --- Sign-in with a Stellar wallet (SEP-10) --- */
 
 export const auth = {
-  /** A single-use nonce and the domain the message must name (the API's SIWE domain). */
-  nonce: async (): Promise<{ nonce: string; domain: string | null }> => {
-    const r = await request<{ nonce?: unknown; domain?: unknown }>({
-      method: 'POST',
-      path: ROUTES.authNonce,
+  /** The SEP-10 challenge for `account`: a transaction the wallet signs, never submitted. */
+  challenge: async (account: string): Promise<{ transaction: string; networkPassphrase: string }> => {
+    const r = await request<{ transaction?: unknown; network_passphrase?: unknown }>({
+      method: 'GET',
+      path: ROUTES.authChallenge,
+      query: { account },
     });
-    if (typeof r?.nonce !== 'string' || !/^[A-Za-z0-9]{8,}$/.test(r.nonce)) throw bad();
-    const domain =
-      typeof r.domain === 'string' && /^[a-z0-9.-]+(:\d+)?$/i.test(r.domain) ? r.domain : null;
-    return { nonce: r.nonce, domain };
+    if (typeof r?.transaction !== 'string' || typeof r.network_passphrase !== 'string') throw bad();
+    return { transaction: r.transaction, networkPassphrase: r.network_passphrase };
   },
-  /** Verify the signed message; the session arrives as an HttpOnly cookie (the token the body
+  /** Verify the signed challenge; the session arrives as an HttpOnly cookie (the token the body
       also carries, for non-browser clients, is never kept). Then read who is signed in. */
-  verify: async (message: string, signature: string) => {
-    await request({
-      method: 'POST',
-      path: ROUTES.authVerify,
-      body: checked('SignIn', { message, signature }),
-    });
+  verify: async (transaction: string) => {
+    await request({ method: 'POST', path: ROUTES.authVerify, body: { transaction } });
     const s = await auth.session();
     if (!s) throw bad();
     return s;
@@ -243,18 +240,33 @@ export const market = {
   clear: () => marketCache.clear(),
 };
 
-const tx = (raw: unknown, action?: string): P2pTransaction => {
+/** An unsigned transaction answer (bare, or `{ transaction }`). */
+export const tx = (raw: unknown, action?: string): P2pTransaction => {
   const o = itemOf(raw) as Record<string, unknown> | null;
-  if (!o || typeof o.to !== 'string' || typeof o.data !== 'string') throw bad();
-  return {
-    chainId: Number(o.chainId),
-    to: o.to,
-    data: o.data,
-    value: typeof o.value === 'string' ? o.value : '0',
-    description: typeof o.description === 'string' ? o.description : undefined,
-    action: typeof o.action === 'string' ? o.action : action,
-  };
+  const t = transaction(o && typeof o === 'object' && 'transaction' in o ? o.transaction : o, action);
+  if (!t) throw bad();
+  return t;
 };
+
+/** The API's names for the actions on one's own order (the contract's names differ). */
+const ORDER_ACTION = {
+  accept: 'accept',
+  mark_paid: 'markPaid',
+  release: 'release',
+  cancel: 'cancel',
+  dispute: 'dispute',
+} as const;
+export type OrderTxAction = keyof typeof ORDER_ACTION;
+
+export interface QrQuoteInput {
+  kind: 'QR_PAY';
+  network: string;
+  token: string;
+  /* The scanned EMV payload, exactly as read. */
+  qr: string;
+  /* The local amount, typed for a static QR; a dynamic QR's own amount wins. */
+  fiatAmount?: string;
+}
 
 export interface QuoteInput {
   side: 'BUY' | 'SELL';
@@ -283,6 +295,24 @@ export const trade = {
     normalizeQuote(
       itemOf(
         await request({ method: 'POST', path: ROUTES.appQuotes, body: checked('AppQuote', input) }),
+      ),
+      decimals,
+    ),
+  qrQuote: async (input: QrQuoteInput, decimals: Decimals = null) =>
+    normalizeQuote(
+      itemOf(await request({ method: 'POST', path: ROUTES.appQuotes, body: input })),
+      decimals,
+    ),
+  /** A QR payment's order: a sale to the matched merchant, with its unsigned
+      `open_with_deposit`. */
+  createQrOrder: async (input: { quoteId: string; qr: string }, decimals: Decimals = null) =>
+    normalizeOrder(
+      itemOf(
+        await request({
+          method: 'POST',
+          path: ROUTES.appOrders,
+          body: { kind: 'QR_PAY', quoteId: input.quoteId, qr: input.qr },
+        }),
       ),
       decimals,
     ),
@@ -321,20 +351,17 @@ export const trade = {
       ),
       decimals,
     ),
-  /** Development only (the local chain, 31337): play the merchant's bot, mark the purchase's
+  /** Development only (the local network): play the merchant's bot, mark the purchase's
       transfer received and release it. The API refuses it anywhere else. */
   simulateTransfer: (orderId: string) =>
     request({ method: 'POST', path: ROUTES.devSimulateTransfer(orderId), body: {} }),
   /** An unsigned transaction for the seller's own wallet, on its own sale. */
-  transaction: async (
-    orderId: string,
-    action: 'accept' | 'markPaid' | 'release' | 'cancel' | 'dispute',
-  ) =>
+  transaction: async (orderId: string, action: OrderTxAction) =>
     tx(
       await request({
         method: 'POST',
         path: ROUTES.appOrderTransactions(orderId),
-        body: checked('AppTransaction', { action }),
+        body: { action: ORDER_ACTION[action] },
       }),
       action,
     ),
@@ -343,32 +370,36 @@ export const trade = {
 /* --- The merchant / business dashboard (`/v1/p2p/*`) --- */
 
 export const accounts = {
+  /** The wallet proof's challenge for `address` (SEP-10 shaped, bound to the organization). */
   challenge: async (scope: Scope, address: string): Promise<P2pChallenge> => {
     const o = itemOf(
       await request({
         method: 'POST',
         path: ROUTES.accountChallenge,
-        body: checked('CreateChallengeDto', { address }),
+        body: { address },
         headers: scoped(scope),
       }),
     ) as Record<string, unknown>;
-    if (!o || typeof o.message !== 'string') throw bad();
+    if (!o || typeof o.transaction !== 'string') throw bad();
+    const passphrase = o.networkPassphrase ?? o.network_passphrase;
+    if (typeof passphrase !== 'string') throw bad();
     return {
-      id: typeof o.id === 'string' ? o.id : '',
-      message: o.message,
+      transaction: o.transaction,
+      networkPassphrase: passphrase,
       expiresAt: String(o.expiresAt ?? ''),
     };
   },
+  /** Register the wallet with its signed challenge. */
   register: async (
     scope: Scope,
-    body: { address: string; signature: string; label?: string; displayName?: string },
+    body: { address: string; transaction: string; label?: string; displayName?: string },
   ) =>
     normalizeAccount(
       itemOf(
         await request({
           method: 'POST',
           path: ROUTES.accounts,
-          body: checked('RegisterAccountDto', body),
+          body,
           headers: scoped(scope),
         }),
       ),
@@ -594,12 +625,37 @@ export const clientOrders = {
       await request({
         method: 'POST',
         path: ROUTES.transactions,
-        body: checked('BuildTransactionDto', body),
+        body,
         headers: scoped(scope),
       }),
       body.action,
     ),
+  /** Submit a signed envelope of one of the organization's accounts (the API fee-bumps it). */
+  submit: async (scope: Scope, xdr: string) =>
+    must(
+      readSubmit(
+        await request({ method: 'POST', path: ROUTES.submit, body: { xdr }, headers: scoped(scope) }),
+      ),
+    ),
+  submission: async (scope: Scope, hash: string) =>
+    must(
+      readSubmit(
+        await request({ method: 'GET', path: ROUTES.submission(hash), headers: scoped(scope) }),
+      ),
+    ),
 };
+
+/** A submission's answer: `{ hash, status: PENDING | SUCCESS | FAILED, error }`. */
+export function readSubmit(raw: unknown): SubmitResult | null {
+  const o = itemOf(raw) as Record<string, unknown> | null;
+  if (!o || typeof o.hash !== 'string') return null;
+  const status = o.status === 'SUCCESS' || o.status === 'FAILED' ? o.status : 'PENDING';
+  return {
+    hash: o.hash,
+    status,
+    error: typeof o.error === 'string' ? o.error : o.error ? JSON.stringify(o.error) : null,
+  };
+}
 
 export const charges = {
   list: async (scope: Scope) =>

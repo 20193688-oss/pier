@@ -3,13 +3,15 @@
    and the screens' requests turned into the bodies the API takes.
 
    What differs, and why the screens keep their own shapes: token amounts travel in base units
-   (here, decimal strings in the token's decimals), `token` is the contract address with the symbol
-   in `tokenSymbol` (here, the symbol), the parties are `buyerAddress` / `sellerAddress`, deadlines
-   and transaction hashes are flat, the merchant's profile is flat on its account, an account's
-   on-chain state is `networks` with operators as a map, and the market nests each currency's rails.
+   (here, decimal strings in the token's decimals), `token` is the token's contract (a C address)
+   with the symbol in `tokenSymbol` (here, the symbol), the parties are `buyerAddress` /
+   `sellerAddress` (Stellar G addresses), deadlines and transaction hashes are flat, the merchant's
+   profile is flat on its account, an account's on-chain state is `networks` with operators as a
+   map, and the market nests each currency's rails.
    Each function also takes the screens' own shape (a cached value, an older answer) and leaves it as
    it is, so it can run on anything. Pure; tests/unit/normalize.test.ts. */
 import { fromBaseUnits, toBaseUnits } from '@/lib/p2p/amounts';
+import { isAccount } from '@/lib/stellar/network';
 import type {
   P2pAccount,
   P2pAccountChain,
@@ -47,8 +49,8 @@ const resolveDecimals = (o: Obj, d: Decimals): number | null =>
     : typeof d === 'function'
       ? d(String(o.network), String(o.tokenSymbol ?? o.token))
       : d;
-const address = (v: unknown): string | null =>
-  typeof v === 'string' && /^0x[0-9a-fA-F]{40}$/.test(v) && !/^0x0{40}$/.test(v) ? v : null;
+/** A Stellar account address (G), kept exactly as written; anything else is null. */
+const address = (v: unknown): string | null => (isAccount(v) ? v : null);
 /** A token amount as a decimal string: base units converted with the token's decimals, a value
     already in decimals (it has a point, or no decimals are known) kept. */
 function amount(v: unknown, decimals: number | null): string {
@@ -65,20 +67,22 @@ export function normalizeMarket(raw: unknown): P2pMarket | null {
     .map((n: Obj) => ({
       id: String(n.id),
       name: String(n.name ?? n.id),
-      chainId: Number(n.chainId),
-      contract: String(n.contract ?? ''),
-      explorer: str(n.explorer ?? n.explorerUrl),
+      networkPassphrase: String(n.networkPassphrase ?? ''),
       rpcUrl: str(n.rpcUrl),
-      nativeSymbol: str(n.nativeSymbol),
+      horizonUrl: str(n.horizonUrl),
+      explorerUrl: str(n.explorerUrl ?? n.explorer),
+      contract: String(n.contract ?? ''),
+      protocolFeeBps: Number.isFinite(Number(n.protocolFeeBps)) ? Number(n.protocolFeeBps) : 0,
       tokens: (Array.isArray(n.tokens) ? n.tokens : []).filter(isObj).map((t: Obj) => ({
-        symbol: String(t.symbol),
-        address: String(t.address),
-        decimals: Number(t.decimals),
+        symbol: String(t.symbol ?? t.code),
+        code: String(t.code ?? t.symbol),
+        issuer: str(t.issuer),
+        contract: String(t.contract ?? ''),
+        decimals: Number(t.decimals ?? 7),
       })),
       paused: n.paused === true,
-      protocolFeeBps: Number.isFinite(Number(n.protocolFeeBps)) ? Number(n.protocolFeeBps) : null,
     }))
-    .filter((n) => !n.paused);
+    .filter((n) => !n.paused && n.networkPassphrase && n.contract);
   const currencies = (Array.isArray(raw.currencies) ? raw.currencies : []).filter(isObj);
   // The server nests each currency's rails (with their fields); the screens keep a flat list.
   const rails: P2pMarketRail[] = Array.isArray(raw.rails)
@@ -93,13 +97,13 @@ export function normalizeMarket(raw: unknown): P2pMarket | null {
         })),
       );
   const w = isObj(raw.windows) ? raw.windows : {};
-  const fees = networks.map((n) => n.protocolFeeBps).filter((x): x is number => x !== null);
+  const fees = networks.map((n) => n.protocolFeeBps);
   return {
     tier:
       raw.tier === 'public' || raw.tier === 'mainnet' || raw.tier === 'live'
         ? 'mainnet'
         : 'testnet',
-    networks: networks.map(({ paused: _p, protocolFeeBps: _f, ...n }) => n),
+    networks: networks.map(({ paused: _p, ...n }) => n),
     currencies: currencies.map((c: Obj) => ({
       code: String(c.code),
       rails: (Array.isArray(c.rails) ? c.rails : []).map((r: unknown) =>
@@ -128,6 +132,7 @@ export function normalizeMarket(raw: unknown): P2pMarket | null {
     sellBondBps: Number(raw.sellBondBps ?? raw.bondBps ?? 0),
     matcher: str(raw.matcher) ?? '',
     maxPayoutItems: Number(raw.maxPayoutItems ?? 100),
+    sponsor: { enabled: isObj(raw.sponsor) && raw.sponsor.enabled === true },
   };
 }
 
@@ -136,7 +141,7 @@ export const decimalsFrom =
   (market: P2pMarket | null | undefined) => (network: string, token: string) =>
     decimalsOf(market, network, token);
 
-/** A token's decimals on a network of the market (6, the stablecoins', when unknown). */
+/** A token's decimals on a network of the market (7, every Stellar asset's, when unknown). */
 export function decimalsOf(
   market: P2pMarket | null | undefined,
   network: string,
@@ -144,8 +149,8 @@ export function decimalsOf(
 ): number {
   const t = market?.networks
     .find((n) => n.id === network)
-    ?.tokens.find((x) => x.symbol === token || x.address.toLowerCase() === token.toLowerCase());
-  return t?.decimals ?? 6;
+    ?.tokens.find((x) => x.symbol === token || x.contract === token);
+  return t?.decimals ?? 7;
 }
 
 /* --- Accounts --- */
@@ -173,7 +178,7 @@ function normalizeChains(raw: Obj): P2pAccountChain[] | undefined {
       balances: (Array.isArray(c.balances) ? c.balances : []).filter(isObj).map((b: Obj) => ({
         token: String(b.token ?? b.address ?? ''),
         symbol: String(b.symbol ?? b.tokenSymbol ?? ''),
-        decimals: Number(b.decimals ?? 6),
+        decimals: Number(b.decimals ?? 7),
         freeUnits: str(b.freeUnits ?? b.amount) ?? '0',
         lockedUnits: str(b.lockedUnits ?? b.locked) ?? '0',
       })),
@@ -323,15 +328,29 @@ function bankAccount(raw: unknown): P2pBankAccount | null {
   };
 }
 
-function transaction(raw: unknown, action?: string): P2pTransaction | null {
-  if (!isObj(raw) || typeof raw.to !== 'string' || typeof raw.data !== 'string') return null;
+/** An unsigned transaction as the API answers it (`P2pTransaction`), or null. */
+export function transaction(raw: unknown, action?: string): P2pTransaction | null {
+  if (!isObj(raw) || typeof raw.xdr !== 'string' || !raw.xdr) return null;
   return {
-    chainId: Number(raw.chainId),
-    to: raw.to,
-    data: raw.data,
-    value: str(raw.value) ?? '0',
-    description: str(raw.description) ?? undefined,
-    action: str(raw.action) ?? action,
+    network: String(raw.network ?? ''),
+    action: str(raw.action) ?? action ?? '',
+    description: str(raw.description) ?? '',
+    xdr: raw.xdr,
+    hash: str(raw.hash) ?? '',
+    expiresAt: iso(raw.expiresAt) ?? '',
+  };
+}
+
+function orderQr(raw: unknown): P2pOrder['qr'] {
+  if (!isObj(raw) || typeof raw.payload !== 'string' || !raw.payload) return null;
+  return {
+    payload: raw.payload,
+    standard: String(raw.standard ?? ''),
+    merchantName: str(raw.merchantName),
+    merchantCity: str(raw.merchantCity),
+    amount: str(raw.amount),
+    currency: str(raw.currency),
+    reference: str(raw.reference),
   };
 }
 
@@ -345,14 +364,15 @@ export function normalizeOrder(raw: unknown, decimals: Decimals = null): P2pOrde
   const bond = amount(o.bond, d);
   const txs = isObj(o.txs) ? o.txs : isObj(o.txHashes) ? o.txHashes : {};
   const txList = Array.isArray(o.transactions) ? o.transactions : [];
-  // A sale's two steps come in order: the approval, then the opening deposit.
-  const steps = txList
-    .map((t: unknown, i: number) => transaction(t, i === 0 ? 'approve' : 'openWithDeposit'))
+  // A sale's one step: its seller opens it with the deposit.
+  const single = isObj(o.transaction) ? [o.transaction] : [];
+  const steps = [...txList, ...single]
+    .map((t: unknown) => transaction(t, 'open_with_deposit'))
     .filter((t): t is P2pTransaction => !!t);
   return {
     id: String(o.id),
     ref: str(o.ref) ?? undefined,
-    kind: (['BUY', 'SELL', 'CHARGE', 'PAYOUT'].includes(o.kind)
+    kind: (['BUY', 'SELL', 'CHARGE', 'PAYOUT', 'QR_PAY'].includes(o.kind)
       ? o.kind
       : 'BUY') as P2pOrder['kind'],
     status: String(o.status) as P2pOrder['status'],
@@ -385,6 +405,7 @@ export function normalizeOrder(raw: unknown, decimals: Decimals = null): P2pOrde
       Object.entries(txs).filter(([, h]) => typeof h === 'string' && h),
     ) as P2pOrder['txs'],
     transactions: steps.length ? steps : undefined,
+    qr: orderQr(o.qr),
     chargeId: str(o.chargeId),
     payoutBatchId: str(o.payoutBatchId),
     externalReference: str(o.externalReference),
@@ -511,18 +532,15 @@ export function txArgs(
   decimals: number,
 ): Record<string, unknown> {
   const out: Record<string, unknown> = { ...args };
-  if (
-    (action === 'approve' || action === 'deposit' || action === 'withdraw') &&
-    typeof args.amount === 'string'
-  ) {
+  if ((action === 'deposit' || action === 'withdraw') && typeof args.amount === 'string') {
     out.amount = toBaseUnits(args.amount, decimals) ?? args.amount;
   }
-  if (action === 'setMatcher' && typeof args.maxPerOrder === 'string')
+  if (action === 'set_matcher' && typeof args.maxPerOrder === 'string')
     out.maxPerOrder = toBaseUnits(args.maxPerOrder, decimals) ?? args.maxPerOrder;
-  if (action === 'setOperator' && 'perms' in args) {
+  if (action === 'set_operator' && 'perms' in args) {
     out.permissions = args.perms;
     delete out.perms;
   }
-  if (action !== 'markPaid') delete out.reference;
+  if (action !== 'mark_paid') delete out.reference;
   return out;
 }

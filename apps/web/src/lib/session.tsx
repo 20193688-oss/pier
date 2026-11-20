@@ -1,10 +1,15 @@
 /* Who is signed in, and with which wallet.
 
-   Sign-in with Ethereum: the person picks one of the wallets the browser announces (EIP-6963),
-   the API gives a single-use nonce, the wallet signs the EIP-4361 message for this site, and the
-   API answers a session in an HttpOnly cookie (the page never reads it; it asks the API who is
-   signed in). The wallet used to sign in is remembered for this tab, so later transactions go to
-   the same wallet without asking again. */
+   Sign-in is SEP-10 against our API as soon as a wallet is ready: the API answers a challenge
+   transaction for the wallet's account, the page checks it is a real challenge (it can never be
+   submitted: src/lib/stellar/challenge.ts), the wallet signs it, the page checks the wallet
+   returned the same transaction, and the API answers a session in an HttpOnly cookie (the page
+   never reads it; it asks the API who is signed in).
+
+   The wallet itself (src/lib/wallet/types.ts) is remembered per tab by kind: a Pollar wallet comes
+   back with Pollar's own session, the dev-key and demo wallets from this tab's storage (they are
+   compiled out of production builds). A reload therefore keeps both the session and the wallet;
+   nothing here logs out on its own except a 401 from the API. */
 import {
   createContext,
   useCallback,
@@ -16,25 +21,22 @@ import {
 } from 'react';
 import { auth } from '@/lib/api/endpoints';
 import type { Session } from '@/lib/api/types';
-import { watchWallets, type DiscoveredWallet } from '@/lib/wallet/eip6963';
-import { connectWallet, currentChainId, signText, siweMessage } from '@/lib/wallet/actions';
-import { DEMO_WALLET_RDNS, MOCK } from '@/lib/env';
-import { useT } from '@/i18n';
+import { MOCK } from '@/lib/env';
+import { usePollarApi, POLLAR_KEY } from '@/lib/wallet/pollar-store';
+import { WalletError, type StellarWallet, type WalletKind } from '@/lib/wallet/types';
 
-const WALLET_KEY = 'pedospe.wallet';
+const KIND_KEY = 'pedospe.wallet-kind';
+
+export type SignInStep = 'challenge' | 'signing' | 'checking';
 
 interface SessionValue {
   /* undefined while the API is asked, null when nobody is signed in. */
   session: Session | null | undefined;
-  wallets: DiscoveredWallet[];
-  /* Whether discovery had time to hear from the browser's wallets. */
-  walletsReady: boolean;
-  /* The wallet used to sign in, when it is still in this browser. */
-  wallet: DiscoveredWallet | null;
-  signIn: (
-    w: DiscoveredWallet,
-    progress?: (step: 'connecting' | 'signing' | 'checking') => void,
-  ) => Promise<Session>;
+  /* The wallet that signed in, while it is still available in this tab. */
+  wallet: StellarWallet | null;
+  /* Whether this tab finished looking for its wallet (a reload restores it). */
+  walletReady: boolean;
+  signIn: (w: StellarWallet, progress?: (step: SignInStep) => void) => Promise<Session>;
   signOut: () => Promise<void>;
   refresh: () => Promise<void>;
   /* A call answered 401: the session is over. */
@@ -44,30 +46,93 @@ interface SessionValue {
 
 const Ctx = createContext<SessionValue | null>(null);
 
-export function SessionProvider({ children }: { children: ReactNode }) {
-  const t = useT();
-  const [session, setSession] = useState<Session | null | undefined>(undefined);
-  const [wallets, setWallets] = useState<DiscoveredWallet[]>([]);
-  const [walletsReady, setWalletsReady] = useState(false);
-  const [walletId, setWalletId] = useState<string | null>(() => {
-    try {
-      return sessionStorage.getItem(WALLET_KEY);
-    } catch {
-      return null;
-    }
-  });
-  const [expired, setExpired] = useState(false);
+const readKind = (): WalletKind | null => {
+  try {
+    const k = sessionStorage.getItem(KIND_KEY);
+    return k === 'pollar' || k === 'demo' || k === 'dev-key' ? k : null;
+  } catch {
+    return null;
+  }
+};
+const writeKind = (k: WalletKind | null) => {
+  try {
+    if (k) sessionStorage.setItem(KIND_KEY, k);
+    else sessionStorage.removeItem(KIND_KEY);
+  } catch {
+    /* the wallet is asked again next time */
+  }
+};
 
+/** SEP-10 against the API with `w`: the session. Every step a wallet signs is checked first. */
+export async function sep10SignIn(
+  w: StellarWallet,
+  progress?: (step: SignInStep) => void,
+): Promise<Session> {
+  progress?.('challenge');
+  const { transaction, networkPassphrase } = await auth.challenge(w.address);
+  const [{ checkChallenge }, { assertSameTransaction }, { KNOWN_PASSPHRASES }] = await Promise.all([
+    import('@/lib/stellar/challenge'),
+    import('@/lib/wallet/signed'),
+    import('@/lib/stellar/network'),
+  ]);
+  const checked = checkChallenge(transaction, {
+    account: w.address,
+    networkPassphrase,
+    allowedPassphrases: KNOWN_PASSPHRASES,
+  });
+  if (!checked.ok) throw new WalletError('mismatch', `challenge:${checked.problem}`);
+  progress?.('signing');
+  const signed = await w.signAuthChallenge(transaction, networkPassphrase, {
+    homeDomain: checked.info.homeDomain,
+    webAuthDomain: checked.info.webAuthDomain,
+  });
+  assertSameTransaction(transaction, signed, networkPassphrase);
+  progress?.('checking');
+  return auth.verify(signed);
+}
+
+export function SessionProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [expired, setExpired] = useState(false);
+  const [kind, setKind] = useState<WalletKind | null>(readKind);
+  const [local, setLocal] = useState<StellarWallet | null>(null);
+  const [localReady, setLocalReady] = useState(false);
+  const pollar = usePollarApi();
+
+  // The dev-key or demo wallet this tab used, back after a reload.
   useEffect(() => {
-    const stop = watchWallets((list) =>
-      setWallets(MOCK ? list.filter((w) => w.info.rdns === DEMO_WALLET_RDNS) : list),
-    );
-    const ready = setTimeout(() => setWalletsReady(true), 700);
-    return () => {
-      stop();
-      clearTimeout(ready);
+    let alive = true;
+    const done = (w: StellarWallet | null) => {
+      if (!alive) return;
+      setLocal(w);
+      setLocalReady(true);
     };
-  }, []);
+    if (kind === 'demo' && MOCK) {
+      import('@/lib/mock/wallet').then((m) => done(m.restoreDemoWallet()), () => done(null));
+    } else if (kind === 'dev-key' && import.meta.env.DEV) {
+      import('@/lib/wallet/dev-key').then((m) => done(m.restoreDevKey()), () => done(null));
+    } else done(null);
+    return () => {
+      alive = false;
+    };
+  }, [kind]);
+
+  // Pollar restores its own session; without a key there is nothing to wait for.
+  const [pollarTimedOut, setPollarTimedOut] = useState(false);
+  useEffect(() => {
+    if (kind !== 'pollar' || !POLLAR_KEY) return;
+    const h = setTimeout(() => setPollarTimedOut(true), 6000);
+    return () => clearTimeout(h);
+  }, [kind]);
+
+  const wallet =
+    kind === 'pollar' ? (pollar?.wallet ?? null) : kind === 'demo' || kind === 'dev-key' ? local : null;
+  const walletReady =
+    kind === 'pollar'
+      ? !POLLAR_KEY || !!pollar?.wallet || (!!pollar?.ready && pollarTimedOut) || pollarTimedOut
+      : kind
+        ? localReady
+        : true;
 
   const refresh = useCallback(async () => {
     try {
@@ -80,60 +145,47 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
-  const signIn = useCallback<SessionValue['signIn']>(
-    async (w, progress) => {
-      progress?.('connecting');
-      const address = await connectWallet(w.provider);
-      const { nonce, domain } = await auth.nonce();
-      const chainId = await currentChainId(w.provider).catch(() => 1);
-      // The API names the domain its sign-in accepts (its SIWE domain, the web app's host); the
-      // wallet compares it with the page and warns when they differ.
-      const message = siweMessage({
-        address,
-        nonce,
-        statement: t.common.wallet.statement,
-        chainId,
-        domain: domain ?? window.location.host,
-        uri: domain ? `${window.location.protocol}//${domain}` : window.location.origin,
-      });
-      progress?.('signing');
-      const signature = await signText(w.provider, address, message);
-      progress?.('checking');
-      const s = await auth.verify(message, signature);
-      setSession(s);
-      setExpired(false);
-      setWalletId(w.info.uuid);
-      try {
-        sessionStorage.setItem(WALLET_KEY, w.info.uuid);
-      } catch {
-        /* the wallet is asked again next time */
-      }
-      return s;
-    },
-    [t],
-  );
+  const signIn = useCallback<SessionValue['signIn']>(async (w, progress) => {
+    const s = await sep10SignIn(w, progress);
+    setSession(s);
+    setExpired(false);
+    setKind(w.kind);
+    writeKind(w.kind);
+    if (w.kind !== 'pollar') {
+      setLocal(w);
+      setLocalReady(true);
+    }
+    return s;
+  }, []);
 
   const signOut = useCallback(async () => {
     await auth.logout().catch(() => {});
+    await wallet?.logout().catch(() => {});
     setSession(null);
-    setWalletId(null);
-    try {
-      sessionStorage.removeItem(WALLET_KEY);
-    } catch {
-      /* nothing kept */
-    }
-  }, []);
+    setKind(null);
+    setLocal(null);
+    writeKind(null);
+  }, [wallet]);
 
   const expire = useCallback(() => {
     setSession(null);
     setExpired(true);
   }, []);
 
-  const wallet =
-    wallets.find((w) => w.info.uuid === walletId) ?? (wallets.length === 1 ? wallets[0] : null);
+  // The wallet counts only while it is the signed-in address.
+  const usable = wallet && session && wallet.address === session.address ? wallet : null;
   const value = useMemo(
-    () => ({ session, wallets, walletsReady, wallet, signIn, signOut, refresh, expire, expired }),
-    [session, wallets, walletsReady, wallet, signIn, signOut, refresh, expire, expired],
+    () => ({
+      session,
+      wallet: usable,
+      walletReady,
+      signIn,
+      signOut,
+      refresh,
+      expire,
+      expired,
+    }),
+    [session, usable, walletReady, signIn, signOut, refresh, expire, expired],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

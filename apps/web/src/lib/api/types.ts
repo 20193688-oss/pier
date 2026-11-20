@@ -4,6 +4,7 @@
    tests/unit/api-types.test.ts. */
 
 import type { Tier } from '@/lib/api/client';
+import { isAccount } from '@/lib/stellar/network';
 
 export type Role = 'owner' | 'admin' | 'member';
 export const ROLES: readonly Role[] = ['owner', 'admin', 'member'];
@@ -93,7 +94,7 @@ export function normalizeSession(raw: unknown): Session | null {
   if (!isObj(raw)) return null;
   const root = isObj(raw.session) ? raw.session : raw;
   const address = s(root.address);
-  if (!/^0x[0-9a-fA-F]{40}$/.test(address)) return null;
+  if (!isAccount(address)) return null;
   const orgs = Array.isArray(root.organizations)
     ? root.organizations
     : Array.isArray(raw.organizations)

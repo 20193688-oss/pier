@@ -51,8 +51,10 @@ export function checkChallenge(
   if (first.source !== input.account) return { ok: false, problem: 'account' };
   const match = /^(.+) auth$/.exec(first.name);
   if (!match || !first.value || first.value.length !== 64) return { ok: false, problem: 'nonce' };
-  // Every other operation is the server's own (web_auth_domain and the like).
-  if (rest.some((op) => op.source !== tx.source)) return { ok: false, problem: 'operations' };
+  // Every other operation is the server's (web_auth_domain and the like) or, for a wallet proof,
+  // the entry binding the organization; manage_data only, in a transaction that cannot run.
+  if (rest.some((op) => op.source !== tx.source && op.source !== input.account))
+    return { ok: false, problem: 'operations' };
   const max = Number(tx.timeBounds?.maxTime ?? 0);
   const min = Number(tx.timeBounds?.minTime ?? 0);
   if (!max || max <= nowSeconds || max > nowSeconds + MAX_CHALLENGE_SECONDS || min > nowSeconds + 60)

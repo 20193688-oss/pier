@@ -102,8 +102,7 @@ const trade: typeof es = {
     sign: 'Lock your USDC in the order',
     signBody:
       'Your wallet first allows the market to take this exact amount, then locks it in the order. Two signatures.',
-    stepApprove: 'Allow {amount} {token}',
-    stepOpen: 'Lock it in the order',
+    stepOpen: 'Lock {amount} {token} in the order',
     stepRelease: 'Release {amount} {token} to the merchant',
     sent: 'Sent. The order updates in a few seconds.',
     clock: {
