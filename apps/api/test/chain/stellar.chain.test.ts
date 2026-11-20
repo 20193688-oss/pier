@@ -96,7 +96,8 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
     accounts = newDevAccounts();
     const market = await setUpDevMarket(chain, accounts);
     const env = localApiEnv({
-      port: 0,
+      // A placeholder: the app below listens on a free port.
+      port: 4999,
       databaseUrl: inject('infra').databaseUrl,
       chain,
       market,
