@@ -178,7 +178,7 @@ test('a new wallet activates for free, then can receive (Spanish)', async ({ pag
     timeout: 15_000,
   });
   await page.getByRole('button', { name: 'Activar wallet' }).click();
-  await expect(page.getByText('Tu wallet está lista para recibir USDC.')).toBeVisible({
+  await expect(page.getByText('Tu wallet está lista para recibir USDC.').first()).toBeVisible({
     timeout: 20_000,
   });
   await expect(page.getByTestId('balance')).toHaveText('US$ 0,00');

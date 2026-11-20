@@ -65,8 +65,12 @@ export function trackErrors(page: Page): string[] {
 
 /** A merchant QR the demo knows, built like the mock's (src/lib/mock/qr.ts). */
 export async function demoQr(page: Page, which: 'cafe' | 'kiosk' | 'pix' = 'cafe'): Promise<string> {
+  // Imported inside the page from the dev server (mock mode serves the source).
   return page.evaluate(
-    async (w) => (await import('/src/lib/mock/qr.ts')).DEMO_QRS[w as 'cafe'],
-    which,
+    async ([w, path]) => {
+      const mod = (await import(/* @vite-ignore */ path)) as { DEMO_QRS: Record<string, string> };
+      return mod.DEMO_QRS[w];
+    },
+    [which, '/src/lib/mock/qr.ts'] as const,
   );
 }
