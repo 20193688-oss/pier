@@ -17,8 +17,8 @@ import {
 } from '@/chain/deployments.service';
 import {
   decodeResult,
-  marketErrorName,
   p2pCall,
+  refusalName,
   toChainOrder,
   toMarketConfig,
   toMatcherTerms,
@@ -186,7 +186,10 @@ export class MarketReader {
       .build();
     const sim = await this.chain.simulate(n, tx);
     if (rpc.Api.isSimulationError(sim)) {
-      throw new ChainCallReverted(marketErrorName(sim.error), sim.error);
+      throw new ChainCallReverted(
+        refusalName(sim, (id) => this.deployments.isMarket(id)),
+        sim.error,
+      );
     }
     if (!sim.result) throw new Error(`${fn}: the simulation answered no result`);
     return decodeResult<T>(fn, sim.result.retval);

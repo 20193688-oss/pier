@@ -1,5 +1,5 @@
 import { MARKET_ERRORS, MARKET_SPEC } from '@pedospe/contracts';
-import { contract, Operation, xdr } from '@stellar/stellar-sdk';
+import { contract, Operation, StrKey, xdr } from '@stellar/stellar-sdk';
 
 /**
  * The `P2PMarket` codec: arguments, results, events and errors, all through
@@ -378,4 +378,95 @@ export function marketErrorName(text: string): string | null {
   const match = /Error\(Contract, #(\d+)\)/.exec(text);
   if (!match) return null;
   return (MARKET_ERRORS as Readonly<Record<number, string>>)[Number(match[1])] ?? null;
+}
+
+/**
+ * The Stellar Asset Contract's own errors (soroban-env-host `ContractError`),
+ * named with a `Token` prefix so they never read as the market's: code 13 is a
+ * missing trustline for the token, not the market's `EmptyRef`.
+ */
+export const TOKEN_ERRORS: Readonly<Record<number, string>> = {
+  1: 'TokenInternalError',
+  2: 'TokenOperationNotSupported',
+  3: 'TokenAlreadyInitialized',
+  4: 'TokenUnauthorized',
+  5: 'TokenAuthentication',
+  6: 'TokenAccountMissing',
+  7: 'TokenAccountIsNotClassic',
+  8: 'TokenNegativeAmount',
+  9: 'TokenAllowance',
+  10: 'TokenBalance',
+  11: 'TokenBalanceDeauthorized',
+  12: 'TokenOverflow',
+  13: 'TokenTrustlineMissing',
+};
+
+export interface ContractErrorOrigin {
+  /** The contract that raised it (C...), or null when the event names none. */
+  contract: string | null;
+  code: number;
+}
+
+interface DiagnosticLike {
+  event?: {
+    contractId?: unknown;
+    body?: { v0?: { topics?: readonly unknown[] } };
+  };
+}
+
+const bytesOf = (value: unknown): Uint8Array | null => {
+  if (value instanceof Uint8Array) return value;
+  const inner = (value as { value?: unknown; bytes?: unknown } | null) ?? null;
+  if (inner?.value instanceof Uint8Array) return inner.value;
+  if (inner?.bytes instanceof Uint8Array) return inner.bytes;
+  return null;
+};
+
+/**
+ * The first contract error in a simulation's diagnostic events, in emission
+ * order, with the contract that raised it. When the market's call into a token
+ * fails, the token's `error` event comes first and the market's are only the
+ * same code propagated (checked on testnet against a missing trustline).
+ */
+export function contractErrorOrigin(
+  events: readonly unknown[] | undefined,
+): ContractErrorOrigin | null {
+  for (const raw of events ?? []) {
+    const event = (raw as DiagnosticLike).event;
+    const topics = event?.body?.v0?.topics;
+    if (!topics || topics.length < 2) continue;
+    const [name, error] = topics as [
+      { type?: string; sym?: unknown },
+      { type?: string; error?: { type?: string; contractCode?: number } },
+    ];
+    const symbol = name?.type === 'scvSymbol' ? bytesOf(name.sym) : null;
+    if (!symbol || new TextDecoder().decode(symbol) !== 'error') continue;
+    if (error?.type !== 'scvError' || error.error?.type !== 'sceContract') continue;
+    const code = Number(error.error.contractCode);
+    if (!Number.isInteger(code)) continue;
+    const id = bytesOf(event?.contractId);
+    return {
+      contract: id && id.length === 32 ? StrKey.encodeContract(Buffer.from(id)) : null,
+      code,
+    };
+  }
+  return null;
+}
+
+/**
+ * Names a simulated refusal by who raised it: the market's own error when a
+ * market contract raised it, a `Token…` error when anything else did (the
+ * market only calls Stellar Asset Contracts), or, with no diagnostic events
+ * to tell, the market's name for the code in the error text.
+ */
+export function refusalName(
+  sim: { error: string; events?: readonly unknown[] },
+  isMarket: (contractId: string) => boolean,
+): string | null {
+  const origin = contractErrorOrigin(sim.events);
+  if (!origin) return marketErrorName(sim.error);
+  if (origin.contract && isMarket(origin.contract)) {
+    return (MARKET_ERRORS as Readonly<Record<number, string>>)[origin.code] ?? null;
+  }
+  return TOKEN_ERRORS[origin.code] ?? null;
 }

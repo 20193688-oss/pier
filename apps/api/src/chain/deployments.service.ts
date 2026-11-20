@@ -90,6 +90,11 @@ export class DeploymentsService {
     return this.all.filter((d) => d.tier === tier);
   }
 
+  /** Whether `contractId` is a market contract this service is configured with (any tier). */
+  isMarket(contractId: string): boolean {
+    return this.all.some((d) => d.contract === contractId);
+  }
+
   find(tier: Tier, network: string): Deployment | null {
     if (!isNetworkId(network)) return null;
     return this.all.find((d) => d.tier === tier && d.network === network) ?? null;
