@@ -5,7 +5,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { ValidationError } from 'class-validator';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import { AppModule } from '@/app.module';
+import { AppModule, type AppOverrides } from '@/app.module';
 import { ApiError } from '@/common/api-error';
 import type { AppConfig } from '@/config/env';
 
@@ -23,12 +23,15 @@ export function flattenValidation(errors: ValidationError[], prefix = ''): strin
 /** The HTTP app with everything a request goes through, in every environment and test. */
 export async function createApp(
   config: AppConfig,
-  options: { logger?: false } = {},
+  options: { logger?: false; overrides?: AppOverrides } = {},
 ): Promise<INestApplication> {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule.register(config), {
-    logger: options.logger === false ? false : ['log', 'warn', 'error'],
-    bodyParser: true,
-  });
+  const app = await NestFactory.create<NestExpressApplication>(
+    AppModule.register(config, options.overrides),
+    {
+      logger: options.logger === false ? false : ['log', 'warn', 'error'],
+      bodyParser: true,
+    },
+  );
   app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
   app.useBodyParser('json', { limit: '256kb' });

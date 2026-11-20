@@ -22,7 +22,7 @@ export const P2P_ORDER_STATUSES = [
 ] as const;
 export type P2pOrderStatus = (typeof P2P_ORDER_STATUSES)[number];
 
-export const P2P_ORDER_KINDS = ['BUY', 'SELL', 'CHARGE', 'PAYOUT'] as const;
+export const P2P_ORDER_KINDS = ['BUY', 'SELL', 'QR_PAY', 'CHARGE', 'PAYOUT'] as const;
 export type P2pOrderKind = (typeof P2P_ORDER_KINDS)[number];
 
 /** Orders whose tokens are still locked: they count against a merchant and show details. */
@@ -64,30 +64,38 @@ export const P2P_MERCHANT_SIDE: Record<P2pOrderKind, 'seller' | 'buyer'> = {
   BUY: 'seller',
   CHARGE: 'seller',
   SELL: 'buyer',
+  QR_PAY: 'buyer',
   PAYOUT: 'buyer',
 };
 
+/** The kinds a person opens from their own wallet (`open_with_deposit`): a sale and a QR payment. */
+export const P2P_SELF_OPENED_KINDS: readonly P2pOrderKind[] = ['SELL', 'QR_PAY'];
+
+export function isSelfOpened(kind: string): boolean {
+  return (P2P_SELF_OPENED_KINDS as readonly string[]).includes(kind);
+}
+
 /** The events that move an order, and from where. */
 export const P2P_EVENT_TRANSITIONS = {
-  // `OrderOpened` moves `pending` (and a late-signed sale's `failed`) to the
+  // `order_opened` moves `pending` (and a late-signed sale's `failed`) to the
   // status the chain answers: `awaiting_acceptance` or `awaiting_payment`.
-  OrderAccepted: { from: ['awaiting_acceptance'], to: 'awaiting_payment' },
-  OrderPaid: { from: ['awaiting_payment'], to: 'paid' },
-  OrderReleased: { from: ['awaiting_payment', 'paid'], to: 'completed' },
-  OrderDisputed: { from: ['paid'], to: 'disputed' },
-  OrderResolved: { from: ['disputed'], to: 'resolved' },
-  // `OrderCancelled` reads `cancelled` or `expired`: see cancellationStatus.
-  OrderCancelled: {
+  order_accepted: { from: ['awaiting_acceptance'], to: 'awaiting_payment' },
+  order_paid: { from: ['awaiting_payment'], to: 'paid' },
+  order_released: { from: ['awaiting_payment', 'paid'], to: 'completed' },
+  order_disputed: { from: ['paid'], to: 'disputed' },
+  order_resolved: { from: ['disputed'], to: 'resolved' },
+  // `order_cancelled` reads `cancelled` or `expired`: see cancellationStatus.
+  order_cancelled: {
     from: ['awaiting_acceptance', 'awaiting_payment', 'paid'],
     to: 'cancelled',
   },
 } as const satisfies Record<string, { from: readonly P2pOrderStatus[]; to: P2pOrderStatus }>;
 
-/** The statuses `OrderOpened` may move an order from. */
+/** The statuses `order_opened` may move an order from. */
 export function openableFrom(kind: P2pOrderKind): P2pOrderStatus[] {
   // A sale the person signed after we gave up on it still locked their
   // tokens: follow it, so it can be accepted or cancelled like any other.
-  return kind === 'SELL' ? ['pending', 'failed'] : ['pending'];
+  return isSelfOpened(kind) ? ['pending', 'failed'] : ['pending'];
 }
 
 /** What a cancelled order reads as. */

@@ -1,15 +1,15 @@
-import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync } from 'node:fs';
+import { spawnSync, type ChildProcess } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { createServer } from 'node:net';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
- * Local infrastructure for development and the e2e tests, from npm packages
- * only: an EVM node (anvil, from `@foundry-rs/anvil-<platform>`) and Postgres
- * (embedded, from `embedded-postgres`). Every process started here is a single
- * PID the caller stops; nothing is ever killed by name.
+ * Local infrastructure for development and the e2e tests: Postgres (embedded,
+ * from `embedded-postgres`) and, when a Docker daemon already answers, the
+ * local Stellar network (`stellar container start local`). Every process
+ * started here is a single PID the caller stops; nothing is ever killed by name.
  */
 
 const require = createRequire(import.meta.url);
@@ -30,85 +30,68 @@ export function freePort(): Promise<number> {
   });
 }
 
-const ANVIL_PACKAGES: Record<string, string> = {
-  'win32-x64': '@foundry-rs/anvil-win32-amd64',
-  'linux-x64': '@foundry-rs/anvil-linux-amd64',
-  'linux-arm64': '@foundry-rs/anvil-linux-arm64',
-  'darwin-x64': '@foundry-rs/anvil-darwin-amd64',
-  'darwin-arm64': '@foundry-rs/anvil-darwin-arm64',
-};
-
-/** The anvil binary of this platform's npm package. */
-export function anvilBinary(): string {
-  const pkg = ANVIL_PACKAGES[`${process.platform}-${process.arch}`];
-  if (!pkg) throw new Error(`No anvil package for ${process.platform}-${process.arch}`);
-  const root = dirname(require.resolve(`${pkg}/package.json`));
-  return join(root, 'bin', process.platform === 'win32' ? 'anvil.exe' : 'anvil');
-}
-
-export interface RunningAnvil {
-  rpcUrl: string;
-  process: ChildProcess;
-  stop(): Promise<void>;
-}
-
-async function rpcAnswers(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_chainId', params: [] }),
-    });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
-/** Starts anvil (chain id 31337, the standard dev mnemonic) and waits until it answers. */
-export async function startAnvil(options: {
-  port: number;
-  /** Load and keep chain state here (dev:stack); omitted: a fresh chain. */
-  stateFile?: string;
-  logFile?: string;
-}): Promise<RunningAnvil> {
-  const args = [
-    '--port',
-    String(options.port),
-    '--host',
-    '127.0.0.1',
-    '--chain-id',
-    '31337',
-    '--accounts',
-    '10',
-    '--balance',
-    '10000',
-  ];
-  if (options.stateFile) args.push('--state', options.stateFile, '--state-interval', '5');
-  const child = spawn(anvilBinary(), args, {
-    stdio: ['ignore', 'pipe', 'pipe'],
+/** Whether a Docker daemon answers (never starts one). */
+export function dockerAnswers(): boolean {
+  const result = spawnSync('docker', ['info', '--format', '{{.ServerVersion}}'], {
+    timeout: 8_000,
+    stdio: 'ignore',
+    shell: process.platform === 'win32',
     windowsHide: true,
   });
-  if (options.logFile) {
-    mkdirSync(dirname(options.logFile), { recursive: true });
-    const log = createWriteStream(options.logFile, { flags: 'a' });
-    child.stdout?.pipe(log);
-    child.stderr?.pipe(log);
-  } else {
-    child.stdout?.resume();
-    child.stderr?.resume();
-  }
-  const rpcUrl = `http://127.0.0.1:${options.port}`;
-  for (let i = 0; i < 100; i++) {
-    if (child.exitCode !== null) throw new Error(`anvil exited with code ${child.exitCode}`);
-    if (await rpcAnswers(rpcUrl)) break;
-    await new Promise((r) => setTimeout(r, 100));
-    if (i === 99) throw new Error('anvil did not answer in 10 s');
+  return result.status === 0;
+}
+
+export interface RunningLocalStellar {
+  rpcUrl: string;
+  horizonUrl: string;
+  friendbotUrl: string;
+  stop(): void;
+}
+
+/** The quickstart network's passphrase. */
+export const LOCAL_PASSPHRASE = 'Standalone Network ; February 2017';
+
+/**
+ * Starts the local Stellar network (`stellar container start local`, the
+ * stellar/quickstart image) and waits until its RPC answers the standalone
+ * passphrase and friendbot funds. Only when a Docker daemon already answers:
+ * Docker itself is never started from here.
+ */
+export async function startLocalStellar(port = 8000): Promise<RunningLocalStellar> {
+  if (!dockerAnswers()) throw new Error('no Docker daemon answers: the local network needs one');
+  const run = (args: string[]) =>
+    spawnSync('stellar', args, {
+      stdio: 'inherit',
+      shell: process.platform === 'win32',
+      windowsHide: true,
+    });
+  const started = run(['container', 'start', 'local', '--ports-mapping', `${port}:8000`]);
+  if (started.status !== 0) throw new Error('stellar container start local failed');
+  const base = `http://localhost:${port}`;
+  const rpcUrl = `${base}/rpc`;
+  for (let i = 0; i < 300; i++) {
+    try {
+      const res = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getNetwork' }),
+      });
+      const body = (await res.json()) as { result?: { passphrase?: string } };
+      if (body.result?.passphrase === LOCAL_PASSPHRASE) {
+        const friendbot = await fetch(`${base}/friendbot`);
+        if (friendbot.status < 500) break;
+      }
+    } catch {
+      // not up yet
+    }
+    if (i === 299) throw new Error('the local Stellar network did not come up in 5 minutes');
+    await new Promise((r) => setTimeout(r, 1_000));
   }
   return {
     rpcUrl,
-    process: child,
-    stop: () => stopProcess(child),
+    horizonUrl: base,
+    friendbotUrl: `${base}/friendbot`,
+    stop: () => void run(['container', 'stop', 'local']),
   };
 }
 

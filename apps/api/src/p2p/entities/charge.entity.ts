@@ -14,10 +14,10 @@ export class ChargeView {
   @ApiProperty({ enum: ['live', 'test'], example: 'test' })
   tier!: string;
 
-  @ApiProperty({ example: 'base' })
+  @ApiProperty({ example: 'testnet' })
   network!: string;
 
-  @ApiProperty({ example: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' })
+  @ApiProperty({ example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA' })
   token!: string;
 
   @ApiProperty({ example: 'USDC' })
@@ -32,7 +32,7 @@ export class ChargeView {
   @ApiProperty({ example: 'cm3p2pacc0001l70g8v5q3z2w' })
   recipientAccountId!: string;
 
-  @ApiProperty({ example: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' })
+  @ApiProperty({ example: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI' })
   recipientAddress!: string;
 
   @ApiProperty({ type: String, nullable: true, example: 'Order #881' })
@@ -104,7 +104,7 @@ export class CheckoutChargeView {
   @ApiProperty({ example: CHARGE_ID })
   id!: string;
 
-  @ApiProperty({ example: 'base' })
+  @ApiProperty({ example: 'testnet' })
   network!: string;
 
   @ApiProperty({ example: 'USDC' })
@@ -265,10 +265,10 @@ export class PayoutBatchView {
   @ApiProperty({ enum: ['live', 'test'], example: 'test' })
   tier!: string;
 
-  @ApiProperty({ example: 'base' })
+  @ApiProperty({ example: 'testnet' })
   network!: string;
 
-  @ApiProperty({ example: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' })
+  @ApiProperty({ example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA' })
   token!: string;
 
   @ApiProperty({

@@ -1,277 +1,247 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
-  BaseError,
-  createPublicClient,
-  defineChain,
-  getAddress,
-  http,
-  keccak256,
-  numberToHex,
-  type Hex,
-  type PublicClient,
-} from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
+  Account,
+  Asset,
+  Contract,
+  FeeBumpTransaction,
+  Keypair,
+  SignerKey,
+  Transaction,
+  rpc,
+  xdr,
+} from '@stellar/stellar-sdk';
 import { ApiError } from '@/common/api-error';
-import type { Deployment } from '@/chain/deployments.service';
-import { p2pRevertName } from '@/chain/market-codec';
+import { DeploymentsService, type StellarNetwork } from '@/chain/deployments.service';
+import type { Token } from '@/chain/networks';
 
-/** A call the contract would revert: `contractError` names its custom error when known. */
+/** A call the contract (or the host) refuses in simulation: `contractError` names the contract error when known. */
 export class ChainCallReverted extends Error {
   constructor(
     readonly contractError: string | null,
-    readonly data: Hex | null,
+    readonly detail: string,
   ) {
-    super(`reverted${contractError ? ` (${contractError})` : ''}`);
+    super(`refused${contractError ? ` (${contractError})` : ''}`);
     this.name = 'ChainCallReverted';
   }
 }
 
-/** A log as `eth_getLogs` answers it. */
-export interface ChainLog {
+/** An account as the ledger holds it. */
+export interface AccountState {
   address: string;
-  topics: Hex[];
-  data: Hex;
-  blockNumber: Hex;
-  transactionHash: Hex;
-  logIndex: Hex;
-  removed?: boolean;
+  sequence: bigint;
+  /** Lumens, stroops. */
+  balance: bigint;
+  /** Master key weight and the low / medium / high thresholds. */
+  thresholds: { master: number; low: number; medium: number; high: number };
+  /** Every signer other than the master key: `G...` keys (and other signer kinds by their StrKey). */
+  signers: { key: string; weight: number }[];
+  subentries: number;
 }
 
-export interface ChainReceipt {
-  succeeded: boolean;
-  blockNumber: bigint;
+/** A trustline as the ledger holds it. */
+export interface TrustlineState {
+  balance: bigint;
+  limit: bigint;
+  /** AUTHORIZED_FLAG: may receive and send. */
+  authorized: boolean;
 }
 
-/** The revert data an RPC error carries, wherever viem nested it. */
-export function revertDataOf(err: unknown): Hex | null {
-  const pick = (value: unknown): Hex | null => {
-    if (typeof value === 'string' && /^0x[0-9a-fA-F]*$/.test(value) && value.length >= 10) {
-      return value as Hex;
-    }
-    if (value && typeof value === 'object' && 'data' in value) {
-      return pick((value as { data: unknown }).data);
-    }
-    return null;
-  };
-  let current: unknown = err;
-  for (let depth = 0; current && depth < 8; depth++) {
-    const found = pick((current as { data?: unknown }).data);
-    if (found) return found;
-    current = (current as { cause?: unknown }).cause;
-  }
-  return null;
-}
+const AUTHORIZED_FLAG = 1;
 
-/** Whether an RPC error is an execution revert (not a node or network failure). */
-export function isRevert(err: unknown): boolean {
-  if (revertDataOf(err)) return true;
-  const text =
-    err instanceof BaseError
-      ? `${err.shortMessage} ${err.details ?? ''} ${err.message}`
-      : String((err as Error)?.message ?? err);
-  return /revert/i.test(text);
+/** The contract error code in a host error text (`Error(Contract, #12)`), or null. */
+export function contractErrorCode(text: string): number | null {
+  const match = /Error\(Contract, #(\d+)\)/.exec(text);
+  return match ? Number(match[1]) : null;
 }
 
 /**
- * Every RPC the market makes, through viem, one client per deployment. Before
- * a client is used its node must answer the deployment's chain id
- * (`eth_chainId`): a node on another chain is refused, never trusted.
+ * Every RPC the market makes, through stellar-sdk's Soroban RPC client, one
+ * client per network and node. Before a client is used its node must answer
+ * the network's passphrase (`getNetwork`): a node on another network is
+ * refused, never trusted. Horizon is not needed.
  */
 @Injectable()
 export class ChainClient {
   private readonly logger = new Logger(ChainClient.name);
-  private readonly clients = new Map<string, PublicClient>();
+  private readonly servers = new Map<string, rpc.Server>();
   private readonly checked = new Map<string, Promise<void>>();
 
-  private key(d: Deployment): string {
-    return `${d.tier}:${d.network}:${d.rpcUrl}`;
-  }
+  constructor(private readonly deployments: DeploymentsService) {}
 
-  private raw(d: Deployment, timeoutMs = 10_000): PublicClient {
-    const key = this.key(d);
-    let client = this.clients.get(key);
-    if (!client) {
-      client = createPublicClient({
-        chain: defineChain({
-          id: d.chainId,
-          name: d.name,
-          nativeCurrency: { name: 'Native', symbol: 'ETH', decimals: 18 },
-          rpcUrls: { default: { http: [d.rpcUrl] } },
-        }),
-        transport: http(d.rpcUrl, { timeout: timeoutMs, retryCount: 1 }),
+  private raw(n: StellarNetwork): rpc.Server {
+    let server = this.servers.get(n.rpcUrl);
+    if (!server) {
+      server = new rpc.Server(n.rpcUrl, {
+        allowHttp: n.rpcUrl.startsWith('http://'),
+        timeout: this.deployments.timeoutMs(),
       });
-      this.clients.set(key, client);
+      this.servers.set(n.rpcUrl, server);
     }
-    return client;
+    return server;
   }
 
-  /** The client of a deployment whose node answered the right chain id. */
-  async client(d: Deployment): Promise<PublicClient> {
-    const client = this.raw(d);
-    const key = this.key(d);
+  /** The client of a network whose node answered the right passphrase. */
+  async server(n: StellarNetwork): Promise<rpc.Server> {
+    const server = this.raw(n);
+    const key = `${n.network}:${n.rpcUrl}`;
     let check = this.checked.get(key);
     if (!check) {
-      check = client.getChainId().then((id) => {
-        if (id !== d.chainId) {
+      check = server.getNetwork().then(
+        (answer) => {
+          if (answer.passphrase !== n.passphrase) {
+            throw ApiError.unavailable(
+              `The market is not available on ${n.name} right now.`,
+              `The node for ${n.network} answered the passphrase "${answer.passphrase}".`,
+            );
+          }
+        },
+        (err: unknown) => {
           throw ApiError.unavailable(
-            `The market is not available on ${d.name} right now.`,
-            `The node for ${d.network}/${d.tier} answered chain id ${id}, not ${d.chainId}.`,
+            `${n.name} cannot be reached right now.`,
+            `getNetwork on ${n.network} failed: ${err instanceof Error ? err.message : String(err)}`,
           );
-        }
-      });
-      // A failed check (node down, wrong chain) is tried again on the next call.
+        },
+      );
+      // A failed check (node down, wrong network) is tried again on the next call.
       check.catch(() => this.checked.delete(key));
       this.checked.set(key, check);
     }
     await check;
-    return client;
+    return server;
   }
 
-  private async request<T>(d: Deployment, method: string, params: unknown[]): Promise<T> {
-    const client = await this.client(d);
-    return (await client.request({ method, params } as never)) as T;
-  }
-
-  /** `eth_call`; a revert is a `ChainCallReverted`. `to` omitted runs init code. */
-  async call(d: Deployment, tx: { to?: string; data: Hex; from?: string }): Promise<Hex> {
+  private async call<T>(
+    n: StellarNetwork,
+    what: string,
+    run: (s: rpc.Server) => Promise<T>,
+  ): Promise<T> {
+    const server = await this.server(n);
     try {
-      return await this.request<Hex>(d, 'eth_call', [
-        {
-          ...(tx.to ? { to: getAddress(tx.to) } : {}),
-          ...(tx.from ? { from: getAddress(tx.from) } : {}),
-          data: tx.data,
-        },
-        'latest',
-      ]);
+      return await run(server);
     } catch (err) {
-      throw this.reverted(err);
-    }
-  }
-
-  async getCode(d: Deployment, address: string): Promise<Hex> {
-    return this.request<Hex>(d, 'eth_getCode', [getAddress(address), 'latest']);
-  }
-
-  /** `eth_estimateGas`: a call the contract would revert is a `ChainCallReverted`, before anything is signed. */
-  async estimateGas(d: Deployment, tx: { from: string; to: string; data: Hex }): Promise<bigint> {
-    try {
-      return BigInt(
-        await this.request<Hex>(d, 'eth_estimateGas', [
-          { from: getAddress(tx.from), to: getAddress(tx.to), data: tx.data },
-        ]),
+      if (err instanceof ApiError) throw err;
+      throw ApiError.unavailable(
+        `${n.name} cannot be reached right now.`,
+        `${what} on ${n.network} failed: ${err instanceof Error ? err.message : String(err)}`,
       );
-    } catch (err) {
-      throw this.reverted(err);
     }
   }
 
-  private reverted(err: unknown): unknown {
-    if (err instanceof ApiError) return err;
-    if (!isRevert(err)) return err;
-    const data = revertDataOf(err);
-    return new ChainCallReverted(p2pRevertName(data), data);
+  simulate(n: StellarNetwork, tx: Transaction): Promise<rpc.Api.SimulateTransactionResponse> {
+    return this.call(n, 'simulateTransaction', (s) => s.simulateTransaction(tx));
   }
 
-  async feeData(d: Deployment): Promise<{ maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }> {
-    const client = await this.client(d);
-    const fees = await client.estimateFeesPerGas();
-    return { maxFeePerGas: fees.maxFeePerGas, maxPriorityFeePerGas: fees.maxPriorityFeePerGas };
+  send(
+    n: StellarNetwork,
+    tx: Transaction | FeeBumpTransaction,
+  ): Promise<rpc.Api.SendTransactionResponse> {
+    return this.call(n, 'sendTransaction', (s) => s.sendTransaction(tx));
   }
 
-  /** The next nonce counting the node's pending pool. */
-  async pendingNonce(d: Deployment, address: string): Promise<bigint> {
-    return BigInt(
-      await this.request<Hex>(d, 'eth_getTransactionCount', [getAddress(address), 'pending']),
+  getTransaction(n: StellarNetwork, hash: string): Promise<rpc.Api.GetTransactionResponse> {
+    return this.call(n, 'getTransaction', (s) => s.getTransaction(hash));
+  }
+
+  getEvents(
+    n: StellarNetwork,
+    request: rpc.Api.GetEventsRequest,
+  ): Promise<rpc.Api.GetEventsResponse> {
+    return this.call(n, 'getEvents', (s) => s.getEvents(request));
+  }
+
+  latestLedger(n: StellarNetwork): Promise<rpc.Api.GetLatestLedgerResponse> {
+    return this.call(n, 'getLatestLedger', (s) => s.getLatestLedger());
+  }
+
+  health(n: StellarNetwork): Promise<rpc.Api.GetHealthResponse> {
+    return this.call(n, 'getHealth', (s) => s.getHealth());
+  }
+
+  ledgerEntries(
+    n: StellarNetwork,
+    keys: xdr.LedgerKey[],
+  ): Promise<rpc.Api.GetLedgerEntriesResponse> {
+    return this.call(n, 'getLedgerEntries', (s) => s.getLedgerEntries(...keys));
+  }
+
+  /** An account's entry, or null when it does not exist. */
+  async account(n: StellarNetwork, address: string): Promise<AccountState | null> {
+    const key = xdr.LedgerKey.account(
+      new xdr.LedgerKeyAccount({ accountId: Keypair.fromPublicKey(address).xdrPublicKey() }),
     );
+    const res = await this.ledgerEntries(n, [key]);
+    const entry = res.entries[0]?.val;
+    if (!entry || entry.type !== 'account') return null;
+    return accountStateOf(address, entry.account);
   }
 
-  /** Transactions of `address` already mined. */
-  async minedNonce(d: Deployment, address: string): Promise<bigint> {
-    return BigInt(
-      await this.request<Hex>(d, 'eth_getTransactionCount', [getAddress(address), 'latest']),
+  /** A sequence-ready `Account` for a transaction builder, or null when it does not exist. */
+  async loadAccount(n: StellarNetwork, address: string): Promise<Account | null> {
+    const state = await this.account(n, address);
+    return state ? new Account(address, state.sequence.toString()) : null;
+  }
+
+  /** The trustlines of `address` to each token (null where there is none). */
+  async trustlines(
+    n: StellarNetwork,
+    address: string,
+    tokens: readonly Token[],
+  ): Promise<(TrustlineState | null)[]> {
+    if (tokens.length === 0) return [];
+    const keys = tokens.map((t) =>
+      xdr.LedgerKey.trustline(
+        new xdr.LedgerKeyTrustLine({
+          accountId: Keypair.fromPublicKey(address).xdrAccountId(),
+          asset: new Asset(t.code, t.issuer).toTrustLineXdrObject(),
+        }),
+      ),
     );
-  }
-
-  async sendRawTransaction(d: Deployment, raw: Hex): Promise<Hex> {
-    try {
-      return await this.request<Hex>(d, 'eth_sendRawTransaction', [raw]);
-    } catch (err) {
-      // A node that already has these exact bytes answers an error; that is a success.
-      if (/already known|known transaction|nonce too low/i.test(String((err as Error).message))) {
-        return keccak256(raw);
-      }
-      throw err;
-    }
-  }
-
-  async receipt(d: Deployment, hash: Hex): Promise<ChainReceipt | null> {
-    const r = await this.request<{ status: Hex; blockNumber: Hex } | null>(
-      d,
-      'eth_getTransactionReceipt',
-      [hash],
-    );
-    if (!r) return null;
-    return { succeeded: r.status === '0x1', blockNumber: BigInt(r.blockNumber) };
-  }
-
-  async blockNumber(d: Deployment): Promise<bigint> {
-    return BigInt(await this.request<Hex>(d, 'eth_blockNumber', []));
-  }
-
-  async blockTimestamp(d: Deployment, block: bigint): Promise<number | null> {
-    const b = await this.request<{ timestamp: Hex } | null>(d, 'eth_getBlockByNumber', [
-      numberToHex(block),
-      false,
-    ]);
-    return b ? Number(BigInt(b.timestamp)) : null;
-  }
-
-  /** The contract's logs with any of `topics` as topic0, in `[from, to]`. */
-  async getLogs(d: Deployment, topics: Hex[], from: bigint, to: bigint): Promise<ChainLog[]> {
-    return this.request<ChainLog[]>(d, 'eth_getLogs', [
-      {
-        address: getAddress(d.contract),
-        topics: [topics],
-        fromBlock: numberToHex(from),
-        toBlock: numberToHex(to),
-      },
-    ]);
-  }
-
-  /** Signs an EIP-1559 transaction; answers its raw bytes and hash. Nothing is sent. */
-  async sign(
-    key: Hex,
-    tx: {
-      chainId: number;
-      nonce: bigint;
-      maxFeePerGas: bigint;
-      maxPriorityFeePerGas: bigint;
-      gas: bigint;
-      to: string;
-      data: Hex;
-    },
-  ): Promise<{ raw: Hex; hash: Hex }> {
-    const account = privateKeyToAccount(key);
-    const raw = await account.signTransaction({
-      type: 'eip1559',
-      chainId: tx.chainId,
-      nonce: Number(tx.nonce),
-      maxFeePerGas: tx.maxFeePerGas,
-      maxPriorityFeePerGas: tx.maxPriorityFeePerGas,
-      gas: tx.gas,
-      to: getAddress(tx.to),
-      value: 0n,
-      data: tx.data,
+    const res = await this.ledgerEntries(n, keys);
+    return keys.map((k) => {
+      const wanted = k.toXdr('base64');
+      const found = res.entries.find((e) => e.key.toXdr('base64') === wanted)?.val;
+      if (!found || found.type !== 'trustline') return null;
+      const tl = found.trustLine;
+      return {
+        balance: BigInt(tl.balance),
+        limit: BigInt(tl.limit),
+        authorized: (tl.flags & AUTHORIZED_FLAG) !== 0,
+      };
     });
-    return { raw, hash: keccak256(raw) };
   }
 
-  /** For logs: never prints a key. */
-  describe(d: Deployment): string {
-    return `${d.network}/${d.tier}`;
+  /** The hex sha256 of the wasm a contract runs, or null (no such contract, or not a wasm contract). */
+  async contractWasmHash(n: StellarNetwork, contractId: string): Promise<string | null> {
+    const res = await this.ledgerEntries(n, [new Contract(contractId).getFootprint()]);
+    const entry = res.entries[0]?.val;
+    if (!entry || entry.type !== 'contractData') return null;
+    const scv = entry.contractData.val;
+    if (scv.type !== 'scvContractInstance') return null;
+    const exec = scv.instance.executable;
+    if (exec.type !== 'contractExecutableWasm') return null;
+    return Buffer.from(exec.wasmHash.value).toString('hex');
   }
 
   warn(message: string): void {
     this.logger.warn(message);
   }
+}
+
+/** An account entry as `AccountState`. */
+export function accountStateOf(address: string, a: xdr.AccountEntry): AccountState {
+  const t = a.thresholds.value;
+  return {
+    address,
+    sequence: BigInt(a.seqNum),
+    balance: BigInt(a.balance),
+    thresholds: { master: t[0], low: t[1], medium: t[2], high: t[3] },
+    signers: a.signers.flatMap((s) => {
+      try {
+        return [{ key: SignerKey.encodeSignerKey(s.key), weight: s.weight }];
+      } catch {
+        return [];
+      }
+    }),
+    subentries: a.numSubEntries,
+  };
 }

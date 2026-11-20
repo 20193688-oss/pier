@@ -19,7 +19,7 @@ export class OrderTxHashesView {
   @ApiProperty({
     type: String,
     nullable: true,
-    example: '0x6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f',
+    example: '6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f',
   })
   open!: string | null;
 
@@ -94,6 +94,62 @@ export class OrderMerchantView {
   displayName!: string | null;
 }
 
+@ApiSchema({
+  description:
+    'What a QR payment’s scanned QR reads, for the person who scanned it (never the payload itself).',
+})
+export class QrSummaryView {
+  @ApiProperty({ enum: ['pix', 'ar-interoperable'], example: 'ar-interoperable' })
+  standard!: string;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Panaderia La Salteña' })
+  merchantName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Salta' })
+  merchantCity!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '12500.00',
+    description: 'The amount a dynamic QR asks for; null for a static one.',
+  })
+  amount!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'ARS' })
+  currency!: string | null;
+}
+
+@ApiSchema({
+  description:
+    'A QR payment’s scanned QR, for its merchant while the order is live: draw the QR from `payload` and pay it with your banking app, then mark the order paid.',
+})
+export class MerchantQrView {
+  @ApiProperty({
+    example: '00020101021243650016com.mercadolibre...6304ABCD',
+    description: 'The exact text scanned (EMV), CRC included.',
+  })
+  payload!: string;
+
+  @ApiProperty({ enum: ['pix', 'ar-interoperable'], example: 'ar-interoperable' })
+  standard!: string;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Panaderia La Salteña' })
+  merchantName!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'Salta' })
+  merchantCity!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: '12500.00' })
+  amount!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'ARS' })
+  currency!: string | null;
+
+  @ApiProperty({ type: String, nullable: true, example: 'TICKET-0042' })
+  reference!: string | null;
+}
+
 /** An order as the client (the organization that created it) reads it. */
 @ApiSchema({
   description:
@@ -104,10 +160,10 @@ export class OrderView {
   id!: string;
 
   @ApiProperty({
-    enum: ['BUY', 'SELL', 'CHARGE', 'PAYOUT'],
+    enum: ['BUY', 'SELL', 'QR_PAY', 'CHARGE', 'PAYOUT'],
     example: 'BUY',
     description:
-      'BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.',
+      'BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. QR_PAY: a person pays a shop’s local-money QR through a merchant that buys their tokens. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.',
   })
   kind!: string;
 
@@ -117,22 +173,19 @@ export class OrderView {
   @ApiProperty({ enum: ['live', 'test'], example: 'test' })
   tier!: string;
 
-  @ApiProperty({ example: 'base' })
+  @ApiProperty({ example: 'testnet' })
   network!: string;
 
-  @ApiProperty({ example: 84532 })
-  chainId!: number;
-
-  @ApiProperty({ example: '0x5FbDB2315678afecb367f032d93F642f64180aa3' })
+  @ApiProperty({ example: 'CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7' })
   contract!: string;
 
-  @ApiProperty({ example: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' })
+  @ApiProperty({ example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA' })
   token!: string;
 
   @ApiProperty({ example: 'USDC' })
   tokenSymbol!: string;
 
-  @ApiProperty({ example: 6 })
+  @ApiProperty({ example: 7 })
   tokenDecimals!: number;
 
   @ApiProperty({ example: 'ARS' })
@@ -174,10 +227,10 @@ export class OrderView {
   })
   bond!: string;
 
-  @ApiProperty({ example: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' })
+  @ApiProperty({ example: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI' })
   sellerAddress!: string;
 
-  @ApiProperty({ example: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' })
+  @ApiProperty({ example: 'GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ' })
   buyerAddress!: string;
 
   @ApiProperty({ type: OrderMerchantView })
@@ -255,6 +308,13 @@ export class OrderView {
   })
   paymentDetails!: PaymentDetailsView | null;
 
+  @ApiProperty({
+    type: QrSummaryView,
+    nullable: true,
+    description: 'A QR payment’s scanned QR, as its payer reads it (one order, not lists).',
+  })
+  qr!: QrSummaryView | null;
+
   @ApiProperty({ example: '2026-11-19T12:01:00.000Z' })
   createdAt!: Date;
 
@@ -262,15 +322,15 @@ export class OrderView {
   updatedAt!: Date;
 }
 
-/** `POST /v1/p2p/orders`: the order, and for a sale the transactions to sign. */
+/** `POST /v1/p2p/orders`: the order, and for a sale the transaction to sign. */
 @ApiSchema({
   description:
-    'A new order. A sale (`SELL`) also carries the two transactions the seller’s wallet signs, in order: the exact token approval, then `openWithDeposit`.',
+    'A new order. A sale (`SELL`) or a QR payment (`QR_PAY`) also carries the one transaction the seller’s wallet signs: `open_with_deposit`, whose token pull into the market is authorised by the same signature (no approval).',
 })
 export class CreatedOrderView extends OrderView {
   @ApiProperty({
     type: [TransactionView],
-    description: 'Empty except on a sale.',
+    description: 'Empty except on a sale or a QR payment still waiting for its signature.',
   })
   transactions!: TransactionView[];
 }
@@ -332,7 +392,7 @@ export class MerchantOrderView {
   @ApiProperty({ example: '3f1c2b7e-8d4a-4c1e-9b2f-6a5d4c3b2a10' })
   id!: string;
 
-  @ApiProperty({ enum: ['BUY', 'SELL', 'CHARGE', 'PAYOUT'], example: 'BUY' })
+  @ApiProperty({ enum: ['BUY', 'SELL', 'QR_PAY', 'CHARGE', 'PAYOUT'], example: 'BUY' })
   kind!: string;
 
   @ApiProperty({ enum: STATUSES, example: 'paid' })
@@ -341,13 +401,10 @@ export class MerchantOrderView {
   @ApiProperty({ enum: ['live', 'test'], example: 'test' })
   tier!: string;
 
-  @ApiProperty({ example: 'base' })
+  @ApiProperty({ example: 'testnet' })
   network!: string;
 
-  @ApiProperty({ example: 84532 })
-  chainId!: number;
-
-  @ApiProperty({ example: '0x5FbDB2315678afecb367f032d93F642f64180aa3' })
+  @ApiProperty({ example: 'CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7' })
   contract!: string;
 
   @ApiProperty({
@@ -361,17 +418,17 @@ export class MerchantOrderView {
     enum: ['seller', 'buyer'],
     example: 'seller',
     description:
-      'The merchant’s side: seller on purchases and charges (it releases), buyer on sales and payouts (it accepts and pays).',
+      'The merchant’s side: seller on purchases and charges (it releases), buyer on sales, QR payments and payouts (it accepts and pays).',
   })
   merchantSide!: string;
 
-  @ApiProperty({ example: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' })
+  @ApiProperty({ example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA' })
   token!: string;
 
   @ApiProperty({ example: 'USDC' })
   tokenSymbol!: string;
 
-  @ApiProperty({ example: 6 })
+  @ApiProperty({ example: 7 })
   tokenDecimals!: number;
 
   @ApiProperty({ example: 'ARS' })
@@ -395,10 +452,10 @@ export class MerchantOrderView {
   @ApiProperty({ example: '0' })
   bond!: string;
 
-  @ApiProperty({ example: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' })
+  @ApiProperty({ example: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI' })
   sellerAddress!: string;
 
-  @ApiProperty({ example: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC' })
+  @ApiProperty({ example: 'GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ' })
   buyerAddress!: string;
 
   @ApiProperty({ type: String, nullable: true, example: '7' })
@@ -448,6 +505,13 @@ export class MerchantOrderView {
   @ApiProperty({ type: BeneficiaryView, nullable: true })
   beneficiary!: BeneficiaryView | null;
 
+  @ApiProperty({
+    type: MerchantQrView,
+    nullable: true,
+    description: 'A live QR payment’s QR: what the merchant pays. Null otherwise.',
+  })
+  qr!: MerchantQrView | null;
+
   @ApiProperty({ example: '2026-11-19T12:01:00.000Z' })
   createdAt!: Date;
 
@@ -491,7 +555,7 @@ export class TransferMatchView {
   @ApiProperty({
     type: TransactionView,
     description:
-      '`release` for the order, for the merchant’s wallet or its bot (PERM_RELEASE) to sign.',
+      '`release` for the order, prepared with the merchant account as source and acting address: the merchant’s key (or its bot holding it) signs it and submits it (`POST /v1/p2p/submit`).',
   })
   transaction!: TransactionView;
 }

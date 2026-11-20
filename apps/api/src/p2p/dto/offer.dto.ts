@@ -41,7 +41,7 @@ export class CreateOfferDto {
   @IsIn(['SELL_TOKEN', 'BUY_TOKEN'])
   side!: 'SELL_TOKEN' | 'BUY_TOKEN';
 
-  @ApiProperty({ enum: NETWORK_IDS, example: 'base' })
+  @ApiProperty({ enum: NETWORK_IDS, example: 'testnet' })
   @IsIn(NETWORK_IDS)
   network!: string;
 

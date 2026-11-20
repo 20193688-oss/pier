@@ -1,6 +1,9 @@
 import { Module, type DynamicModule, type Provider, type Type } from '@nestjs/common';
 import { AccountsService } from '@/p2p/accounts.service';
 import { AdminService } from '@/p2p/admin.service';
+import { AppChargesService } from '@/p2p/app-charges.service';
+import { AppWalletService } from '@/p2p/app-wallet.service';
+import { AppWalletController, SubmitController } from '@/p2p/controllers/app-wallet.controller';
 import { AppOrdersService } from '@/p2p/app-orders.service';
 import { ChargesService } from '@/p2p/charges.service';
 import { CheckoutService } from '@/p2p/checkout.service';
@@ -32,6 +35,8 @@ import { OrdersService } from '@/p2p/orders.service';
 import { PaymentMethodsService } from '@/p2p/payment-methods.service';
 import { PayoutsService } from '@/p2p/payouts.service';
 import { QuotesService } from '@/p2p/quotes.service';
+import { SubmissionFollowerJob } from '@/p2p/submission-follower.job';
+import { SubmissionsService } from '@/p2p/submissions.service';
 import { TransactionsService } from '@/p2p/transactions.service';
 import { TransferMatchesService } from '@/p2p/transfer-matches.service';
 
@@ -51,9 +56,13 @@ const SERVICES: Provider[] = [
   AdminService,
   MarketService,
   AppOrdersService,
+  AppWalletService,
+  AppChargesService,
+  SubmissionsService,
   IndexerJob,
   ExpiryJob,
   MatcherFollowerJob,
+  SubmissionFollowerJob,
 ];
 
 const CONTROLLERS: Type[] = [
@@ -66,6 +75,8 @@ const CONTROLLERS: Type[] = [
   PayoutsController,
   CheckoutController,
   AppController,
+  AppWalletController,
+  SubmitController,
   AdminController,
 ];
 
@@ -77,7 +88,7 @@ export class P2pModule {
       module: P2pModule,
       controllers: options.devTools ? [...CONTROLLERS, DevController] : CONTROLLERS,
       providers: options.devTools ? [...SERVICES, DevToolsService] : SERVICES,
-      exports: [IndexerJob, ExpiryJob, MatcherFollowerJob, MarketService],
+      exports: [IndexerJob, ExpiryJob, MatcherFollowerJob, SubmissionFollowerJob, MarketService],
     };
   }
 }

@@ -26,6 +26,11 @@ export type RailCheck = { ok: true; details: RailDetails } | { ok: false; errors
 
 export interface P2pRail {
   currency: P2pCurrency;
+  /**
+   * A QR rail pays a scanned merchant QR (the destination is the payload):
+   * it takes no account details and serves only QR payments (`QR_PAY`).
+   */
+  qr?: 'ar-interoperable' | 'pix';
   /** A neutral display name, in English. */
   name: string;
   fields: readonly P2pRailField[];
@@ -241,6 +246,8 @@ export const P2P_RAIL_IDS = [
   'co_bank_transfer',
   'pe_bank_transfer',
   'cl_bank_transfer',
+  'ar_qr',
+  'br_pix_qr',
 ] as const;
 export type P2pRailId = (typeof P2P_RAIL_IDS)[number];
 
@@ -382,7 +389,39 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
     },
     summary: (d) => `${d.bank} ${mask(d.accountNumber ?? '')}`,
   },
+  ar_qr: {
+    currency: 'ARS',
+    qr: 'ar-interoperable',
+    name: 'Interoperable QR (Transferencias 3.0)',
+    fields: [],
+    check: () => ({
+      ok: false,
+      errors: ['ar_qr takes no account: the destination is the scanned QR'],
+    }),
+    summary: () => 'QR',
+  },
+  br_pix_qr: {
+    currency: 'BRL',
+    qr: 'pix',
+    name: 'PIX QR (BR Code)',
+    fields: [],
+    check: () => ({
+      ok: false,
+      errors: ['br_pix_qr takes no account: the destination is the scanned QR'],
+    }),
+    summary: () => 'PIX QR',
+  },
 };
+
+/** True for a rail that pays a scanned QR (`ar_qr`, `br_pix_qr`). */
+export function isQrRail(rail: string): boolean {
+  return isP2pRailId(rail) && P2P_RAILS[rail].qr !== undefined;
+}
+
+/** The QR rail that pays a payload of this EMV standard, or null. */
+export function qrRailFor(standard: string): P2pRailId | null {
+  return P2P_RAIL_IDS.find((id) => P2P_RAILS[id].qr === standard) ?? null;
+}
 
 /** Checks a rail's details for its currency; one message per problem. */
 export function validateRailDetails(

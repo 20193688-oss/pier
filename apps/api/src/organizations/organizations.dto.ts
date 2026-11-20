@@ -10,8 +10,7 @@ import {
 } from 'class-validator';
 import { MEMBER_ROLES, SCOPES } from '@/auth/auth.types';
 import { TIERS } from '@/chain/networks';
-
-const EVM_ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+import { ACCOUNT_ADDRESS_RE } from '@/common/stellar';
 
 @ApiSchema({ name: 'CreateOrganization' })
 export class CreateOrganizationDto {
@@ -40,8 +39,8 @@ export class OrganizationListView {
 
 @ApiSchema({ name: 'AddMember' })
 export class AddMemberDto {
-  @ApiProperty({ example: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' })
-  @Matches(EVM_ADDRESS, { message: 'address must be an EVM address' })
+  @ApiProperty({ example: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI' })
+  @Matches(ACCOUNT_ADDRESS_RE, { message: 'address must be a Stellar account address (G...)' })
   address!: string;
 
   @ApiProperty({ enum: MEMBER_ROLES, example: 'member' })
@@ -59,7 +58,8 @@ export class UpdateMemberDto {
 @ApiSchema({ name: 'Member', description: 'A wallet that signs in for an organization.' })
 export class MemberView {
   @ApiProperty() id!: string;
-  @ApiProperty({ example: '0x90F79bf6EB2c4f870365E785982E1f101E93b906' }) address!: string;
+  @ApiProperty({ example: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI' })
+  address!: string;
   @ApiProperty({ enum: MEMBER_ROLES }) role!: string;
   @ApiProperty() createdAt!: Date;
 }

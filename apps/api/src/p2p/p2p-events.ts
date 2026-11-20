@@ -26,18 +26,14 @@ export const STATUS_EVENTS: Record<string, WebhookEventType | undefined> = {
  * projections: never a payment method, a payer's identity or a beneficiary's
  * account (those are read on the routes, by whoever is entitled).
  */
-export function orderEvents(
-  type: WebhookEventType,
-  row: P2pOrderRow,
-  chainId: number,
-): OutboxEvent[] {
+export function orderEvents(type: WebhookEventType, row: P2pOrderRow): OutboxEvent[] {
   const events: OutboxEvent[] = [];
   if (row.organizationId !== APP_ORGANIZATION_ID) {
     events.push({
       organizationId: row.organizationId,
       tier: row.tier,
       type,
-      data: toOrderWebhookData(row, chainId, 'client'),
+      data: toOrderWebhookData(row, 'client'),
     });
   }
   if (row.merchantOrganizationId !== row.organizationId) {
@@ -45,7 +41,7 @@ export function orderEvents(
       organizationId: row.merchantOrganizationId,
       tier: row.tier,
       type,
-      data: toOrderWebhookData(row, chainId, 'merchant'),
+      data: toOrderWebhookData(row, 'merchant'),
     });
   }
   return events;

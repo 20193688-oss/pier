@@ -18,7 +18,7 @@ import { P2P_TRANSACTION_ACTIONS } from '@/p2p/domain/transaction-actions';
     'A transaction to build for a wallet: what to do, from which wallet, with which arguments. See each action’s arguments in the route’s description.',
 })
 export class BuildTransactionDto {
-  @ApiProperty({ enum: NETWORK_IDS, example: 'base' })
+  @ApiProperty({ enum: NETWORK_IDS, example: 'testnet' })
   @IsIn(NETWORK_IDS)
   network!: string;
 

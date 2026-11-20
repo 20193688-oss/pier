@@ -44,7 +44,7 @@ model Member {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  // EIP-55: the wallet that signs in (SIWE).
+  // The Stellar account (G...) that signs in (SEP-10).
   address        String
   // owner | admin | member
   role           String
@@ -56,15 +56,24 @@ model Member {
   @@map("member")
 }
 
-// A single-use SIWE nonce: issued, then spent by exactly one sign-in.
-model SiweNonce {
-  nonce     String    @id
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
+// A single-use SEP-10 challenge: issued for one account, then spent by
+// exactly one sign-in (`session`) or one wallet registration (`account`,
+// bound to an organization and tier).
+model AuthChallenge {
+  // The challenge's random manage_data value (48 bytes, base64).
+  nonce          String    @id
+  // session | account
+  purpose        String
+  account        String
+  network        String
+  organizationId String?
+  tier           String?
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
 
   @@index([expiresAt])
-  @@map("siwe_nonce")
+  @@map("auth_challenge")
 }
 
 // A wallet's session: only the SHA-256 of its token is kept.
@@ -187,7 +196,8 @@ model P2pAccount {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tier           String
-  // EIP-55, proven by an EIP-191 signature over a single-use challenge.
+  // A Stellar account (G...), proven by a SEP-10-shaped challenge bound to
+  // the organization and tier.
   address        String
   label          String?
   verifiedAt     DateTime
@@ -217,21 +227,6 @@ model P2pAccount {
   @@unique([tier, address])
   @@index([organizationId, tier, createdAt])
   @@map("p2p_account")
-}
-
-model P2pAccountChallenge {
-  id             String    @id @default(cuid())
-  organizationId String
-  tier           String
-  address        String
-  nonce          String    @unique
-  expiresAt      DateTime
-  usedAt         DateTime?
-  createdAt      DateTime  @default(now())
-
-  @@index([organizationId, tier, address])
-  @@index([expiresAt])
-  @@map("p2p_account_challenge")
 }
 
 model P2pPaymentMethod {
@@ -292,6 +287,10 @@ model P2pQuote {
   endUserAddress    String?
   // The person's side: BUY (they receive tokens) or SELL (they send them).
   side              String
+  // BUY | SELL | QR_PAY (a SELL whose local money pays a scanned merchant QR).
+  kind              String
+  // QR_PAY: SHA-256 of the scanned payload, which the order must repeat.
+  qrHash            String?
   network           String
   token             String
   currency          String
@@ -319,12 +318,12 @@ model P2pQuote {
 
 model P2pOrder {
   id                      String          @id
-  // keccak-256 of the uuid's bytes: the order's on-chain `ref`.
+  // SHA-256 of the uuid's 16 bytes, hex: the order's on-chain `ref_id`.
   ref                     String          @unique
   organizationId          String
   organization            Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tier                    String
-  // BUY | SELL | CHARGE | PAYOUT
+  // BUY | SELL | QR_PAY | CHARGE | PAYOUT
   kind                    String
   // The public app's wallet that owns this order (BUY recipient, SELL seller).
   endUserAddress          String?
@@ -382,6 +381,9 @@ model P2pOrder {
   // live order.
   payerInfo               String?
   beneficiary             String?
+  // QR_PAY: the scanned merchant QR (payload and what it reads), sealed at
+  // rest; shown only to the merchant of a live order.
+  qrPayload               String?
   paidReference           String?
   failureReason           String?
   chargeId                String?
@@ -430,7 +432,8 @@ model P2pCharge {
   createdAt          DateTime     @default(now())
   updatedAt          DateTime     @updatedAt
 
-  orders P2pOrder[]
+  orders   P2pOrder[]
+  payments P2pChargePayment[]
 
   @@index([organizationId, tier, createdAt])
   @@map("p2p_charge")
@@ -460,41 +463,181 @@ model P2pPayoutBatch {
   @@map("p2p_payout_batch")
 }
 
-// Every transaction the matcher signs, written BEFORE it is broadcast; only
-// these bytes are ever sent again.
+// Every transaction the matcher sends, in order. A call is `queued` until
+// the matcher has no other transaction in flight on its network (Stellar
+// takes one transaction per source account per ledger), then signed and
+// WRITTEN here before it is broadcast; only these bytes are ever sent again.
 model P2pMatcherTx {
   id          String    @id @default(cuid())
   tier        String
   network     String
   fromAddress String
-  nonce       BigInt
   // open | markPaid | cancel | dispute
   kind        String
   orderId     String?
-  toAddress   String
-  hash        String    @unique
-  raw         String
-  // signed | sent | mined | reverted | dropped
-  status      String    @default("signed")
+  // The operation, base64 XDR, as it was asked for.
+  operation   String
+  // Set when signed.
+  sequence    BigInt?
+  hash        String?   @unique
+  raw         String?
+  maxTime     DateTime?
+  // queued | signed | sent | mined | reverted | dropped
+  status      String    @default("queued")
   sentAt      DateTime?
-  minedBlock  BigInt?
+  ledger      Int?
   lastError   String?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@unique([tier, network, fromAddress, nonce])
+  @@unique([tier, network, fromAddress, sequence])
+  @@index([network, status, createdAt])
   @@index([status, updatedAt])
   @@index([orderId])
   @@map("p2p_matcher_tx")
 }
 
+// Where the indexer is in a deployment's events: RPC `getEvents`' paging
+// cursor, and the last ledger it covered.
 model P2pChainCursor {
-  tier      String
-  network   String
-  contract  String
-  lastBlock BigInt
-  updatedAt DateTime @updatedAt
+  tier       String
+  network    String
+  contract   String
+  cursor     String?
+  lastLedger Int      @default(0)
+  updatedAt  DateTime @updatedAt
 
   @@id([tier, network, contract])
   @@map("p2p_chain_cursor")
+}
+
+// --- the payments app ---------------------------------------------------------
+
+// A wallet's public profile: its `@handle` (lower case, unique).
+model AppProfile {
+  address   String   @id
+  handle    String?  @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("app_profile")
+}
+
+// A token transfer between wallets: made through the app (`origin = app`),
+// or an incoming payment seen on-chain (`origin = external`).
+model AppTransfer {
+  id          String    @id
+  tier        String
+  network     String
+  // The token's Stellar Asset Contract (C...).
+  token       String
+  tokenSymbol String
+  // Base units (7 decimals).
+  amount      String
+  fromAddress String
+  // As given: G, M or C.
+  toAddress   String
+  // The G account behind an M address, or the address itself.
+  toAccount   String
+  note        String?
+  // PENDING | SUBMITTED | COMPLETED | FAILED
+  status      String    @default("PENDING")
+  // app | external
+  origin      String    @default("app")
+  // The inner transaction's hash (app), or the transaction seen (external).
+  hash        String?
+  // The on-chain event an external transfer was read from.
+  eventId     String?   @unique
+  expiresAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([fromAddress, network, createdAt])
+  @@index([toAccount, network, createdAt])
+  @@index([hash])
+  @@index([status, updatedAt])
+  @@map("app_transfer")
+}
+
+// How far the incoming payments of one wallet were read on one network.
+model AppIncomingScan {
+  address    String
+  network    String
+  lastLedger Int
+  updatedAt  DateTime @updatedAt
+
+  @@id([address, network])
+  @@map("app_incoming_scan")
+}
+
+// A transaction a wallet signed and the API submitted (fee-bumped by the
+// sponsor when gasless is on). Written BEFORE it is broadcast; only these
+// bytes are ever sent again.
+model P2pSubmission {
+  id             String    @id @default(cuid())
+  // The inner transaction's hash, hex.
+  hash           String    @unique
+  // The sponsor's fee-bump's hash, when sponsored.
+  feeBumpHash    String?   @unique
+  tier           String
+  network        String
+  // app (a wallet session) | org (an organization's account)
+  channel        String
+  organizationId String?
+  source         String
+  // invoke | sac_transfer | payment | activation
+  kind           String
+  // The signed inner envelope, base64.
+  envelope       String
+  // The signed fee-bump envelope, base64; null when submitted as signed.
+  outer          String?
+  sponsored      Boolean
+  // What the sponsor committed: the fee-bump's fee, and the reserves it sponsors.
+  feeStroops     BigInt    @default(0)
+  reserveStroops BigInt    @default(0)
+  // HMAC of the caller's address (an IPv4 or an IPv6 /48).
+  clientKey      String?
+  // PENDING | SUCCESS | FAILED
+  status         String    @default("PENDING")
+  error          String?
+  maxTime        DateTime
+  ledger         Int?
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([source, createdAt])
+  @@index([clientKey, createdAt])
+  @@index([status, updatedAt])
+  @@index([createdAt])
+  @@map("p2p_submission")
+}
+
+// A charge paid with tokens from a wallet's balance (no merchant in between).
+model P2pChargePayment {
+  id               String    @id
+  chargeId         String
+  charge           P2pCharge @relation(fields: [chargeId], references: [id], onDelete: Cascade)
+  tier             String
+  network          String
+  token            String
+  tokenSymbol      String
+  // Base units: what the business receives.
+  amount           String
+  payerAddress     String
+  recipientAddress String
+  // PENDING | SUBMITTED | COMPLETED | FAILED | EXPIRED
+  status           String    @default("PENDING")
+  // The hash of the transaction the API built for it.
+  hash             String    @unique
+  expiresAt        DateTime
+  completedAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([chargeId, status])
+  @@index([payerAddress, createdAt])
+  @@index([status, updatedAt])
+  @@map("p2p_charge_payment")
 }

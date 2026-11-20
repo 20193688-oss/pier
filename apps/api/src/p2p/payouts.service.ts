@@ -94,7 +94,7 @@ export class PayoutsService {
     if (!matcher) {
       throw ApiError.unavailable(
         'The P2P market cannot open payouts on this deployment right now.',
-        'P2P_MATCHER_PRIVATE_KEY is not set.',
+        'P2P_MATCHER_SECRET is not set.',
       );
     }
     const [terms, protocol] = await Promise.all([
@@ -114,7 +114,7 @@ export class PayoutsService {
         organizationId,
         tier,
         network: deployment.network,
-        token: token.address,
+        token: token.contract,
         accountId: account.id,
         sellerAddress: account.address,
         itemCount: items.length,

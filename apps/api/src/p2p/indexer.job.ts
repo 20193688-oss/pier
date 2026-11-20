@@ -1,23 +1,26 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { ChainClient, type ChainLog } from '@/chain/chain-client.service';
+import type { rpc } from '@stellar/stellar-sdk';
+import { ChainClient } from '@/chain/chain-client.service';
 import { DeploymentsService, type Deployment } from '@/chain/deployments.service';
-import { decodeP2pMarketLog, P2P_EVENT_TOPICS, type P2pMarketEvent } from '@/chain/market-codec';
+import { decodeMarketEvent, type P2pChainOrder, type P2pMarketEvent } from '@/chain/market-codec';
 import { MarketReader } from '@/chain/market-reader.service';
-import { sameAddress } from '@/common/evm';
+import { sameAddress } from '@/common/stellar';
 import { APP_CONFIG } from '@/config/config.module';
 import type { AppConfig } from '@/config/env';
 import type { Prisma } from '@/generated/prisma/client';
 import { JOB_LOCK_KEYS, ScheduledJob } from '@/jobs/scheduled-job';
 import { ChargesService } from '@/p2p/charges.service';
-import { P2P_INDEXER_MAX_CALLS, P2P_INDEXER_REREAD_BLOCKS } from '@/p2p/domain/constants';
-import { openParamsOf } from '@/p2p/domain/order-ref';
+import { P2P_INDEXER_MAX_PAGES, P2P_INDEXER_PAGE_LIMIT } from '@/p2p/domain/constants';
+import { openParamsOf, orderRef } from '@/p2p/domain/order-ref';
 import {
   cancellationStatus,
+  isSelfOpened,
   medianSeconds,
   merchantAtFault,
   merchantLostDispute,
   openableFrom,
   P2P_EVENT_TRANSITIONS,
+  P2P_LIVE_STATUSES,
   P2P_MERCHANT_SIDE,
   type P2pOrderKind,
   type P2pOrderStatus,
@@ -28,56 +31,82 @@ import { P2P_ORDER_SELECT, type P2pOrderRow } from '@/p2p/views';
 import { PrismaService } from '@/prisma/prisma.service';
 import { enqueueWebhooks, type Tx } from '@/webhooks/webhook-outbox';
 
-/** The topics the indexer asks for; `MatcherSet` is read live, never stored. */
-const INDEXED_TOPICS = [
-  P2P_EVENT_TOPICS.OperatorSet,
-  P2P_EVENT_TOPICS.OrderOpened,
-  P2P_EVENT_TOPICS.OrderAccepted,
-  P2P_EVENT_TOPICS.OrderPaid,
-  P2P_EVENT_TOPICS.OrderReleased,
-  P2P_EVENT_TOPICS.OrderCancelled,
-  P2P_EVENT_TOPICS.OrderDisputed,
-  P2P_EVENT_TOPICS.OrderResolved,
-];
-
 /** Recent completed orders a merchant's median release time is taken over. */
 const MEDIAN_WINDOW = 50;
+/** Live orders a recovery pass reads back from the contract per tick. */
+const RECONCILE_BATCH = 25;
 
-interface IndexedLog {
+/** One decoded event, where and when it happened. */
+export interface IndexedEvent {
   event: P2pMarketEvent;
-  block: bigint;
+  /** Unix seconds of the ledger that closed it. */
+  at: number;
+  ledger: number;
   txHash: string;
 }
 
-/** Logs in chain order: block, then index in the block. */
-export function sortLogs(logs: readonly ChainLog[]): ChainLog[] {
-  return [...logs].sort((a, b) => {
-    const block = BigInt(a.blockNumber) - BigInt(b.blockNumber);
-    if (block !== 0n) return block < 0n ? -1 : 1;
-    return Number(BigInt(a.logIndex) - BigInt(b.logIndex));
-  });
+type Opened = Extract<P2pMarketEvent, { name: 'order_opened' }>;
+
+/**
+ * The field-by-field check of an `order_opened` against the order we expect:
+ * the opener the order names (the matcher, or the person selling), every
+ * `OpenParams` field, where the tokens came from (`from_balance`: the
+ * matcher opens on a balance, a seller deposits), the protocol fee the quote
+ * priced, and the accept deadline the bond implies. Answers what differs.
+ */
+export function openedMismatch(row: P2pOrderRow, event: Opened, at: number): string[] {
+  const expected = openParamsOf(row);
+  const selfOpened = isSelfOpened(row.kind);
+  const problems: string[] = [];
+  const check = (ok: boolean, field: string) => {
+    if (!ok) problems.push(field);
+  };
+  check(sameAddress(event.opener, row.openerAddress), 'opener');
+  check(event.refId === orderRef(row.id), 'ref_id');
+  check(sameAddress(event.seller, expected.seller), 'seller');
+  check(sameAddress(event.buyer, expected.buyer), 'buyer');
+  check(sameAddress(event.token, expected.token), 'token');
+  check(event.amount === expected.amount, 'amount');
+  check(event.bond === expected.bond, 'bond');
+  check(event.viaMatcher === !selfOpened, 'via_matcher');
+  check(event.fromBalance === !selfOpened, 'from_balance');
+  check(event.paymentWindow === expected.paymentWindow, 'payment_window');
+  check(event.settleWindow === expected.settleWindow, 'settle_window');
+  check(event.integratorFeeBps === expected.integratorFeeBps, 'integrator_fee_bps');
+  check((event.integrator ?? null) === expected.integrator, 'integrator');
+  check(event.feeBps === row.protocolFeeBps, 'fee_bps');
+  if (expected.bond > 0n)
+    check(event.acceptDeadline - at === expected.acceptWindow, 'accept_deadline');
+  return problems;
 }
 
 /**
  * Follows every P2PMarket deployment and moves our orders on what the chain
- * shows. Per deployment and tick: `eth_getLogs` from the cursor in ranges the
- * network's nodes accept (at most {@link P2P_INDEXER_MAX_CALLS}), only up to
- * `head - confirmations`, re-reading the last {@link P2P_INDEXER_REREAD_BLOCKS}
- * confirmed blocks every time. Every write is a compare-and-swap from the
- * statuses an event may move (`P2P_EVENT_TRANSITIONS`), committed in ONE
- * transaction with its webhook events and the charge / payout bookkeeping, so
- * a log read twice changes nothing and a stale one never moves an order back.
+ * shows. Per deployment and tick: RPC `getEvents` for the contract from the
+ * persisted cursor (at most {@link P2P_INDEXER_MAX_PAGES} pages). Stellar has
+ * finality, so there is no confirmation depth and no reorg window. Every
+ * write is a compare-and-swap from the statuses an event may move
+ * (`P2P_EVENT_TRANSITIONS`), committed in ONE transaction with its webhook
+ * events and the charge / payout bookkeeping, so an event read twice changes
+ * nothing and a stale one never moves an order back.
  *
- * An `OrderOpened` is ours only when its `ref` is one of our orders, from the
- * opener that order expects (the matcher, or the person selling), and every
- * field equals the order's; a sale's windows and integrator, which the event
- * does not carry, are read back with `getOrder`. A copy of our ref under
- * another opener is someone else's order and is ignored.
+ * An `order_opened` is ours only when its `ref_id` is one of our orders, from
+ * the opener that order expects, and every field equals the order's
+ * ({@link openedMismatch}). A copy of our ref under another opener is someone
+ * else's order and is ignored.
+ *
+ * Recovery: RPC keeps events for a limited window (about 7 days on SDF's
+ * RPC). When the cursor (or the configured start ledger) fell out of it, the
+ * indexer starts again from the oldest retained ledger and reads every live
+ * order back from the contract (`get_order`, `order_id_of`), applying the
+ * moves it missed (their settlement amounts are left empty).
  */
 @Injectable()
 export class IndexerJob extends ScheduledJob {
   protected readonly logger = new Logger(IndexerJob.name);
   protected readonly lockKey = JOB_LOCK_KEYS.indexer;
+  /** Deployments whose cursor fell out of retention: their live orders are read back. */
+  private readonly reconciling = new Set<string>();
 
   constructor(
     @Inject(APP_CONFIG) private readonly config: AppConfig,
@@ -100,7 +129,7 @@ export class IndexerJob extends ScheduledJob {
   }
 
   protected override lockTimeoutMs(): number {
-    return this.deployments.timeoutMs() * (P2P_INDEXER_MAX_CALLS * 3 + 20);
+    return this.deployments.timeoutMs() * (P2P_INDEXER_MAX_PAGES * 3 + RECONCILE_BATCH + 20);
   }
 
   protected async run(): Promise<void> {
@@ -108,10 +137,9 @@ export class IndexerJob extends ScheduledJob {
       for (const d of await this.reader.liveDeployments(tier)) {
         try {
           await this.indexDeployment(d);
+          if (this.reconciling.has(d.contract)) await this.reconcile(d);
         } catch (err) {
-          this.logger.warn(
-            `${d.network}/${d.tier}: ${err instanceof Error ? err.message : String(err)}`,
-          );
+          this.logger.warn(`${d.network}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
     }
@@ -120,60 +148,80 @@ export class IndexerJob extends ScheduledJob {
   /** One deployment's tick. */
   async indexDeployment(d: Deployment): Promise<void> {
     const key = { tier: d.tier, network: d.network, contract: d.contract };
-    const cursor = await this.prisma.p2pChainCursor.findUnique({
+    const saved = await this.prisma.p2pChainCursor.findUnique({
       where: { tier_network_contract: key },
-      select: { lastBlock: true },
+      select: { cursor: true, lastLedger: true },
     });
-    const last = cursor?.lastBlock ?? d.deployBlock - 1n;
-    const head = await this.chain.blockNumber(d);
-    const safe = head - BigInt(d.confirmations);
-    const reread = last + 1n - P2P_INDEXER_REREAD_BLOCKS;
-    const from = reread > d.deployBlock ? reread : d.deployBlock;
-    if (from > safe) return;
-    const range = BigInt(d.logBlockRange);
-    const ceiling = from + range * BigInt(P2P_INDEXER_MAX_CALLS) - 1n;
-    const to = safe < ceiling ? safe : ceiling;
-
-    const times = new Map<bigint, number>();
-    for (let start = from; start <= to; start += range) {
-      const end = start + range - 1n < to ? start + range - 1n : to;
-      const logs = await this.chain.getLogs(d, INDEXED_TOPICS, start, end);
-      for (const log of sortLogs(logs)) {
-        const indexed = this.decode(d, log);
-        if (indexed) await this.apply(d, indexed, times);
+    const filters: rpc.Api.EventFilter[] = [{ type: 'contract', contractIds: [d.contract] }];
+    let cursor = saved?.cursor ?? null;
+    for (let page = 0; page < P2P_INDEXER_MAX_PAGES; page++) {
+      let res: rpc.Api.GetEventsResponse;
+      try {
+        res = cursor
+          ? await this.chain.getEvents(d, { filters, cursor, limit: P2P_INDEXER_PAGE_LIMIT })
+          : await this.chain.getEvents(d, {
+              filters,
+              startLedger: await this.startLedger(d, saved?.lastLedger ?? 0),
+              limit: P2P_INDEXER_PAGE_LIMIT,
+            });
+      } catch (err) {
+        if (cursor && /cursor|range|ledger/i.test(String(err))) {
+          this.logger.error(
+            `${d.network}: the event cursor is no longer served (${String(err)}): starting from the oldest retained ledger and reading live orders back from the contract`,
+          );
+          cursor = null;
+          this.reconciling.add(d.contract);
+          await this.prisma.p2pChainCursor.updateMany({ where: key, data: { cursor: null } });
+          continue;
+        }
+        throw err;
       }
-      const reached = end > last ? end : last;
+      for (const raw of res.events) {
+        const indexed = this.decode(d, raw);
+        if (indexed) await this.apply(d, indexed);
+      }
+      const lastLedger = res.events.at(-1)?.ledger ?? saved?.lastLedger ?? 0;
       await this.prisma.p2pChainCursor.upsert({
         where: { tier_network_contract: key },
-        create: { ...key, lastBlock: reached },
-        update: { lastBlock: reached },
+        create: { ...key, cursor: res.cursor, lastLedger },
+        update: { cursor: res.cursor, lastLedger },
       });
+      cursor = res.cursor;
+      if (res.events.length < P2P_INDEXER_PAGE_LIMIT) return;
     }
   }
 
-  private decode(d: Deployment, log: ChainLog): IndexedLog | null {
-    if (log.removed || !sameAddress(log.address, d.contract)) return null;
-    try {
-      const event = decodeP2pMarketLog(log);
-      return event ? { event, block: BigInt(log.blockNumber), txHash: log.transactionHash } : null;
-    } catch (err) {
-      this.logger.warn(
-        `${d.network}/${d.tier}: log ${log.transactionHash}#${log.logIndex} not decoded: ${String(err)}`,
+  /** Where to start without a cursor: the configured ledger, never older than what RPC keeps. */
+  private async startLedger(d: Deployment, lastLedger: number): Promise<number> {
+    const health = await this.chain.health(d);
+    const wanted = lastLedger > 0 ? lastLedger : (d.startLedger ?? health.oldestLedger);
+    if (wanted < health.oldestLedger) {
+      this.logger.error(
+        `${d.network}: ledger ${wanted} is older than what the RPC keeps (${health.oldestLedger}): reading live orders back from the contract`,
       );
+      this.reconciling.add(d.contract);
+      return health.oldestLedger;
+    }
+    return wanted;
+  }
+
+  private decode(d: Deployment, raw: rpc.Api.EventResponse): IndexedEvent | null {
+    if (raw.inSuccessfulContractCall === false) return null;
+    if (raw.contractId && raw.contractId.contractId() !== d.contract) return null;
+    try {
+      const event = decodeMarketEvent(raw.topic, raw.value);
+      return event
+        ? {
+            event,
+            at: Math.floor(Date.parse(raw.ledgerClosedAt) / 1000),
+            ledger: raw.ledger,
+            txHash: raw.txHash,
+          }
+        : null;
+    } catch (err) {
+      this.logger.warn(`${d.network}: event ${raw.id} not decoded: ${String(err)}`);
       return null;
     }
-  }
-
-  private async blockTime(
-    d: Deployment,
-    block: bigint,
-    times: Map<bigint, number>,
-  ): Promise<number> {
-    const cached = times.get(block);
-    if (cached !== undefined) return cached;
-    const at = (await this.chain.blockTimestamp(d, block)) ?? Math.floor(Date.now() / 1000);
-    times.set(block, at);
-    return at;
   }
 
   private byChainId(d: Deployment, id: bigint): Promise<P2pOrderRow | null> {
@@ -190,54 +238,47 @@ export class IndexerJob extends ScheduledJob {
     });
   }
 
-  private async apply(d: Deployment, log: IndexedLog, times: Map<bigint, number>): Promise<void> {
+  /** Applies one event (exported for tests and the recovery pass). */
+  async apply(d: Deployment, log: IndexedEvent): Promise<void> {
     const { event } = log;
     switch (event.name) {
-      case 'OperatorSet':
+      case 'operator_set':
         return this.operatorSet(d, event);
-      case 'MatcherSet':
+      case 'matcher_set':
         return;
-      case 'OrderOpened':
-        return this.opened(d, event, log, times);
+      case 'order_opened':
+        return this.opened(d, event, log);
       default:
         break;
     }
     const row = await this.byChainId(d, event.id);
     if (!row) return;
-    const at = await this.blockTime(d, log.block, times);
-    const when = new Date(at * 1000);
+    const when = new Date(log.at * 1000);
     switch (event.name) {
-      case 'OrderAccepted':
-        if (row.status === 'awaiting_payment' && !row.paymentDeadline) {
-          await this.prisma.p2pOrder.updateMany({
-            where: { id: row.id, paymentDeadline: null },
-            data: { paymentDeadline: new Date(event.paymentDeadline * 1000) },
-          });
-          return;
-        }
-        await this.move(row, 'OrderAccepted', {
+      case 'order_accepted':
+        await this.move(row, 'order_accepted', {
           chainStatus: 'Active',
           paymentDeadline: new Date(event.paymentDeadline * 1000),
           acceptTxHash: log.txHash,
         });
         return;
-      case 'OrderPaid':
-        await this.move(row, 'OrderPaid', {
+      case 'order_paid':
+        await this.move(row, 'order_paid', {
           chainStatus: 'Paid',
           paidAt: when,
           paidTxHash: log.txHash,
         });
         return;
-      case 'OrderDisputed':
-        await this.move(row, 'OrderDisputed', {
+      case 'order_disputed':
+        await this.move(row, 'order_disputed', {
           chainStatus: 'Disputed',
           disputeTxHash: log.txHash,
         });
         return;
-      case 'OrderReleased':
+      case 'order_released':
         await this.move(
           row,
-          'OrderReleased',
+          'order_released',
           {
             chainStatus: 'Released',
             endedAt: when,
@@ -258,17 +299,17 @@ export class IndexerJob extends ScheduledJob {
           },
         );
         return;
-      case 'OrderCancelled': {
+      case 'order_cancelled': {
         const previous = row.status as P2pOrderStatus;
         const outcome = cancellationStatus({
           previous,
-          at,
+          at: log.at,
           acceptDeadline: row.acceptDeadline ? row.acceptDeadline.getTime() / 1000 : null,
           paymentDeadline: row.paymentDeadline ? row.paymentDeadline.getTime() / 1000 : null,
         });
         await this.move(
           row,
-          'OrderCancelled',
+          'order_cancelled',
           { chainStatus: 'Cancelled', endedAt: when, cancelTxHash: log.txHash },
           outcome,
           async (tx, moved) => {
@@ -283,10 +324,10 @@ export class IndexerJob extends ScheduledJob {
         );
         return;
       }
-      case 'OrderResolved':
+      case 'order_resolved':
         await this.move(
           row,
-          'OrderResolved',
+          'order_resolved',
           {
             chainStatus: 'Resolved',
             endedAt: when,
@@ -320,7 +361,7 @@ export class IndexerJob extends ScheduledJob {
   /**
    * One compare-and-swap, in one transaction with its webhook events and
    * `after` (the bookkeeping the move causes). Nothing happens when the order
-   * already moved (a log read again) or is elsewhere.
+   * already moved (an event read again) or is elsewhere.
    */
   private async move(
     row: P2pOrderRow,
@@ -339,69 +380,32 @@ export class IndexerJob extends ScheduledJob {
       const now = await tx.p2pOrder.findUnique({ where: { id: row.id }, select: P2P_ORDER_SELECT });
       if (!now) return;
       const type = STATUS_EVENTS[to];
-      if (type) await enqueueWebhooks(tx, orderEvents(type, now, this.deployments.chainIdOf(now)));
+      if (type) await enqueueWebhooks(tx, orderEvents(type, now));
       await this.bumpMerchant(tx, row.merchantAccountId, { lastActiveAt: new Date() });
       if (after) await after(tx, now);
     });
   }
 
-  private async opened(
-    d: Deployment,
-    event: Extract<P2pMarketEvent, { name: 'OrderOpened' }>,
-    log: IndexedLog,
-    times: Map<bigint, number>,
-  ): Promise<void> {
+  private async opened(d: Deployment, event: Opened, log: IndexedEvent): Promise<void> {
     const row = await this.prisma.p2pOrder.findUnique({
-      where: { ref: event.ref.toLowerCase() },
+      where: { ref: event.refId },
       select: P2P_ORDER_SELECT,
     });
-    if (
-      !row ||
-      row.tier !== d.tier ||
-      row.network !== d.network ||
-      !sameAddress(row.contract, d.contract)
-    ) {
+    if (!row || row.tier !== d.tier || row.network !== d.network || row.contract !== d.contract) {
       return;
     }
-    const kind = row.kind as P2pOrderKind;
-    const expected = openParamsOf(row);
-    const matches =
-      sameAddress(event.opener, row.openerAddress) &&
-      sameAddress(event.seller, expected.seller) &&
-      sameAddress(event.buyer, expected.buyer) &&
-      sameAddress(event.token, expected.token) &&
-      event.amount === expected.amount &&
-      event.bond === expected.bond &&
-      event.viaMatcher === (kind !== 'SELL');
-    if (!matches) {
+    const problems = openedMismatch(row, event, log.at);
+    if (problems.length > 0) {
       this.logger.warn(
-        `${d.network}/${d.tier}: order ${event.id} carries the ref of ${row.id} but not its terms (opener ${event.opener}); ignored`,
+        `${d.network}: order ${event.id} carries the ref of ${row.id} but not its terms (${problems.join(', ')}; opener ${event.opener}); ignored`,
       );
       return;
     }
-    const at = await this.blockTime(d, log.block, times);
-    if (kind === 'SELL') {
-      // The seller's wallet signed this; read back what the event leaves out.
-      const onchain = await this.reader.getOrder(d, event.id);
-      const termsMatch =
-        onchain.paymentWindow === expected.paymentWindow &&
-        onchain.settleWindow === expected.settleWindow &&
-        onchain.integratorFeeBps === expected.integratorFeeBps &&
-        sameAddress(onchain.integrator, expected.integrator) &&
-        onchain.fromBalance === false &&
-        onchain.feeBps === row.protocolFeeBps &&
-        (expected.bond === 0n || onchain.acceptDeadline - at === expected.acceptWindow);
-      if (!termsMatch) {
-        this.logger.warn(
-          `${d.network}/${d.tier}: sale ${row.id} opened as order ${event.id} with other windows, fees or integrator; ignored`,
-        );
-        return;
-      }
-    }
-    const bonded = expected.bond > 0n;
+    const kind = row.kind as P2pOrderKind;
+    const bonded = BigInt(row.bond) > 0n;
     const deadlines = {
-      acceptDeadline: bonded ? new Date((at + expected.acceptWindow) * 1000) : null,
-      paymentDeadline: bonded ? null : new Date((at + expected.paymentWindow) * 1000),
+      acceptDeadline: bonded ? new Date(event.acceptDeadline * 1000) : null,
+      paymentDeadline: bonded ? null : new Date(event.paymentDeadline * 1000),
     };
     await this.prisma.$transaction(async (tx) => {
       const moved = await tx.p2pOrder.updateMany({
@@ -431,18 +435,13 @@ export class IndexerJob extends ScheduledJob {
         return;
       }
       const now = await tx.p2pOrder.findUnique({ where: { id: row.id }, select: P2P_ORDER_SELECT });
-      if (now) {
-        await enqueueWebhooks(
-          tx,
-          orderEvents('P2P_ORDER_CREATED', now, this.deployments.chainIdOf(now)),
-        );
-      }
+      if (now) await enqueueWebhooks(tx, orderEvents('P2P_ORDER_CREATED', now));
     });
   }
 
   private async operatorSet(
     d: Deployment,
-    event: Extract<P2pMarketEvent, { name: 'OperatorSet' }>,
+    event: Extract<P2pMarketEvent, { name: 'operator_set' }>,
   ): Promise<void> {
     const account = await this.prisma.p2pAccount.findUnique({
       where: { tier_address: { tier: d.tier, address: event.account } },
@@ -452,6 +451,48 @@ export class IndexerJob extends ScheduledJob {
     const all = { ...((account.operators ?? {}) as Record<string, Record<string, number>>) };
     all[d.network] = { ...(all[d.network] ?? {}), [event.operator]: event.permissions };
     await this.prisma.p2pAccount.update({ where: { id: account.id }, data: { operators: all } });
+  }
+
+  /**
+   * The recovery pass: live orders read back from the contract. An order not
+   * open yet is looked up by its ref under its expected opener; an open one
+   * gets the moves its chain status implies. Done when no live order is left
+   * to read.
+   */
+  async reconcile(d: Deployment): Promise<void> {
+    const rows = await this.prisma.p2pOrder.findMany({
+      where: {
+        tier: d.tier,
+        network: d.network,
+        contract: d.contract,
+        status: { in: [...P2P_LIVE_STATUSES] },
+      },
+      orderBy: { updatedAt: 'asc' },
+      take: RECONCILE_BATCH,
+      select: P2P_ORDER_SELECT,
+    });
+    const now = Math.floor(Date.now() / 1000);
+    for (const row of rows) {
+      let id = row.onchainId ? BigInt(row.onchainId) : 0n;
+      if (id === 0n) id = await this.reader.orderIdOf(d, row.openerAddress, orderRef(row.id));
+      if (id === 0n) continue;
+      const onchain = await this.reader.getOrder(d, id);
+      if (!onchain) continue;
+      const base = { at: now, ledger: 0, txHash: '' };
+      if (!row.onchainId) {
+        const event: Opened = { name: 'order_opened', id, ...withoutPaidAt(onchain) };
+        // When it opened, as its own deadlines tell (the event's time is lost).
+        const openedAt =
+          BigInt(row.bond) > 0n
+            ? onchain.acceptDeadline - row.acceptWindow
+            : onchain.paymentDeadline - row.paymentWindow;
+        await this.opened(d, event, { ...base, at: openedAt, event });
+      }
+      for (const event of missedEvents(id, onchain, row.netAmount)) {
+        await this.apply(d, { ...base, event });
+      }
+    }
+    if (rows.length < RECONCILE_BATCH) this.reconciling.delete(d.contract);
   }
 
   private async bumpMerchant(
@@ -494,5 +535,65 @@ export class IndexerJob extends ScheduledJob {
       lastActiveAt: when,
       ...(median !== undefined ? { medianReleaseSeconds: median } : {}),
     });
+  }
+}
+
+function withoutPaidAt(o: P2pChainOrder): Omit<P2pChainOrder, 'paidAt'> {
+  const { paidAt: _paidAt, ...rest } = o;
+  return rest;
+}
+
+/**
+ * The events an order went through on-chain that its stored status has not
+ * seen, rebuilt from its chain status (recovery only; amounts the contract
+ * does not store are left out). Each is applied as a compare-and-swap, so
+ * the ones already seen change nothing.
+ */
+export function missedEvents(id: bigint, o: P2pChainOrder, netAmount: string): P2pMarketEvent[] {
+  const accepted: P2pMarketEvent = {
+    name: 'order_accepted',
+    id,
+    paymentDeadline: o.paymentDeadline,
+  };
+  const paid: P2pMarketEvent = { name: 'order_paid', id, by: null };
+  const disputed: P2pMarketEvent = { name: 'order_disputed', id, by: null };
+  switch (o.status) {
+    case 'Active':
+      return [accepted];
+    case 'Paid':
+      return [accepted, paid];
+    case 'Disputed':
+      return [accepted, paid, disputed];
+    case 'Released':
+      return [
+        accepted,
+        {
+          name: 'order_released',
+          id,
+          by: null,
+          toBuyer: BigInt(netAmount),
+          protocolFee: 0n,
+          integratorFee: 0n,
+        },
+      ];
+    case 'Cancelled':
+      return [{ name: 'order_cancelled', id, by: null }];
+    case 'Resolved':
+      return [
+        accepted,
+        paid,
+        disputed,
+        {
+          name: 'order_resolved',
+          id,
+          toBuyer: 0n,
+          toSeller: 0n,
+          bondToSeller: 0n,
+          protocolFee: 0n,
+          integratorFee: 0n,
+        },
+      ];
+    default:
+      return [];
   }
 }

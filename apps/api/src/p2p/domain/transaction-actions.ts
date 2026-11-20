@@ -1,22 +1,24 @@
-import { approveCalldata } from '@/chain/market-codec';
-import { p2pCalldata, type P2pOrderAction } from '@/chain/market-codec';
-import { formatUnits } from '@/p2p/domain/pricing';
-import { P2P_PERMISSIONS, P2P_PERMISSIONS_ALL, type P2pPermission } from '@/p2p/domain/constants';
+import type { xdr } from '@stellar/stellar-sdk';
+import { p2pCall, type P2pOrderAction } from '@/chain/market-codec';
 import type { Token as P2pToken } from '@/chain/networks';
+import { isAccountAddress, isContractAddress } from '@/common/stellar';
+import { P2P_PERMISSIONS, P2P_PERMISSIONS_ALL, type P2pPermission } from '@/p2p/domain/constants';
+import { formatUnits } from '@/p2p/domain/pricing';
 
 /**
  * The transactions `POST /v1/p2p/transactions` builds, ONE table: each action
  * says whether it acts on a balance (an account) or on an order, how it reads
- * its arguments, what it refuses, and the call it builds. A new action is one
- * entry. Pure; `P2pTransactionsService` loads the account, the order and the
- * facts each check reads.
+ * its arguments, what it refuses, and the market call it builds (one
+ * operation; `TxBuilder` makes it a prepared transaction). A new action is one
+ * entry. Pure; `TransactionsService` loads the account, the order and the
+ * facts each check reads. There is no `approve`: `deposit` and
+ * `open_with_deposit` pull the tokens under the payer's own authorization.
  *
  * Every check here only spares a wallet a transaction the contract would
- * revert: the contract is the boundary, and a refused build moves nothing.
+ * refuse: the contract is the boundary, and a refused build moves nothing.
  */
 
 export const P2P_TRANSACTION_ACTIONS = [
-  'approve',
   'deposit',
   'withdraw',
   'setOperator',
@@ -32,10 +34,10 @@ export type P2pTransactionAction = (typeof P2P_TRANSACTION_ACTIONS)[number];
 /** What an action on a balance knows. */
 export interface P2pBalanceContext {
   contract: string;
-  /** The signing wallet. */
+  /** The signing account (the transaction's source and the acting address). */
   from: string;
   matcher: string | null;
-  /** Resolves a token the deployment lists (address or symbol), or null. */
+  /** Resolves a token the deployment lists (contract, symbol or CODE:ISSUER), or null. */
   token(value: string): P2pToken | null;
   /** The account publishes an active offer selling tokens (it is a liquidity merchant). */
   sellsLiquidity: boolean;
@@ -62,8 +64,9 @@ export interface P2pOrderContext {
 }
 
 export interface P2pBuiltCall {
-  to: string;
-  data: string;
+  /** The market function it calls (`P2pTransaction.action`). */
+  fn: string;
+  operation: xdr.Operation;
   description: string;
 }
 
@@ -83,15 +86,19 @@ interface OrderAction {
   describe(ctx: P2pOrderContext): string;
 }
 
-const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
-const EVM_RE = /^0x[0-9a-fA-F]{40}$/;
-const UINT_RE = /^[1-9]\d{0,37}$/;
-const MAX_UINT128 = (1n << 128n) - 1n;
+const same = (a: string, b: string) => a === b;
+const UINT_RE = /^[1-9]\d{0,38}$/;
+/** The largest `i128`. */
+export const MAX_I128 = (1n << 127n) - 1n;
 
 function amountArg(args: Record<string, unknown>, name: string, allowZero = false): Parsed<bigint> {
   const raw = args[name];
   const text = typeof raw === 'number' ? String(raw) : raw;
-  if (typeof text !== 'string' || !(UINT_RE.test(text) || (allowZero && text === '0'))) {
+  if (
+    typeof text !== 'string' ||
+    !(UINT_RE.test(text) || (allowZero && text === '0')) ||
+    BigInt(text) > MAX_I128
+  ) {
     return {
       ok: false,
       error: `args.${name} must be ${allowZero ? 'a non-negative' : 'a positive'} integer in base units`,
@@ -105,10 +112,7 @@ function tokenArg(args: Record<string, unknown>, ctx: P2pBalanceContext): Parsed
   const token = typeof raw === 'string' ? ctx.token(raw) : null;
   return token
     ? { ok: true, value: token }
-    : {
-        ok: false,
-        error: 'args.token must be a token the market lists on this network',
-      };
+    : { ok: false, error: 'args.token must be a token the market lists on this network' };
 }
 
 function tokenAndAmount(
@@ -160,7 +164,7 @@ const ORDER_ACTIONS: Record<'accept' | 'markPaid' | 'release' | 'cancel' | 'disp
     },
     markPaid: {
       scope: 'order',
-      call: 'markPaid',
+      call: 'mark_paid',
       refusal: ({ order, from }) =>
         order.status !== 'awaiting_payment'
           ? `only an order awaiting payment can be marked paid (this one is ${order.status})`
@@ -220,30 +224,21 @@ const ORDER_ACTIONS: Record<'accept' | 'markPaid' | 'release' | 'cancel' | 'disp
   };
 
 const BALANCE_ACTIONS = {
-  approve: {
-    scope: 'balance',
-    parse: tokenAndAmount,
-    build: ({ token, amount }, ctx) => ({
-      to: token.address,
-      data: approveCalldata(ctx.contract, amount),
-      description: `Allow the P2P market to take exactly ${human(amount, token)}`,
-    }),
-  } satisfies BalanceAction<{ token: P2pToken; amount: bigint }>,
   deposit: {
     scope: 'balance',
     parse: tokenAndAmount,
     build: ({ token, amount }, ctx) => ({
-      to: ctx.contract,
-      data: p2pCalldata.deposit(token.address, amount),
-      description: `Deposit ${human(amount, token)} into your P2P balance (approve it first)`,
+      fn: 'deposit',
+      operation: p2pCall.deposit(ctx.contract, ctx.from, token.contract, amount),
+      description: `Deposit ${human(amount, token)} into your P2P balance`,
     }),
   } satisfies BalanceAction<{ token: P2pToken; amount: bigint }>,
   withdraw: {
     scope: 'balance',
     parse: tokenAndAmount,
     build: ({ token, amount }, ctx) => ({
-      to: ctx.contract,
-      data: p2pCalldata.withdraw(token.address, amount),
+      fn: 'withdraw',
+      operation: p2pCall.withdraw(ctx.contract, ctx.from, token.contract, amount),
       description: `Withdraw ${human(amount, token)} from your P2P balance to your wallet`,
     }),
   } satisfies BalanceAction<{ token: P2pToken; amount: bigint }>,
@@ -251,14 +246,11 @@ const BALANCE_ACTIONS = {
     scope: 'balance',
     parse: (args, ctx) => {
       const operator = args.operator;
-      if (typeof operator !== 'string' || !EVM_RE.test(operator)) {
-        return { ok: false, error: 'args.operator must be an EVM address' };
+      if (!isAccountAddress(operator) && !isContractAddress(operator)) {
+        return { ok: false, error: 'args.operator must be a Stellar address (G... or C...)' };
       }
       if (same(operator, ctx.from)) {
-        return {
-          ok: false,
-          error: 'args.operator must be another wallet than the account',
-        };
+        return { ok: false, error: 'args.operator must be another wallet than the account' };
       }
       const bits = permissionBits(args.permissions);
       if (bits === null) {
@@ -270,8 +262,8 @@ const BALANCE_ACTIONS = {
       return { ok: true, value: { operator, bits } };
     },
     build: ({ operator, bits }, ctx) => ({
-      to: ctx.contract,
-      data: p2pCalldata.setOperator(operator, bits),
+      fn: 'set_operator',
+      operation: p2pCall.setOperator(ctx.contract, ctx.from, operator, bits),
       description:
         bits === 0
           ? `Revoke every permission of ${operator}`
@@ -285,16 +277,10 @@ const BALANCE_ACTIONS = {
     scope: 'balance',
     parse: (args, ctx) => {
       if (!ctx.matcher) {
-        return {
-          ok: false,
-          error: 'the matcher is not available on this deployment',
-        };
+        return { ok: false, error: 'the matcher is not available on this deployment' };
       }
       const max = amountArg(args, 'maxPerOrder', true);
       if (!max.ok) return max;
-      if (max.value > MAX_UINT128) {
-        return { ok: false, error: 'args.maxPerOrder does not fit uint128' };
-      }
       const autoSettle = args.autoSettle ?? false;
       if (typeof autoSettle !== 'boolean') {
         return { ok: false, error: 'args.autoSettle must be a boolean' };
@@ -312,8 +298,14 @@ const BALANCE_ACTIONS = {
       return { ok: true, value: { maxPerOrder: max.value, autoSettle } };
     },
     build: ({ maxPerOrder, autoSettle }, ctx) => ({
-      to: ctx.contract,
-      data: p2pCalldata.setMatcher(ctx.matcher as string, maxPerOrder, autoSettle),
+      fn: 'set_matcher',
+      operation: p2pCall.setMatcher(
+        ctx.contract,
+        ctx.from,
+        ctx.matcher as string,
+        maxPerOrder,
+        autoSettle,
+      ),
       description:
         maxPerOrder === 0n
           ? 'Revoke the matcher: no new order opens on your balance'
@@ -354,8 +346,13 @@ export function buildOrderAction(
   return {
     ok: true,
     value: {
-      to: ctx.contract,
-      data: p2pCalldata.orderAction(entry.call, BigInt(ctx.order.onchainId)),
+      fn: entry.call,
+      operation: p2pCall.orderAction(
+        ctx.contract,
+        entry.call,
+        ctx.from,
+        BigInt(ctx.order.onchainId),
+      ),
       description: entry.describe(ctx),
     },
   };
