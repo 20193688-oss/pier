@@ -1,6 +1,6 @@
 /* api.test.ts: the client's error shape and list readers (src/lib/api/client.ts), the account-side
    readers (types.ts), a request through a fake transport with the scope headers
-   (endpoints.ts), and the wallet announcement and sign-in message readers. */
+   (endpoints.ts), SEP-10 sign-in's requests, and the payments app's readers (app.ts). */
 import { afterEach, test } from 'vitest';
 import assert from 'node:assert/strict';
 import {
@@ -23,9 +23,20 @@ import {
   normalizeMember,
   normalizeSession,
 } from '@/lib/api/types';
-import { readAnnouncement } from '@/lib/wallet/eip6963';
-import { siweMessage } from '@/lib/wallet/actions';
-import { getAddress } from 'viem';
+import {
+  app,
+  readActivity,
+  readBalances,
+  readChargePayment,
+  readPayerCharge,
+  readProfile,
+  readTransfer,
+} from '@/lib/api/app';
+import { readSubmit } from '@/lib/api/endpoints';
+
+const G = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
+const G2 = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
+const C = 'CA3D5KRYM6CB7OWQ6TWYRR3Z4T7GNZLKERYNZGGA5SOAOPIFY6YQGAXE';
 
 afterEach(() => {
   setTransport(fetchTransport);
@@ -109,9 +120,15 @@ test('the charge page sends its payer token as a header and refuses a malformed 
 
 test('sessions, members, keys, webhooks and deliveries are read tolerantly', () => {
   assert.equal(normalizeSession({ address: 'nope' }), null);
+  assert.equal(
+    normalizeSession({ address: '0xde3000000000000000000000000000000000a11e' }),
+    null,
+    'an EVM address is no Stellar account',
+  );
+  assert.equal(normalizeSession({ address: C }), null, 'a contract is no session');
   const s = normalizeSession({
     session: {
-      address: '0xde3000000000000000000000000000000000a11e',
+      address: G,
       expiresAt: '2026-11-20T00:00:00Z',
     },
     organizations: [
@@ -154,46 +171,6 @@ test('sessions, members, keys, webhooks and deliveries are read tolerantly', () 
     'A',
   );
   assert.equal(normalizeDelivery({ status: 'succeeded' }).status, 'delivered');
-});
-
-test('a wallet announcement is checked; only a data-URI icon is kept', () => {
-  const provider = { request: async () => null };
-  assert.equal(readAnnouncement(null), null);
-  assert.equal(readAnnouncement({ info: { name: 'X', uuid: '1' } }), null, 'no provider');
-  assert.equal(readAnnouncement({ info: { uuid: '1' }, provider }), null, 'no name');
-  const w = readAnnouncement({
-    info: { name: ' Wallet ', uuid: '1', icon: 'https://evil.example/x.png', rdns: 'a.b' },
-    provider,
-  });
-  assert.equal(w?.info.name, 'Wallet');
-  assert.equal(w?.info.icon, null, 'a remote icon is dropped');
-  assert.equal(
-    readAnnouncement({
-      info: { name: 'W', uuid: '1', icon: 'data:image/png;base64,iVBORw0=' },
-      provider,
-    })?.info.icon,
-    'data:image/png;base64,iVBORw0=',
-  );
-});
-
-test('the sign-in message names this site, the address, the nonce and a short expiry', () => {
-  const m = siweMessage({
-    address: '0xde3000000000000000000000000000000000a11e',
-    nonce: 'abcdef123456',
-    statement: 'Sign in to pedospe.',
-    chainId: 8453,
-    domain: 'pedospe.example',
-    uri: 'https://pedospe.example',
-    now: new Date('2026-11-19T12:00:00Z'),
-  });
-  assert.ok(
-    m.startsWith(
-      `pedospe.example wants you to sign in with your Ethereum account:\n${getAddress('0xde3000000000000000000000000000000000a11e')}\n`,
-    ),
-  );
-  assert.match(m, /Nonce: abcdef123456/);
-  assert.match(m, /Chain ID: 8453/);
-  assert.match(m, /Expiration Time: 2026-11-19T12:10:00.000Z/);
 });
 
 test('the market is read once per tier and reused; a failure is not kept', async () => {
@@ -258,38 +235,153 @@ test("the app's order body carries only the quote and who pays or is paid", asyn
     return {
       status: 200,
       json: {
-        chainId: 1,
-        to: '0x5eed00000000000000000000000000000000ba5e',
-        data: '0x37bdc99b',
-        value: '0',
+        network: 'testnet',
+        action: 'release',
         description: 'Release',
+        xdr: 'AAAAAgAAAAA=',
+        hash: 'ab'.repeat(32),
+        expiresAt: '2026-11-19T12:05:00Z',
       },
     };
   });
   const t = await trade.transaction('o1', 'release');
   assert.deepEqual(
-    [seen.at(-1)?.path, seen.at(-1)?.body, t.action],
-    ['/v1/app/orders/o1/transactions', { action: 'release' }, 'release'],
+    [seen.at(-1)?.path, seen.at(-1)?.body, t.action, t.xdr],
+    ['/v1/app/orders/o1/transactions', { action: 'release' }, 'release', 'AAAAAgAAAAA='],
   );
+  await trade.transaction('o1', 'mark_paid');
+  assert.deepEqual(seen.at(-1)?.body, { action: 'markPaid' }, "the API's own action name");
+  setTransport(async () => ({ status: 200, json: { to: '0x1', data: '0x' } }));
+  await assert.rejects(trade.transaction('o1', 'release'), ApiError, 'an EVM answer is unreadable');
 });
 
-test('sign-in takes the nonce and the domain the API names', async () => {
-  setTransport(async () => ({
-    status: 200,
-    json: {
-      nonce: 'abcdef123456',
-      domain: 'app.pedospe.example',
-      expiresAt: '2026-11-19T12:05:00Z',
-    },
-  }));
-  assert.deepEqual(await auth.nonce(), { nonce: 'abcdef123456', domain: 'app.pedospe.example' });
-  setTransport(async () => ({
-    status: 200,
-    json: { nonce: 'abcdef123456', domain: 'evil.example/x' },
-  }));
-  assert.deepEqual(
-    await auth.nonce(),
-    { nonce: 'abcdef123456', domain: null },
-    'a malformed domain is not used',
+test('SEP-10 sign-in: the challenge for the account, then the signed transaction', async () => {
+  const seen: ApiRequest[] = [];
+  setTransport(async (req) => {
+    seen.push(req);
+    if (req.path === '/v1/auth/challenge')
+      return {
+        status: 200,
+        json: { transaction: 'AAAA', network_passphrase: 'Test SDF Network ; September 2015' },
+      };
+    if (req.path === '/v1/auth/verify')
+      return { status: 200, json: { token: 'ps_sess_x', session: { address: G } } };
+    return { status: 200, json: { address: G, organizations: [] } };
+  });
+  assert.deepEqual(await auth.challenge(G), {
+    transaction: 'AAAA',
+    networkPassphrase: 'Test SDF Network ; September 2015',
+  });
+  assert.deepEqual(seen[0].query, { account: G });
+  const s = await auth.verify('SIGNED');
+  assert.equal(s.address, G);
+  assert.deepEqual(seen[1].body, { transaction: 'SIGNED' }, 'only the signed challenge is sent');
+  assert.equal(seen[2].path, '/v1/auth/session', 'the session is then read from the API');
+  setTransport(async () => ({ status: 200, json: { transaction: 1 } }));
+  await assert.rejects(auth.challenge(G), ApiError);
+});
+
+test("the app's readers: profile, balances, transfers, activity, charges, submissions", () => {
+  assert.deepEqual(readProfile({ address: G, handle: '@Lucia' }), { address: G, handle: 'lucia' });
+  assert.deepEqual(readProfile({ address: G, handle: 'no way' }), { address: G, handle: null });
+  assert.equal(readProfile({ address: 'nope' }), null);
+  const b = readBalances({
+    network: 'testnet',
+    account: { exists: true },
+    xlm: '0',
+    tokens: [{ symbol: 'USDC', contract: C, amount: '125000000', trustline: true, authorized: true }],
+  });
+  assert.deepEqual(b?.tokens[0], {
+    symbol: 'USDC',
+    contract: C,
+    amount: '125000000',
+    trustline: true,
+    authorized: true,
+  });
+  assert.equal(
+    readBalances({ tokens: [{ symbol: 'USDC', amount: '-1', trustline: false }] })?.tokens[0].amount,
+    '0',
+    'a malformed amount reads as nothing',
   );
+  assert.equal(
+    readBalances({ tokens: [{ symbol: 'USDC', amount: '1', trustline: false, authorized: true }] })
+      ?.tokens[0].authorized,
+    false,
+    'no trustline, not authorized',
+  );
+  const tr = readTransfer({
+    id: 't1',
+    network: 'testnet',
+    token: 'USDC',
+    amount: '10',
+    from: G,
+    to: G2,
+    toHandle: 'lucia',
+    direction: 'out',
+    status: 'COMPLETED',
+    createdAt: '2026-11-19T12:00:00Z',
+  });
+  assert.deepEqual([tr?.direction, tr?.status, tr?.fromHandle, tr?.note], ['out', 'COMPLETED', null, null]);
+  assert.equal(readTransfer({ id: 't', status: 'WEIRD' })?.status, 'PENDING');
+  const page = readActivity({
+    items: [
+      { type: 'transfer', at: '2026-11-19T12:00:00Z', transfer: { id: 't1', direction: 'in' } },
+      { type: 'order', at: '2026-11-19T11:00:00Z', order: { id: 'o1', kind: 'QR_PAY' } },
+      { type: 'other' },
+    ],
+    nextCursor: 'c2',
+  });
+  assert.deepEqual(
+    [page.items.length, page.items[1].type === 'order' && page.items[1].order.kind, page.nextCursor],
+    [2, 'QR_PAY', 'c2'],
+  );
+  assert.equal(
+    readPayerCharge({ id: 'ch', status: 'open', payWithBalance: { token: 'USDC', amount: '0' } })
+      ?.payWithBalance,
+    null,
+    'nothing to pay is no price',
+  );
+  assert.equal(
+    readPayerCharge({ id: 'ch', payWithBalance: { token: 'USDC', amount: '5', expiresAt: '2026-11-19T12:01:00Z' } })
+      ?.payWithBalance?.amount,
+    '5',
+  );
+  assert.equal(readChargePayment({ id: 'p', to: '0xabc' }), null, 'no Stellar destination');
+  assert.equal(readChargePayment({ id: 'p', to: G2, amount: '5' })?.to, G2);
+  assert.deepEqual(readSubmit({ hash: 'h', status: 'SUCCESS' }), { hash: 'h', status: 'SUCCESS', error: null });
+  assert.equal(readSubmit({ hash: 'h', status: '??' })?.status, 'PENDING');
+  assert.equal(readSubmit({ status: 'SUCCESS' }), null);
+});
+
+test('app calls: handles resolve or are null, transfers carry base units and the note', async () => {
+  const seen: ApiRequest[] = [];
+  setTransport(async (req) => {
+    seen.push(req);
+    if (req.path === '/v1/app/handles/lucia') return { status: 200, json: { handle: 'lucia', address: G2 } };
+    if (req.path.startsWith('/v1/app/handles/'))
+      return { status: 404, json: { error: { code: 'not_found', message: 'x' } } };
+    if (req.path === '/v1/app/transfers')
+      return {
+        status: 201,
+        json: {
+          transfer: { id: 't1', to: G2, amount: '125000000', status: 'PENDING' },
+          transaction: { network: 'testnet', xdr: 'AAAA', hash: 'ab'.repeat(32), action: 'payment' },
+        },
+      };
+    if (req.path === '/v1/app/activate') return { status: 200, json: { transaction: null } };
+    return { status: 200, json: {} };
+  });
+  assert.deepEqual(await app.resolveHandle('@Lucia'), { handle: 'lucia', address: G2 });
+  assert.equal(await app.resolveHandle('@nobody'), null);
+  assert.equal(await app.resolveHandle('no way'), null, 'not a handle: not even asked');
+  const r = await app.transfer({ network: 'testnet', to: '@lucia', token: 'USDC', amount: '125000000', note: 'Café' });
+  assert.equal(r.transaction.xdr, 'AAAA');
+  assert.deepEqual(seen.at(-1)?.body, {
+    network: 'testnet',
+    to: '@lucia',
+    token: 'USDC',
+    amount: '125000000',
+    note: 'Café',
+  });
+  assert.equal(await app.activate('testnet', 'USDC'), null, 'nothing to activate');
 });

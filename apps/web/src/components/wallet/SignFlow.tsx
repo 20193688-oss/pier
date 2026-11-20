@@ -21,6 +21,9 @@ export interface TxStep {
   build: () => Promise<P2pTransaction>;
   /* Null: no trusted expectation, so the step is refused. */
   expect: TxExpectation | null;
+  /* An expectation that can only be known once `build` ran (a sale's ref comes from the order
+     `build` opened); it wins over `expect`. */
+  expectFor?: () => TxExpectation | null;
 }
 
 /** A signing failure in the reader's words. */
@@ -98,7 +101,7 @@ export function SignFlow({
           wallet,
           network,
           tx,
-          expect: step.expect,
+          expect: step.expectFor ? step.expectFor() : step.expect,
           via,
           onStep: (st) =>
             setProgress(

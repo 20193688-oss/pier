@@ -528,6 +528,79 @@
   }
 }
 
+/* The payments app (/app/*): a phone-width column, centred on a desktop against a darker paper,
+   with the phone's safe areas (notch, home indicator) kept clear. */
+@layer components {
+  .app-backdrop {
+    background: var(--paper);
+  }
+  @media (min-width: 640px) {
+    .app-backdrop {
+      background: var(--well);
+      padding: 0;
+    }
+    .app-column {
+      border-left: 1px solid var(--line);
+      border-right: 1px solid var(--line);
+    }
+  }
+  .app-top-inset {
+    height: env(safe-area-inset-top, 0px);
+  }
+  .app-with-tabs {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+  }
+  .app-without-tabs {
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  }
+  .app-tabbar {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  .app-column {
+    padding-left: env(safe-area-inset-left, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+  }
+  /* The scanner: the camera fills its frame; the viewfinder corners sit on top. */
+  .scan-frame {
+    position: relative;
+    overflow: hidden;
+    border-radius: var(--radius-sheet);
+    background: #08120f;
+    aspect-ratio: 1 / 1;
+  }
+  .scan-frame video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .scan-finder {
+    position: absolute;
+    inset: 18%;
+    border-radius: 18px;
+    box-shadow: 0 0 0 999px rgb(8 18 15 / 0.45);
+    outline: 3px solid rgb(255 255 255 / 0.9);
+    outline-offset: -3px;
+  }
+  /* A keypad-style amount: wide banknote figures, no spinner, no zoom on focus (16px+). */
+  .amount-input {
+    width: 100%;
+    min-width: 0;
+    background: transparent;
+    outline: none;
+    text-align: center;
+    font-stretch: 125%;
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-size: clamp(2.4rem, 13vw, 3.6rem);
+    line-height: 1.1;
+  }
+  .amount-input::placeholder {
+    color: var(--ink-3);
+    opacity: 0.45;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -244,8 +244,7 @@ export const appRoutes: [ApiRequest['method'], string, Handler][] = [
           `WEB_AUTH_ENDPOINT = "${location.origin}/v1/auth/challenge"`,
           `SIGNING_KEY = "${SEP10_SIGNER.publicKey()}"`,
           '',
-        ].join('
-'),
+        ].join(String.fromCharCode(10)),
       ),
   ],
   [

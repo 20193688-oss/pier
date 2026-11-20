@@ -1,4 +1,5 @@
-/* Providers and routes. The dashboard and the docs load as their own chunks. */
+/* Providers and routes. The payments app (/app/*), the dashboard and the docs load as their own
+   chunks; Pollar loads beside the app (never around it) only when this build has its key. */
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { createBrowserRouter, Link, Outlet, RouterProvider, useLocation } from 'react-router';
 import { I18nProvider, useDocumentMeta, useT } from '@/i18n';
@@ -7,8 +8,12 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { SiteLayout } from '@/components/layout/SiteFrame';
 import { Spinner } from '@/components/ui/controls';
 import LandingPage from '@/features/landing/LandingPage';
+import { POLLAR_KEY } from '@/lib/wallet/pollar-store';
+import { MOCK } from '@/lib/env';
+import { APP_TIER } from '@/lib/api/endpoints';
 
-const TradePage = lazy(() => import('@/features/trade/TradePage'));
+const AppRoot = lazy(() => import('@/features/app/AppRoot'));
+const PollarRoot = lazy(() => import('@/lib/wallet/pollar'));
 const ChargePage = lazy(() => import('@/features/charge/ChargePage'));
 const DashboardApp = lazy(() => import('@/features/dashboard/DashboardApp'));
 const DocsApp = lazy(() => import('@/features/docs/DocsApp'));
@@ -70,7 +75,6 @@ const router = createBrowserRouter([
         element: <Site />,
         children: [
           { path: '/', element: <LandingPage /> },
-          { path: '/app', element: <TradePage /> },
           { path: '/docs/*', element: <DocsApp /> },
           { path: '*', element: <NotFound /> },
         ],
@@ -85,6 +89,14 @@ const router = createBrowserRouter([
         ),
       })),
       {
+        path: '/app/*',
+        element: (
+          <Suspense fallback={<Loading />}>
+            <AppRoot />
+          </Suspense>
+        ),
+      },
+      {
         path: '/dashboard/*',
         element: (
           <Suspense fallback={<Loading />}>
@@ -96,6 +108,9 @@ const router = createBrowserRouter([
   },
 ]);
 
+/* Pollar's network follows the market tier: testnet for test, mainnet for live. */
+const POLLAR_NETWORK = APP_TIER === 'live' ? 'mainnet' : 'testnet';
+
 export function App() {
   return (
     <I18nProvider>
@@ -103,6 +118,11 @@ export function App() {
         <ToastProvider>
           <RouterProvider router={router} />
         </ToastProvider>
+        {POLLAR_KEY && !MOCK && (
+          <Suspense fallback={null}>
+            <PollarRoot apiKey={POLLAR_KEY} network={POLLAR_NETWORK} />
+          </Suspense>
+        )}
       </SessionProvider>
     </I18nProvider>
   );

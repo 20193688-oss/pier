@@ -7,7 +7,7 @@ const common: typeof es = {
   skip: 'Skip to content',
   nav: {
     label: 'Main',
-    app: 'Buy and sell',
+    app: 'Payments app',
     merchants: 'Merchants',
     business: 'Businesses',
     docs: 'Docs',
