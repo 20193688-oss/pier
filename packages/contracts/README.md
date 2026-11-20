@@ -161,6 +161,10 @@ target, installs on first use) and Node 24.9+. The Stellar CLI is not needed to 
   backslash, a drive or the cargo home is left in the wasm. Caller `RUSTFLAGS` are ignored.
 - **Check:** the vitest artifact test rebuilds and compares byte for byte. Rust normalizes CRLF in
   sources, so a Windows checkout with `autocrlf` builds the same bytes.
+- **Verified (2026-11-19):** two clean builds; a copy from `git archive` at another path, with CRLF
+  sources and a separate, empty `CARGO_HOME`; and a Linux build (WSL Ubuntu, same toolchain and
+  remap rules) of the unshaken cargo output all gave the same bytes. Shaking is a pure function of
+  those bytes.
 
 To verify a deployment, compare the installed wasm hash (`stellar contract info` or the deploy
 output's "Using wasm hash") with `MARKET_WASM_HASH`.
