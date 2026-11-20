@@ -149,9 +149,13 @@ export class SubmissionsService {
     const hash = Buffer.from(tx.hash()).toString('hex');
     const existing = await this.prisma.p2pSubmission.findUnique({
       where: { hash },
-      select: SELECT,
+      select: { ...SELECT, source: true },
     });
-    if (existing) return this.follow(d, existing, P2P_SUBMIT_WAIT_MS);
+    if (existing) {
+      // The same signed bytes again: where they stand, to whoever may submit for them.
+      await this.checkSubmitter(principal, existing.source);
+      return this.follow(d, existing, P2P_SUBMIT_WAIT_MS);
+    }
 
     const sponsor = this.deployments.sponsorKey();
     const check = checkSubmission(tx, {
