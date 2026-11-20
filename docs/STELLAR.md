@@ -1,5 +1,18 @@
 # Stellar port and the mobile payments app: design contract
 
+> **Status (2026-11-19):** implemented on `feat/stellar` and verified as described in
+> `docs/HANDOFF.md` section 5. Where the code deliberately differs from this text, the code and the
+> workspace READMEs win. The main differences:
+>
+> - activating a missing account uses the sponsor as transaction source;
+> - submit takes `{ xdr, network? }`;
+> - `P2pTransaction.action` is the contract function name in snake_case;
+> - a SELL is one transaction;
+> - contract functions return plain values, and error codes 1 and 3 never fire;
+> - external wallets come from Pollar's built-in Freighter and Albedo adapters, not the
+>   wallets-kit adapter;
+> - the app's token is the one the wallet holds when `VITE_APP_TOKEN` is unset.
+
 Binding spec for the work on branch `feat/stellar` (written 2026-11-19). Three agents build it in
 parallel (contracts; API + SDK + dev stack; web + mobile app) and the orchestrator integrates. The
 interfaces that cross a boundary (sections 3, 4, 5 and 7.2) are binding: if one is wrong or
