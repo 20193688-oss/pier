@@ -89,4 +89,13 @@ export class TransferMatchesDto {
   @IsOptional()
   @IsDateString()
   receivedAt?: string;
+
+  @ApiPropertyOptional({
+    example: 'GAXTHY6ASJEWI3OJGM7UZ2KSMBQD7VHCCH27PAL6ALSSSW7D33B5WMMI',
+    description:
+      'The account that signs the releases: the merchant account (default), or an operator it granted PERM_RELEASE (`set_operator`), so a bot never needs the merchant’s own key.',
+  })
+  @IsOptional()
+  @Matches(/^G[A-Z2-7]{55}$/, { message: 'signer must be a Stellar account address (G...)' })
+  signer?: string;
 }

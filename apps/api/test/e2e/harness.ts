@@ -1,54 +1,75 @@
+import { randomBytes } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
+import { Keypair, StrKey, TransactionBuilder, type Transaction } from '@stellar/stellar-sdk';
 import supertest from 'supertest';
-import type { Hex } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { createSiweMessage } from 'viem/siwe';
 import { inject } from 'vitest';
 import { createApp } from '@/app.factory';
+import { RateLimiter } from '@/common/rate-limit';
 import { loadConfig, type AppConfig } from '@/config/env';
-import {
-  devSend,
-  devWallet,
-  fundDevWallet,
-  localApiEnv,
-  type DevRole,
-  type DevWallet,
-} from '@/dev/index';
 import { PrismaService } from '@/prisma/prisma.service';
+import { FakeChain } from '@test/e2e/fake-chain';
 
-export const WEB_ORIGIN = 'http://localhost:3000';
-export const SIWE_DOMAIN = 'localhost:3000';
+export const WEB_ORIGIN = 'http://localhost:3100';
+export const HOME_DOMAIN = 'localhost:3100';
+
+/** Keys of the e2e API (fresh per run; never funded anywhere). */
+export const KEYS = {
+  sep10: Keypair.random(),
+  matcher: Keypair.random(),
+  sponsor: Keypair.random(),
+  admin: Keypair.random(),
+};
+
+/** A contract id nobody deployed: the fake chain never verifies it. */
+export const FAKE_CONTRACT = StrKey.encodeContract(randomBytes(32));
 
 export interface Harness {
   app: INestApplication;
   config: AppConfig;
   prisma: PrismaService;
+  chain: FakeChain;
   http: () => ReturnType<typeof supertest>;
   close(): Promise<void>;
 }
 
-/** Boots the HTTP app against the e2e Postgres and dev chain; jobs are ticked by hand. */
-export async function bootApp(overrides: Record<string, string> = {}): Promise<Harness> {
+/** The API's environment for the wiring suites: testnet and mainnet configured, no network reached. */
+export function e2eEnv(overrides: Record<string, string> = {}): Record<string, string> {
   const infra = inject('infra');
-  const env = {
-    ...localApiEnv({
-      port: 4999,
-      databaseUrl: infra.databaseUrl,
-      rpcUrl: infra.rpcUrl,
-      deployment: infra.deployment,
-      dataEncryptionKey: '11'.repeat(32),
-      webOrigin: WEB_ORIGIN,
-      jobsEnabled: false,
-    }),
+  return {
+    NODE_ENV: 'test',
+    DATABASE_URL: infra.databaseUrl,
+    DATA_ENCRYPTION_KEY: '11'.repeat(32),
+    WEB_ORIGINS: WEB_ORIGIN,
+    SEP10_HOME_DOMAIN: HOME_DOMAIN,
+    SEP10_NETWORK: 'testnet',
+    SEP10_SIGNING_SECRET: KEYS.sep10.secret(),
+    P2P_MATCHER_SECRET: KEYS.matcher.secret(),
+    P2P_SPONSOR_SECRET: KEYS.sponsor.secret(),
+    ADMIN_ADDRESSES: KEYS.admin.publicKey(),
+    STELLAR_TESTNET_RPC_URL: 'http://127.0.0.1:9/rpc',
+    P2P_TESTNET_CONTRACT: FAKE_CONTRACT,
+    STELLAR_MAINNET_RPC_URL: 'http://127.0.0.1:9/rpc',
+    P2P_MAINNET_CONTRACT: FAKE_CONTRACT,
+    APP_TIER: 'test',
+    JOBS_ENABLED: 'false',
+    DEV_TOOLS: 'true',
+    COOKIE_SECURE: 'false',
+    WEBHOOKS_ALLOW_INSECURE: 'true',
     ...overrides,
   };
-  const config = loadConfig(env);
-  const app = await createApp(config, { logger: false });
+}
+
+/** Boots the HTTP app against the e2e Postgres with a fake chain; jobs are ticked by hand. */
+export async function bootApp(overrides: Record<string, string> = {}): Promise<Harness> {
+  const config = loadConfig(e2eEnv(overrides));
+  const chain = new FakeChain();
+  const app = await createApp(config, { logger: false, overrides: { chain } });
   await app.init();
   const server = app.getHttpServer();
   return {
     app,
     config,
+    chain,
     prisma: app.get(PrismaService),
     http: () => supertest(server),
     close: () => app.close(),
@@ -57,46 +78,44 @@ export async function bootApp(overrides: Record<string, string> = {}): Promise<H
 
 let counter = 0;
 
-/** A fresh random wallet (for isolation between tests). */
-export function randomWallet(): DevWallet {
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const privateKey = `0x${Buffer.from(bytes).toString('hex')}` as Hex;
-  return { role: 'user', address: privateKeyToAccount(privateKey).address, privateKey };
+/** A fresh random account (for isolation between tests). */
+export function randomWallet(): Keypair {
+  return Keypair.random();
 }
 
-export function wallet(role: DevRole): DevWallet {
-  return devWallet(role);
+export const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
+
+/** Signs a challenge envelope with `signer`. */
+export function sign(xdr: string, passphrase: string, ...signers: Keypair[]): string {
+  const tx = TransactionBuilder.fromXDR(xdr, passphrase) as Transaction;
+  tx.sign(...signers);
+  return tx.toXDR();
 }
 
-/** Signs a wallet in through the API; answers its session token. */
-export async function signIn(h: Harness, w: DevWallet): Promise<string> {
-  const nonce = await h.http().post('/v1/auth/nonce').expect(200);
-  const message = createSiweMessage({
-    domain: SIWE_DOMAIN,
-    address: w.address,
-    statement: 'Sign in to pedospe.',
-    uri: `http://${SIWE_DOMAIN}`,
-    version: '1',
-    chainId: 31337,
-    nonce: nonce.body.nonce,
-    issuedAt: new Date(),
-  });
-  const signature = await privateKeyToAccount(w.privateKey).signMessage({ message });
-  const res = await h.http().post('/v1/auth/verify').send({ message, signature }).expect(200);
+/** Signs an account in through the API (SEP-10); answers its session token. */
+export async function signIn(h: Harness, w: Keypair): Promise<string> {
+  // Every test signs in from the same address: the per-IP sign-in limit is not under test here.
+  h.app.get(RateLimiter).reset();
+  const challenge = await h.http().get(`/v1/auth/challenge?account=${w.publicKey()}`).expect(200);
+  const res = await h
+    .http()
+    .post('/v1/auth/verify')
+    .send({ transaction: sign(challenge.body.transaction, challenge.body.network_passphrase, w) })
+    .expect(200);
   return res.body.token as string;
 }
 
-/** An organization owned by a fresh wallet, with an API key per tier. */
+/** An organization owned by a fresh account, with an API key per tier. */
 export async function organization(
   h: Harness,
-  owner: DevWallet = randomWallet(),
-): Promise<{ id: string; session: string; testKey: string; liveKey: string; owner: DevWallet }> {
+  owner: Keypair = randomWallet(),
+): Promise<{ id: string; session: string; testKey: string; liveKey: string; owner: Keypair }> {
   const session = await signIn(h, owner);
   counter += 1;
   const org = await h
     .http()
     .post('/v1/organizations')
-    .set('authorization', `Bearer ${session}`)
+    .set(bearer(session))
     .send({ name: `Org ${counter}` })
     .expect(201);
   const key = async (tier: 'test' | 'live') =>
@@ -104,7 +123,7 @@ export async function organization(
       await h
         .http()
         .post(`/v1/organizations/${org.body.id}/api-keys`)
-        .set('authorization', `Bearer ${session}`)
+        .set(bearer(session))
         .send({ name: `${tier} key`, tier, scopes: ['p2p:read', 'p2p:write'] })
         .expect(201)
     ).body.key as string;
@@ -117,113 +136,27 @@ export async function organization(
   };
 }
 
-/** Registers a wallet for an organization (challenge + signature). */
+/** Registers an account for an organization (SEP-10-shaped proof). */
 export async function registerWallet(
   h: Harness,
   key: string,
-  w: DevWallet,
+  w: Keypair,
   displayName?: string,
 ): Promise<{ id: string; address: string }> {
   const challenge = await h
     .http()
     .post('/v1/p2p/accounts/challenge')
-    .set('authorization', `Bearer ${key}`)
-    .send({ address: w.address })
+    .set(bearer(key))
+    .send({ address: w.publicKey() })
     .expect(200);
-  const signature = await privateKeyToAccount(w.privateKey).signMessage({
-    message: challenge.body.message,
-  });
   const res = await h
     .http()
     .post('/v1/p2p/accounts')
-    .set('authorization', `Bearer ${key}`)
-    .send({ address: w.address, signature, ...(displayName ? { displayName } : {}) })
-    .expect(201);
-  return res.body;
-}
-
-export const bearer = (token: string) => ({ authorization: `Bearer ${token}` });
-
-export interface Merchant {
-  org: Awaited<ReturnType<typeof organization>>;
-  wallet: DevWallet;
-  accountId: string;
-}
-
-/**
- * A funded merchant with an ARS payment method, ARS offers on both sides,
- * 100 000 tUSD deposited and the matcher authorised up to 5 000 per order,
- * all through the API's routes and transaction builder.
- */
-export async function setupMerchant(
-  h: Harness,
-  name: string,
-  prices: { sell: string; buy: string } = { sell: '1250', buy: '1180' },
-): Promise<Merchant> {
-  const infra = inject('infra');
-  const U = 1_000_000n;
-  const w = randomWallet();
-  await fundDevWallet(infra.rpcUrl, infra.deployment.token, w.address, 200_000n * U);
-  const org = await organization(h, w);
-  const account = await registerWallet(h, org.testKey, w, name);
-  await h
-    .http()
-    .post('/v1/p2p/payment-methods')
-    .set(bearer(org.testKey))
+    .set(bearer(key))
     .send({
-      accountId: account.id,
-      currency: 'ARS',
-      rail: 'ar_bank_transfer',
-      holderName: `${name} SRL`,
-      details: { alias: 'merchant.alias', cuit: '20123456786' },
+      transaction: sign(challenge.body.transaction, challenge.body.network_passphrase, w),
+      ...(displayName ? { displayName } : {}),
     })
     .expect(201);
-  for (const offer of [
-    { side: 'SELL_TOKEN', price: prices.sell },
-    { side: 'BUY_TOKEN', price: prices.buy },
-  ]) {
-    await h
-      .http()
-      .post('/v1/p2p/offers')
-      .set(bearer(org.testKey))
-      .send({
-        accountId: account.id,
-        network: 'local',
-        token: 'tUSD',
-        currency: 'ARS',
-        rails: ['ar_bank_transfer'],
-        minFiat: '1000',
-        maxFiat: '5000000',
-        priceTtlSeconds: 3600,
-        ...offer,
-      })
-      .expect(201);
-  }
-  for (const [action, args] of [
-    ['approve', { token: 'tUSD', amount: (100_000n * U).toString() }],
-    ['deposit', { token: 'tUSD', amount: (100_000n * U).toString() }],
-    ['setMatcher', { maxPerOrder: (5_000n * U).toString(), autoSettle: false }],
-  ] as const) {
-    const tx = await h
-      .http()
-      .post('/v1/p2p/transactions')
-      .set(bearer(org.testKey))
-      .send({ network: 'local', from: account.id, action, args })
-      .expect(200);
-    await devSend(infra.rpcUrl, w.privateKey, tx.body);
-  }
-  return { org, wallet: w, accountId: account.id };
-}
-
-/** Moves every matcher transaction and indexed event forward once. */
-export async function tickChain(h: Harness): Promise<void> {
-  const { IndexerJob } = await import('@/p2p/indexer.job');
-  const { MatcherFollowerJob } = await import('@/p2p/matcher-follower.job');
-  await h.app.get(MatcherFollowerJob).tick();
-  await h.app.get(IndexerJob).tick();
-}
-
-/** Test files share one database: each behaviour file starts with no other merchant's offers. */
-export async function quietMarket(h: Harness): Promise<void> {
-  await h.prisma.p2pOffer.updateMany({ data: { active: false } });
+  return res.body;
 }

@@ -12,15 +12,19 @@
  * - the best score is at least `MIN_SCORE` (default 3: amount, name and document),
  * - no other match has the same score (an ambiguous transfer is left to a person),
  * - the order is a purchase (BUY), and
- * - the transaction is exactly `release(<the order's on-chain id>)` on the
- *   order's contract (and `MARKET_CONTRACT` when set), with no value.
+ * - the transaction, decoded with the bot's OWN passphrase for the order's
+ *   network, is exactly one `release(<the bot's account>, <the order's
+ *   on-chain id>)` on the bot's OWN `MARKET_CONTRACT`, from the bot's account,
+ *   with no memo, no preconditions but an upper time bound within 6 minutes, a
+ *   fee under `MAX_FEE_STROOPS`, and at most one source-account authorization
+ *   for that same call with no sub-invocations. A test key never signs on
+ *   mainnet. Every API answer is untrusted.
  *
- * It then signs the transaction with its own key, through `RPC_URL`, refusing
- * when the node's `eth_chainId` is not the transaction's `chainId`, and waits
- * for the receipt. The API never holds that key: it is the merchant's wallet,
- * or better a separate key the merchant allowed to release with
- * `P2PMarket.setOperator(<bot address>, 2)` (PERM_RELEASE), so it cannot
- * withdraw the merchant's balance.
+ * It then signs the envelope with its own Stellar secret (`BOT_SECRET`: best
+ * an operator the merchant granted only PERM_RELEASE with `set_operator`, so
+ * the key cannot withdraw; or the merchant account's own), submits it through
+ * the API (`POST /v1/p2p/submit`: the API's sponsor pays the fee when gasless
+ * is on) and waits for the result. The API never holds that key.
  *
  * Input: one JSON object per line, from the file named by the first argument,
  * or from stdin when there is none (or it is `-`):
@@ -31,27 +35,30 @@
  *
  * - `PEDOSPE_API_URL`  the API origin
  * - `PEDOSPE_API_KEY`  the merchant organization's API key (`pk_live_...` / `pk_test_...`)
- * - `BOT_PRIVATE_KEY`  the signing key (0x + 64 hex); not needed with `DRY_RUN`
- * - `RPC_URL`          a node on the orders' chain; not needed with `DRY_RUN`
+ * - `BOT_SECRET`       its Stellar secret (S...): an operator with PERM_RELEASE, or the merchant; not needed with `DRY_RUN`
  * - `MIN_SCORE`        1 to 3 (default 3)
  * - `DRY_RUN`          `true`: decide and log, never sign or send
- * - `MARKET_CONTRACT`  optional: the only contract address the bot will call
+ * - `MARKET_CONTRACT`  required: the market contract (C...), or `network=C...` pairs
+ * - `MAX_FEE_STROOPS`  optional: the largest fee it signs (default 1000000)
  *
  * Run (after `npm run build -w @pedospe/sdk`):
  *
  *     DRY_RUN=true PEDOSPE_API_URL=... PEDOSPE_API_KEY=... npm run bot -w @pedospe/sdk -- transfers.jsonl
  *     tail -f bank-feed.jsonl | node packages/sdk/dist/bot/auto-release.js
  *
- * Every outcome is logged as one JSON line on stdout. Keys and the RPC URL
- * (which often embeds a provider key) are never logged. The exit code is 1
+ * Every outcome is logged as one JSON line on stdout. Keys are never logged. The exit code is 1
  * when any transfer could not be processed or a release was refused.
  */
 import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { BaseError } from 'viem';
 import { chooseMatch, type MatchDecision } from '@/bot/choose-match';
 import { parseTransferLine, readBotConfig } from '@/bot/config';
-import { createReleaseSender, releaseProblem, type ReleaseSender } from '@/bot/release';
+import {
+  BOT_NETWORKS,
+  createReleaseSender,
+  releaseProblem,
+  type ReleaseSender,
+} from '@/bot/release';
 import { createPedospeClient, PedospeError, unwrap, type PedospeClient } from '@/client';
 import type { TransferMatchRequest } from '@/types';
 
@@ -70,7 +77,12 @@ export interface BotContext {
   minScore: number;
   /** Null in a dry run. */
   sender: ReleaseSender | null;
-  marketContract: `0x${string}` | null;
+  /** The API key's tier: a test key never signs on mainnet, nor a live key on testnet. */
+  tier: 'live' | 'test';
+  /** The market contract per network, from the bot's own configuration (never the API). */
+  marketContracts: Readonly<Record<string, string>>;
+  /** The largest fee the bot signs, stroops. */
+  maxFeeStroops: number;
   /**
    * Orders released in this run. The API sees a release only once it is
    * indexed, so until then a second transfer could match the same order again.
@@ -84,7 +96,10 @@ export async function handleTransfer(
   ctx: BotContext,
 ): Promise<TransferOutcome> {
   const { data } = await unwrap(
-    ctx.client.POST('/v1/p2p/merchant/transfer-matches', { body: transfer }),
+    ctx.client.POST('/v1/p2p/merchant/transfer-matches', {
+      // The releases are built for the bot's own account (the merchant, or its operator).
+      body: ctx.sender ? { ...transfer, signer: ctx.sender.address } : transfer,
+    }),
   );
   const decision = chooseMatch(
     data.filter((m) => !ctx.released.has(m.order.id)),
@@ -100,7 +115,14 @@ export async function handleTransfer(
   }
   const { match } = decision;
   const orderId = match.order.id;
-  const problem = releaseProblem(match, { marketContract: ctx.marketContract });
+  const problem = releaseProblem(match, {
+    // A dry run (no key) checks the release is the merchant's own.
+    signer: ctx.sender?.address ?? match.order.sellerAddress,
+    network: match.order.network,
+    tier: ctx.tier,
+    marketContracts: ctx.marketContracts,
+    maxFeeStroops: ctx.maxFeeStroops,
+  });
   if (problem !== null) return { status: 'refused', orderId, problem };
   if (ctx.sender === null) {
     ctx.released.add(orderId);
@@ -111,7 +133,10 @@ export async function handleTransfer(
       description: match.transaction.description,
     };
   }
-  const { hash, status } = await ctx.sender.send(match.transaction);
+  const { hash, status } = await ctx.sender.send(
+    match.transaction,
+    BOT_NETWORKS[match.order.network].passphrase,
+  );
   if (status !== 'success') return { status: 'reverted', orderId, hash };
   ctx.released.add(orderId);
   return { status: 'released', orderId, hash };
@@ -121,24 +146,26 @@ function log(level: 'info' | 'warn' | 'error', msg: string, fields: object = {})
   console.log(JSON.stringify({ time: new Date().toISOString(), level, msg, ...fields }));
 }
 
-/** A one-line reason that never carries request details (viem's long messages include the RPC URL). */
+/** A one-line reason that never carries request details. */
 function describeError(error: unknown): string {
   if (error instanceof PedospeError) return `${error.code}: ${error.message}`;
-  if (error instanceof BaseError) return error.shortMessage;
   return error instanceof Error ? error.message : String(error);
 }
 
 async function main(): Promise<void> {
   const config = readBotConfig(process.env);
+  const client = createPedospeClient({ baseUrl: config.apiUrl, apiKey: config.apiKey });
   const sender =
-    config.dryRun || config.privateKey === null || config.rpcUrl === null
+    config.dryRun || config.secret === null
       ? null
-      : createReleaseSender({ privateKey: config.privateKey, rpcUrl: config.rpcUrl });
+      : createReleaseSender({ secret: config.secret, client });
   const ctx: BotContext = {
-    client: createPedospeClient({ baseUrl: config.apiUrl, apiKey: config.apiKey }),
+    client,
     minScore: config.minScore,
     sender,
-    marketContract: config.marketContract,
+    tier: config.tier,
+    marketContracts: config.marketContracts,
+    maxFeeStroops: config.maxFeeStroops,
     released: new Set(),
   };
   const file = process.argv[2] && process.argv[2] !== '-' ? process.argv[2] : null;

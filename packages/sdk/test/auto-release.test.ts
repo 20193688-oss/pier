@@ -1,62 +1,83 @@
-import { custom } from 'viem';
+import { Keypair, TransactionBuilder, type Transaction as StellarTx } from '@stellar/stellar-sdk';
 import { describe, expect, it } from 'vitest';
 import { handleTransfer, type BotContext } from '@/bot/auto-release';
 import { parseTransferLine, readBotConfig } from '@/bot/config';
 import {
-  ChainMismatchError,
   createReleaseSender,
   releaseProblem,
+  type ReleaseCheck,
   type ReleaseSender,
 } from '@/bot/release';
 import { createPedospeClient } from '@/client';
 import type { Transaction, TransferMatch } from '@/types';
-import { MARKET, releaseData, transferMatch } from '@test/fixtures';
+import {
+  MARKET,
+  MERCHANT,
+  PASSPHRASE,
+  releaseXdr,
+  transferMatch,
+  type ReleaseOptions,
+} from '@test/fixtures';
 
-// Anvil's well-known first development key: never a real secret.
-const BOT_KEY = '0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80';
 const API_KEY = 'pk_test_3kQ9x7Lm2Vb8';
+const OTHER_CONTRACT = 'CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7';
 
 describe('readBotConfig', () => {
   const env = {
     PEDOSPE_API_URL: 'https://api.pedospe.test',
     PEDOSPE_API_KEY: API_KEY,
-    BOT_PRIVATE_KEY: BOT_KEY,
-    RPC_URL: 'https://rpc.example/v3/provider-key',
+    BOT_SECRET: MERCHANT.secret(),
+    MARKET_CONTRACT: MARKET,
   };
 
-  it('reads the settings with their defaults', () => {
+  it('reads the settings with their defaults; a bare contract is the tier’s network', () => {
     expect(readBotConfig(env)).toEqual({
       apiUrl: env.PEDOSPE_API_URL,
       apiKey: API_KEY,
-      privateKey: BOT_KEY,
-      rpcUrl: env.RPC_URL,
+      secret: MERCHANT.secret(),
       minScore: 3,
       dryRun: false,
-      marketContract: null,
+      tier: 'test',
+      marketContracts: { testnet: MARKET },
+      maxFeeStroops: 1_000_000,
     });
   });
 
-  it('reads MIN_SCORE, DRY_RUN and MARKET_CONTRACT', () => {
+  it('reads MIN_SCORE, DRY_RUN, MAX_FEE_STROOPS and per-network contracts', () => {
     const config = readBotConfig({
       PEDOSPE_API_URL: env.PEDOSPE_API_URL,
       PEDOSPE_API_KEY: API_KEY,
       MIN_SCORE: '2',
       DRY_RUN: 'true',
-      MARKET_CONTRACT: MARKET,
+      MAX_FEE_STROOPS: '500000',
+      MARKET_CONTRACT: `testnet=${MARKET},local=${OTHER_CONTRACT}`,
     });
     expect(config).toMatchObject({
       minScore: 2,
       dryRun: true,
-      privateKey: null,
-      rpcUrl: null,
-      marketContract: MARKET,
+      secret: null,
+      maxFeeStroops: 500_000,
+      marketContracts: { testnet: MARKET, local: OTHER_CONTRACT },
     });
   });
 
-  it('requires a signing key and a node unless it is a dry run', () => {
+  it('requires the secret (unless a dry run) and the market contract', () => {
     expect(() =>
       readBotConfig({ PEDOSPE_API_URL: env.PEDOSPE_API_URL, PEDOSPE_API_KEY: API_KEY }),
-    ).toThrow(/BOT_PRIVATE_KEY is required[\s\S]*RPC_URL is required/);
+    ).toThrow(/BOT_SECRET is required[\s\S]*MARKET_CONTRACT is required/);
+  });
+
+  it('refuses mainnet with a test key, and testnet with a live key', () => {
+    expect(() => readBotConfig({ ...env, MARKET_CONTRACT: `mainnet=${MARKET}` })).toThrow(
+      /test API key never signs/,
+    );
+    expect(() =>
+      readBotConfig({ ...env, PEDOSPE_API_KEY: 'pk_live_x', MARKET_CONTRACT: `testnet=${MARKET}` }),
+    ).toThrow(/live API key never signs/);
+    expect(
+      readBotConfig({ ...env, PEDOSPE_API_KEY: 'pk_live_x', MARKET_CONTRACT: MARKET })
+        .marketContracts,
+    ).toEqual({ mainnet: MARKET });
   });
 
   it('lists every problem without echoing secret values', () => {
@@ -65,10 +86,10 @@ describe('readBotConfig', () => {
       readBotConfig({
         PEDOSPE_API_URL: 'nope',
         PEDOSPE_API_KEY: 'sk_live_leaked',
-        BOT_PRIVATE_KEY: '0xdeadbeef-secret',
-        RPC_URL: env.RPC_URL,
+        BOT_SECRET: 'Sdeadbeef-secret',
         MIN_SCORE: '5',
         MARKET_CONTRACT: '0x1234',
+        MAX_FEE_STROOPS: '1',
       });
     } catch (error) {
       message = (error as Error).message;
@@ -76,9 +97,10 @@ describe('readBotConfig', () => {
     for (const name of [
       'PEDOSPE_API_URL',
       'PEDOSPE_API_KEY',
-      'BOT_PRIVATE_KEY',
+      'BOT_SECRET',
       'MIN_SCORE',
       'MARKET_CONTRACT',
+      'MAX_FEE_STROOPS',
     ]) {
       expect(message).toContain(name);
     }
@@ -130,54 +152,115 @@ describe('parseTransferLine', () => {
 });
 
 describe('releaseProblem', () => {
-  it('accepts exactly release(<on-chain id>) on the order contract with no value', () => {
-    expect(releaseProblem(transferMatch('7', 3))).toBeNull();
-    expect(releaseProblem(transferMatch('7', 3), { marketContract: MARKET })).toBeNull();
+  const check: ReleaseCheck = {
+    signer: MERCHANT.publicKey(),
+    network: 'testnet',
+    tier: 'test',
+    marketContracts: { testnet: MARKET },
+    maxFeeStroops: 1_000_000,
+  };
+  const with_ = (options: ReleaseOptions, order: Parameters<typeof transferMatch>[2] = {}) => {
+    const match = transferMatch('7', 3, order);
+    return { ...match, transaction: { ...match.transaction, xdr: releaseXdr('7', options) } };
+  };
+  const problem = (match: TransferMatch, overrides: Partial<ReleaseCheck> = {}) =>
+    releaseProblem(match, { ...check, ...overrides });
+
+  it('accepts exactly release(<the bot>, <on-chain id>) on its own contract', () => {
+    expect(problem(transferMatch('7', 3))).toBeNull();
+    expect(problem(with_({ auth: 'self' }))).toBeNull();
   });
 
-  function tamper(transaction: Partial<Transaction>): TransferMatch {
-    const match = transferMatch('7', 3);
-    return { ...match, transaction: { ...match.transaction, ...transaction } };
-  }
-
-  it('refuses any other call', () => {
-    expect(releaseProblem(tamper({ data: releaseData('8') }))).toMatch(/release\(7\)/);
-    // transfer(address,uint256): the selector of a token transfer.
-    expect(releaseProblem(tamper({ data: '0xa9059cbb' }))).toMatch(/calldata/);
-    expect(releaseProblem(tamper({ to: '0x000000000000000000000000000000000000dEaD' }))).toMatch(
-      /not the order's contract/,
+  it('pins the contract to the bot’s own configuration, never the order’s', () => {
+    // The API says the order lives on its contract, and builds the call there: refused.
+    expect(problem(with_({ contract: OTHER_CONTRACT }, { contract: OTHER_CONTRACT }))).toMatch(
+      /not MARKET_CONTRACT/,
     );
-    expect(releaseProblem(tamper({ value: '1' }))).toMatch(/value/);
-    expect(releaseProblem(tamper({ chainId: 1 }))).toMatch(/chain 1/);
-    expect(releaseProblem(tamper({ to: 'not-an-address' }))).toMatch(/invalid/);
+    expect(problem(transferMatch('7', 3), { marketContracts: {} })).toMatch(/names no contract/);
+  });
+
+  it('refuses another function, caller, id, source or operation count', () => {
+    expect(problem(with_({ fn: 'withdraw' }))).toMatch(/not release/);
+    expect(problem(with_({ caller: Keypair.random().publicKey() }))).toMatch(/not release/);
+    const otherId = transferMatch('7', 3);
+    otherId.transaction.xdr = releaseXdr('8');
+    expect(problem(otherId)).toMatch(/not release/);
+    expect(problem(with_({ source: Keypair.random().publicKey() }))).toMatch(/source/);
+    expect(problem(with_({ extraOp: true }))).toMatch(/exactly one operation/);
+  });
+
+  it('refuses an auth tree other than one source-account entry for the same call', () => {
+    expect(problem(with_({ auth: 'sub' }))).toMatch(/sub-invocations/);
+    expect(problem(with_({ auth: 'two' }))).toMatch(/more than one/);
+    expect(problem(with_({ auth: 'address' }))).toMatch(/source account/);
+  });
+
+  it('refuses a fee above the cap, a far or missing deadline, preconditions and a memo', () => {
+    expect(problem(with_({ fee: '2000000' }))).toMatch(/above the cap/);
+    expect(problem(with_({ timeoutSeconds: 3600 }))).toMatch(/expire within/);
+    expect(problem(with_({ timeoutSeconds: 0 }))).toMatch(/expire within/);
+    expect(problem(with_({ minSequence: '1' }))).toMatch(/preconditions/);
+    expect(problem(with_({ memo: 'x' }))).toMatch(/memo/);
+  });
+
+  it('pins the passphrase and the network, and keeps a test key off mainnet', () => {
+    expect(problem(transferMatch('7', 3), { network: 'futurenet' })).toMatch(/does not sign/);
+    expect(problem(transferMatch('7', 3), { network: 'mainnet' })).toMatch(/never signs/);
+    const elsewhere = transferMatch('7', 3);
+    elsewhere.transaction = { ...elsewhere.transaction, network: 'local' };
+    expect(problem(elsewhere)).toMatch(/not on testnet/);
     expect(
-      releaseProblem(transferMatch('7', 3), {
-        marketContract: '0x000000000000000000000000000000000000dEaD',
+      problem({
+        ...transferMatch('7', 3),
+        transaction: { ...transferMatch('7', 3).transaction, xdr: 'nope' },
       }),
-    ).toMatch(/MARKET_CONTRACT/);
-    expect(releaseProblem(transferMatch('7', 3, { onchainId: null }))).toMatch(/on-chain id/);
+    ).toMatch(/not an envelope/);
+    expect(problem(transferMatch('7', 3, { onchainId: null }))).toMatch(/on-chain id/);
   });
 });
 
 describe('createReleaseSender', () => {
-  it('refuses to send when the node is on another chain', async () => {
-    const methods: string[] = [];
-    const transport = custom({
-      async request({ method }: { method: string }) {
-        methods.push(method);
-        if (method === 'eth_chainId') return '0x1';
-        throw new Error(`unexpected ${method}`);
+  it('signs with the merchant’s key and submits through /v1/p2p/submit, then polls', async () => {
+    const calls: { url: string; body: unknown }[] = [];
+    const client = createPedospeClient({
+      baseUrl: 'https://api.pedospe.test',
+      apiKey: API_KEY,
+      fetch: async (request) => {
+        const body = request.method === 'POST' ? await request.json() : null;
+        calls.push({ url: `${request.method} ${new URL(request.url).pathname}`, body });
+        const status = calls.length === 1 ? 'PENDING' : 'SUCCESS';
+        return new Response(
+          JSON.stringify({
+            hash: 'ab'.repeat(32),
+            network: 'testnet',
+            status,
+            error: null,
+            feeBumpHash: null,
+            ledger: 9,
+            sponsored: true,
+          }),
+          { status: 200, headers: { 'content-type': 'application/json' } },
+        );
       },
     });
-    const sender = createReleaseSender({
-      privateKey: BOT_KEY,
-      rpcUrl: 'http://127.0.0.1:8545',
-      transport,
-    });
-    expect(sender.address).toBe('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266');
+    const sender = createReleaseSender({ secret: MERCHANT.secret(), client, pollMs: 1 });
+    expect(sender.address).toBe(MERCHANT.publicKey());
     const { transaction } = transferMatch('7', 3);
-    await expect(sender.send(transaction)).rejects.toBeInstanceOf(ChainMismatchError);
-    expect(methods).toEqual(['eth_chainId']);
+    expect(await sender.send(transaction, PASSPHRASE)).toMatchObject({ status: 'success' });
+    expect(calls.map((c) => c.url)).toEqual([
+      'POST /v1/p2p/submit',
+      `GET /v1/p2p/submissions/${'ab'.repeat(32)}`,
+    ]);
+    const submitted = calls[0].body as { xdr: string; network: string };
+    expect(submitted.network).toBe('testnet');
+    const signed = TransactionBuilder.fromXDR(submitted.xdr, PASSPHRASE) as StellarTx;
+    expect(signed.signatures).toHaveLength(1);
+    const { signature } = signed.signatures[0] as unknown as {
+      signature: { value?: Uint8Array } & Uint8Array;
+    };
+    expect(
+      MERCHANT.verify(Buffer.from(signed.hash()), Buffer.from(signature.value ?? signature)),
+    ).toBe(true);
   });
 });
 
@@ -199,7 +282,9 @@ describe('handleTransfer', () => {
       client,
       minScore: 3,
       sender,
-      marketContract: null,
+      tier: 'test',
+      marketContracts: { testnet: MARKET },
+      maxFeeStroops: 1_000_000,
       released: new Set(),
     };
     return { ctx, bodies };
@@ -208,10 +293,10 @@ describe('handleTransfer', () => {
   function recordingSender(status: 'success' | 'reverted' = 'success') {
     const sent: Transaction[] = [];
     const sender: ReleaseSender = {
-      address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+      address: MERCHANT.publicKey(),
       async send(transaction) {
         sent.push(transaction);
-        return { hash: '0xabc', status };
+        return { hash: 'abc', status };
       },
     };
     return { sender, sent };
@@ -227,9 +312,9 @@ describe('handleTransfer', () => {
     expect(await handleTransfer(transfer, ctx)).toEqual({
       status: 'released',
       orderId: 'order-7',
-      hash: '0xabc',
+      hash: 'abc',
     });
-    expect(bodies).toEqual([transfer]);
+    expect(bodies).toEqual([{ ...transfer, signer: MERCHANT.publicKey() }]);
     expect(sent).toEqual([match.transaction]);
     expect(ctx.released.has('order-7')).toBe(true);
   });
@@ -260,7 +345,7 @@ describe('handleTransfer', () => {
   it('refuses a transaction that is not the release', async () => {
     const { sender, sent } = recordingSender();
     const match = transferMatch('7', 3);
-    match.transaction.data = releaseData('99');
+    match.transaction.xdr = releaseXdr('99');
     const { ctx } = context([match], sender);
     expect(await handleTransfer(transfer, ctx)).toMatchObject({
       status: 'refused',

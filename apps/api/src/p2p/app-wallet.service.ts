@@ -90,7 +90,7 @@ function decodeCursor(cursor: string): { at: Date; key: string } | null {
  * reached it from outside the app.
  *
  * External payments are read from the token contracts' CAP-67 `transfer`
- * events (RPC `getEvents`, filtered by recipient), on demand when the
+ * and `mint` events (RPC `getEvents`, filtered by recipient), on demand when the
  * activity is read, from where the last read stopped, at most
  * {@link INCOMING_WINDOW_LEDGERS} back and never before what the RPC keeps
  * (about 7 days on SDF's RPC): a payment older than that window when the
@@ -408,7 +408,11 @@ export class AppWalletService {
       {
         type: 'contract',
         contractIds: d.tokens.map((t) => t.contract),
-        topics: [[eventNameTopic('transfer'), '*', toTopic, '**']],
+        // CAP-67: `transfer` [from, to, asset], and `mint` [to, asset] from the issuer.
+        topics: [
+          [eventNameTopic('transfer'), '*', toTopic, '**'],
+          [eventNameTopic('mint'), toTopic, '**'],
+        ],
       },
     ];
     let lastLedger = startLedger;
@@ -436,7 +440,8 @@ export class AppWalletService {
   ): Promise<void> {
     const token = d.tokens.find((t) => t.contract === ev.contractId?.contractId());
     if (!token || ev.topic.length < 3) return;
-    const from = Address.fromScVal(ev.topic[1]).toString();
+    const name = scValToNative(ev.topic[0]) as unknown;
+    const from = name === 'mint' ? token.issuer : Address.fromScVal(ev.topic[1]).toString();
     if (from === d.contract || from === address) return;
     const raw = scValToNative(ev.value) as unknown;
     const amount =

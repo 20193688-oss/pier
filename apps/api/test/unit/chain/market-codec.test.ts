@@ -1,290 +1,219 @@
-import { P2P_MARKET_ARTIFACT } from '@pedospe/contracts';
+import { createHash } from 'node:crypto';
+import { MARKET_ERRORS } from '@pedospe/contracts';
+import { Keypair, StrKey, nativeToScVal, xdr } from '@stellar/stellar-sdk';
+import { describe, expect, it } from 'vitest';
 import {
-  InProcessEvm,
-  addressOf,
-  compileContract,
-  type CompiledContract,
-  type DeployedContract,
-  type RawLog,
-} from '@pedospe/contracts/testing';
-import { encodeDeployData, keccak256, toHex, zeroAddress, type Abi, type Hex } from 'viem';
-import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import {
-  MARKET_ABI,
-  approveCalldata,
-  decodeChainOrder,
-  decodeMatcherTerms,
-  decodeP2pMarketLog,
-  decodeView,
-  marketInitCode,
-  p2pCalldata,
-  p2pRevertName,
-  P2P_EVENT_TOPICS,
-  type P2pMarketEvent,
+  MARKET,
+  decodeMarketEvent,
+  marketErrorName,
+  p2pCall,
+  snakeCase,
+  toChainOrder,
   type P2pOpenParams,
 } from '@/chain/market-codec';
+import { openParamsOf, orderRef } from '@/p2p/domain/order-ref';
+import { call } from '@test/unit/helpers/ops';
 
-/**
- * The API's codec run against the contract itself: every call below is OUR
- * calldata (`p2pCalldata`, `approveCalldata`) executed raw in an in-process
- * EVM, and every log is read back by OUR decoder, field by field. A codec
- * that drifted from the deployed bytecode fails here, not on a real chain.
- */
+const CONTRACT = StrKey.encodeContract(Buffer.alloc(32, 3));
+const TOKEN = StrKey.encodeContract(Buffer.alloc(32, 4));
+const SELLER = Keypair.random().publicKey();
+const BUYER = Keypair.random().publicKey();
+const MATCHER = Keypair.random().publicKey();
+const ID = '3f1c2b7e-8d4a-4c1e-9b2f-6a5d4c3b2a10';
 
-const U = 1_000_000n;
-const OWNER = addressOf('owner');
-const TREASURY = addressOf('treasury');
-const ARBITER = addressOf('arbiter');
-const MATCHER = addressOf('matcher');
-const MERCHANT = addressOf('merchant');
-const BUYER = addressOf('buyer');
-const USER = addressOf('user');
-const INTEGRATOR = addressOf('integrator');
-const BOT = addressOf('bot');
+const sym = (s: string) => xdr.ScVal.scvSymbol(s);
+const u64 = (n: bigint) => nativeToScVal(n, { type: 'u64' });
+const u32 = (n: number) => nativeToScVal(n, { type: 'u32' });
+const i128 = (n: bigint) => nativeToScVal(n, { type: 'i128' });
+const addr = (a: string) => nativeToScVal(a, { type: 'address' });
+const map = (entries: Record<string, xdr.ScVal>) =>
+  xdr.ScVal.scvMap(
+    Object.keys(entries)
+      .sort()
+      .map((k) => new xdr.ScMapEntry({ key: sym(k), val: entries[k] })),
+  );
 
-let TOKEN_SOURCE: CompiledContract;
-let evm: InProcessEvm;
-let market: DeployedContract;
-let token: DeployedContract;
-
-const ARTIFACT: CompiledContract = {
-  abi: P2P_MARKET_ARTIFACT.abi as unknown as Abi,
-  bytecode: P2P_MARKET_ARTIFACT.bytecode as Hex,
+const params: P2pOpenParams = {
+  refId: orderRef(ID),
+  seller: SELLER,
+  buyer: BUYER,
+  token: TOKEN,
+  amount: 1_000_000_000n,
+  bond: 100_000_000n,
+  acceptWindow: 300,
+  paymentWindow: 1800,
+  settleWindow: 21_600,
+  integrator: null,
+  integratorFeeBps: 0,
 };
 
-async function raw(from: Hex, to: Hex, data: Hex) {
-  const result = await evm.callRaw(from, to, data);
-  if (!result.ok) {
-    throw new Error(`call reverted: ${p2pRevertName(result.returned) ?? result.returned}`);
-  }
-  return result;
-}
-
-function events(logs: RawLog[]): P2pMarketEvent[] {
-  return logs
-    .filter((l) => l.address.toLowerCase() === market.address.toLowerCase())
-    .map((l) => decodeP2pMarketLog(l))
-    .filter((e): e is P2pMarketEvent => e !== null);
-}
-
-function params(overrides: Partial<P2pOpenParams> = {}): P2pOpenParams {
-  return {
-    ref: keccak256(toHex('order-1')),
-    seller: MERCHANT,
-    buyer: BUYER,
-    token: token.address,
-    amount: 100n * U,
-    bond: 0n,
-    acceptWindow: 0,
-    paymentWindow: 1800,
-    settleWindow: 0,
-    integrator: INTEGRATOR,
-    integratorFeeBps: 25,
-    ...overrides,
-  };
-}
-
-beforeAll(() => {
-  TOKEN_SOURCE = compileContract('test/P2PTestToken.sol', 'P2PTestToken');
-});
-
-beforeEach(async () => {
-  evm = await InProcessEvm.create();
-  market = await evm.deploy(OWNER, ARTIFACT, [OWNER, TREASURY, ARBITER, 50]);
-  token = await evm.deploy(OWNER, TOKEN_SOURCE);
-  await raw(OWNER, market.address, p2pCalldata.setToken(token.address, true));
-  for (const who of [MERCHANT, USER]) {
-    await token.must(OWNER, 'mint', [who, 1_000n * U]);
-  }
-  // The merchant funds its balance with our approve + deposit calldata.
-  await raw(MERCHANT, token.address, approveCalldata(market.address, 500n * U));
-  await raw(MERCHANT, market.address, p2pCalldata.deposit(token.address, 500n * U));
-});
-
-describe('market codec against the contract', () => {
-  it('builds init code that deploys the committed artifact', () => {
-    const args = { owner: OWNER, treasury: TREASURY, arbiter: ARBITER, feeBps: 50 };
-    expect(marketInitCode(args)).toBe(
-      encodeDeployData({
-        abi: ARTIFACT.abi,
-        bytecode: ARTIFACT.bytecode,
-        args: [OWNER, TREASURY, ARBITER, 50],
-      }),
-    );
+describe('order refs', () => {
+  it('is SHA-256 of the uuid’s 16 bytes, hex', () => {
+    const expected = createHash('sha256')
+      .update(Buffer.from(ID.replace(/-/g, ''), 'hex'))
+      .digest('hex');
+    expect(orderRef(ID)).toBe(expected);
+    expect(() => orderRef('not-a-uuid')).toThrow();
   });
 
-  it('reads the views it encodes', async () => {
-    const balance = await raw(USER, market.address, p2pCalldata.balanceOf(MERCHANT, token.address));
-    expect(decodeView<bigint>('balanceOf', balance.returned)).toBe(500n * U);
-    const fee = await raw(USER, market.address, p2pCalldata.protocolFeeBps());
-    expect(decodeView<number>('protocolFeeBps', fee.returned)).toBe(50);
-    const allowed = await raw(USER, market.address, p2pCalldata.tokenAllowed(token.address));
-    expect(decodeView<boolean>('tokenAllowed', allowed.returned)).toBe(true);
-    const arbiter = await raw(USER, market.address, p2pCalldata.arbiter());
-    expect(decodeView<string>('arbiter', arbiter.returned)).toBe(ARBITER);
-  });
-
-  it('authorises the matcher and decodes MatcherSet and the terms', async () => {
-    const set = await raw(
-      MERCHANT,
-      market.address,
-      p2pCalldata.setMatcher(MATCHER, 200n * U, false),
-    );
-    expect(events(set.logs)).toEqual([
-      {
-        name: 'MatcherSet',
-        seller: MERCHANT,
-        matcher: MATCHER,
-        maxPerOrder: 200n * U,
-        autoSettle: false,
-      },
-    ]);
-    const terms = await raw(USER, market.address, p2pCalldata.matcherTermsOf(MERCHANT, MATCHER));
-    expect(decodeMatcherTerms(terms.returned)).toEqual({
-      maxPerOrder: 200n * U,
-      autoSettle: false,
-    });
-  });
-
-  it('opens a purchase through the matcher and reads every event back', async () => {
-    await raw(MERCHANT, market.address, p2pCalldata.setMatcher(MATCHER, 200n * U, false));
-    const p = params();
-    const opened = await raw(MATCHER, market.address, p2pCalldata.open(p));
-    const [openedEvent, accepted] = events(opened.logs);
-    expect(openedEvent).toEqual({
-      name: 'OrderOpened',
-      id: 1n,
-      opener: MATCHER,
-      ref: p.ref.toLowerCase(),
-      seller: MERCHANT,
-      buyer: BUYER,
-      token: token.address,
-      amount: 100n * U,
-      bond: 0n,
-      viaMatcher: true,
-    });
-    expect(accepted).toMatchObject({ name: 'OrderAccepted', id: 1n });
-
-    const idOf = await raw(USER, market.address, p2pCalldata.orderIdOf(MATCHER, p.ref));
-    expect(decodeView<bigint>('orderIdOf', idOf.returned)).toBe(1n);
-    const stored = decodeChainOrder(
-      (await raw(USER, market.address, p2pCalldata.getOrder(1n))).returned,
-    );
-    expect(stored).toMatchObject({
-      seller: MERCHANT,
-      buyer: BUYER,
-      status: 'Active',
-      fromBalance: true,
-      viaMatcher: true,
+  it('opens with no integrator unless both an address and a fee are set', () => {
+    const terms = {
+      id: ID,
+      sellerAddress: SELLER,
+      buyerAddress: BUYER,
+      token: TOKEN,
+      tokenAmount: '1000',
+      bond: '0',
+      acceptWindow: 0,
       paymentWindow: 1800,
       settleWindow: 0,
-      feeBps: 50,
-      integrator: INTEGRATOR,
-      integratorFeeBps: 25,
-      opener: MATCHER,
-      amount: 100n * U,
-      bond: 0n,
-      ref: p.ref.toLowerCase(),
-    });
-
-    const paid = await raw(MATCHER, market.address, p2pCalldata.orderAction('markPaid', 1n));
-    expect(events(paid.logs)).toEqual([{ name: 'OrderPaid', id: 1n, by: MATCHER }]);
-    const released = await raw(MERCHANT, market.address, p2pCalldata.orderAction('release', 1n));
-    expect(events(released.logs)).toEqual([
-      {
-        name: 'OrderReleased',
-        id: 1n,
-        by: MERCHANT,
-        toBuyer: 100n * U - (100n * U * 75n) / 10_000n,
-        protocolFee: (100n * U * 50n) / 10_000n,
-        integratorFee: (100n * U * 25n) / 10_000n,
-      },
-    ]);
-  });
-
-  it('opens a sale with a deposit, then accept, dispute and resolve', async () => {
-    const p = params({
-      ref: keccak256(toHex('sale-1')),
-      seller: USER,
-      buyer: MERCHANT,
-      bond: 10n * U,
-      acceptWindow: 300,
-      settleWindow: 6 * 3600,
-      integrator: zeroAddress,
+      integratorAddress: MATCHER,
       integratorFeeBps: 0,
+    };
+    expect(openParamsOf(terms)).toMatchObject({ integrator: null, integratorFeeBps: 0 });
+    expect(openParamsOf({ ...terms, integratorFeeBps: 25 })).toMatchObject({
+      integrator: MATCHER,
+      integratorFeeBps: 25,
     });
-    await raw(USER, token.address, approveCalldata(market.address, p.amount));
-    const opened = await raw(USER, market.address, p2pCalldata.openWithDeposit(p));
-    expect(events(opened.logs)).toEqual([
-      {
-        name: 'OrderOpened',
-        id: 1n,
-        opener: USER,
-        ref: p.ref.toLowerCase(),
-        seller: USER,
-        buyer: MERCHANT,
-        token: token.address,
-        amount: 100n * U,
-        bond: 10n * U,
-        viaMatcher: false,
-      },
-    ]);
-    const accepted = await raw(MERCHANT, market.address, p2pCalldata.orderAction('accept', 1n));
-    expect(events(accepted.logs)).toEqual([
-      { name: 'OrderAccepted', id: 1n, paymentDeadline: Number(evm.now) + 1800 },
-    ]);
-    await raw(MERCHANT, market.address, p2pCalldata.orderAction('markPaid', 1n));
-    const disputed = await raw(USER, market.address, p2pCalldata.orderAction('dispute', 1n));
-    expect(events(disputed.logs)).toEqual([{ name: 'OrderDisputed', id: 1n, by: USER }]);
-    const resolved = await raw(ARBITER, market.address, p2pCalldata.resolve(1n, 40n * U, 5n * U));
-    expect(events(resolved.logs)).toEqual([
-      {
-        name: 'OrderResolved',
-        id: 1n,
-        toBuyer: 40n * U,
-        toSeller: 60n * U,
-        bondToSeller: 5n * U,
-        protocolFee: (40n * U * 50n) / 10_000n,
-        integratorFee: 0n,
-      },
-    ]);
+  });
+});
+
+describe('the market codec (contract.Spec over MARKET_SPEC)', () => {
+  it('encodes open_with_deposit with the OpenParams struct, ref_id as 32 bytes', () => {
+    const c = call(p2pCall.openWithDeposit(CONTRACT, params));
+    expect(c.contract).toBe(CONTRACT);
+    expect(c.fn).toBe('open_with_deposit');
+    const p = c.args[0] as Record<string, unknown>;
+    expect(Buffer.from(p.ref_id as Uint8Array).toString('hex')).toBe(orderRef(ID));
+    expect(p).toMatchObject({
+      seller: SELLER,
+      buyer: BUYER,
+      token: TOKEN,
+      amount: 1_000_000_000n,
+      bond: 100_000_000n,
+      accept_window: 300,
+      payment_window: 1800,
+      settle_window: 21_600,
+      integrator_fee_bps: 0,
+    });
   });
 
-  it('decodes cancellations and operator grants', async () => {
-    const granted = await raw(MERCHANT, market.address, p2pCalldata.setOperator(BOT, 2 | 4));
-    expect(events(granted.logs)).toEqual([
-      { name: 'OperatorSet', account: MERCHANT, operator: BOT, permissions: 6 },
-    ]);
-    await raw(MERCHANT, market.address, p2pCalldata.setMatcher(MATCHER, 200n * U, false));
-    await raw(MATCHER, market.address, p2pCalldata.open(params()));
-    const cancelled = await raw(MATCHER, market.address, p2pCalldata.orderAction('cancel', 1n));
-    expect(events(cancelled.logs)).toEqual([{ name: 'OrderCancelled', id: 1n, by: MATCHER }]);
+  it('encodes the matcher’s open with the matcher as caller, and order acts by id', () => {
+    const open = call(p2pCall.open(CONTRACT, MATCHER, params));
+    expect(open.fn).toBe('open');
+    expect(open.args[0]).toBe(MATCHER);
+    expect(call(p2pCall.orderAction(CONTRACT, 'mark_paid', MATCHER, 9n))).toMatchObject({
+      fn: 'mark_paid',
+      args: [MATCHER, 9n],
+    });
+    expect(call(p2pCall.resolve(CONTRACT, 9n, 5n, 1n))).toMatchObject({
+      fn: 'resolve',
+      args: [9n, 5n, 1n],
+    });
   });
 
-  it('names the contract error of a revert', async () => {
-    const over = await evm.callRaw(MATCHER, market.address, p2pCalldata.open(params()));
-    expect(over.ok).toBe(false);
-    expect(p2pRevertName(over.returned)).toBe('NotAuthorized');
-    await raw(MERCHANT, market.address, p2pCalldata.setMatcher(MATCHER, 10_000n * U, false));
-    const short = await evm.callRaw(
-      MATCHER,
-      market.address,
-      p2pCalldata.open(params({ amount: 900n * U })),
+  it('refuses arguments the spec does not take', () => {
+    expect(() => MARKET.funcArgsToScVals('deposit', { account: SELLER, token: TOKEN })).toThrow();
+  });
+
+  it('decodes order_opened with every field and the id topic', () => {
+    const topics = [sym('order_opened'), u64(7n)];
+    const data = map({
+      seller: addr(SELLER),
+      buyer: addr(BUYER),
+      token: addr(TOKEN),
+      opener: addr(SELLER),
+      integrator: xdr.ScVal.scvVoid(),
+      amount: i128(1_000_000_000n),
+      bond: i128(100_000_000n),
+      status: u32(1),
+      from_balance: xdr.ScVal.scvBool(false),
+      via_matcher: xdr.ScVal.scvBool(false),
+      fee_bps: u32(50),
+      integrator_fee_bps: u32(0),
+      accept_deadline: u64(1_800_000_300n),
+      payment_deadline: u64(0n),
+      payment_window: u32(1800),
+      settle_window: u32(21_600),
+      ref_id: xdr.ScVal.scvBytes(Buffer.from(orderRef(ID), 'hex')),
+    });
+    const event = decodeMarketEvent(topics, data);
+    expect(event).toMatchObject({
+      name: 'order_opened',
+      id: 7n,
+      seller: SELLER,
+      opener: SELLER,
+      integrator: null,
+      amount: 1_000_000_000n,
+      status: 'Offered',
+      fromBalance: false,
+      viaMatcher: false,
+      feeBps: 50,
+      acceptDeadline: 1_800_000_300,
+      refId: orderRef(ID),
+    });
+  });
+
+  it('decodes order_released with an optional `by`, and ignores events it does not read', () => {
+    const released = decodeMarketEvent(
+      [sym('order_released'), u64(3n)],
+      map({
+        by: xdr.ScVal.scvVoid(),
+        to_buyer: i128(995n),
+        protocol_fee: i128(5n),
+        integrator_fee: i128(0n),
+      }),
     );
-    expect(p2pRevertName(short.returned)).toBe('InsufficientBalance');
-    expect(p2pRevertName('0x')).toBeNull();
-    expect(p2pRevertName('0xdeadbeef')).toBeNull();
+    expect(released).toEqual({
+      name: 'order_released',
+      id: 3n,
+      by: null,
+      toBuyer: 995n,
+      protocolFee: 5n,
+      integratorFee: 0n,
+    });
+    const deposited = decodeMarketEvent(
+      [sym('deposited'), addr(SELLER), addr(TOKEN)],
+      map({ amount: i128(1n) }),
+    );
+    expect(deposited).toBeNull();
+    expect(decodeMarketEvent([sym('something_else')], xdr.ScVal.scvVoid())).toBeNull();
   });
 
-  it('ignores foreign logs and refuses a malformed log of its own events', () => {
-    expect(decodeP2pMarketLog({ topics: [keccak256(toHex('Other()'))], data: '0x' })).toBeNull();
-    expect(() =>
-      decodeP2pMarketLog({ topics: [P2P_EVENT_TOPICS.OrderPaid], data: '0x' }),
-    ).toThrow();
+  it('reads a get_order result', () => {
+    const o = toChainOrder({
+      seller: SELLER,
+      buyer: BUYER,
+      token: TOKEN,
+      opener: MATCHER,
+      integrator: undefined,
+      amount: 10n,
+      bond: 0n,
+      status: 3,
+      from_balance: true,
+      via_matcher: true,
+      fee_bps: 50,
+      integrator_fee_bps: 0,
+      accept_deadline: 0n,
+      payment_deadline: 100n,
+      paid_at: 50n,
+      payment_window: 1800,
+      settle_window: 0,
+      ref_id: Buffer.from(orderRef(ID), 'hex'),
+    });
+    expect(o).toMatchObject({ status: 'Paid', integrator: null, paidAt: 50, refId: orderRef(ID) });
   });
 
-  it('carries a topic for every event the indexer reads', () => {
-    const fromAbi = MARKET_ABI.filter((i) => i.type === 'event').map((i) => i.name);
-    for (const name of Object.keys(P2P_EVENT_TOPICS)) expect(fromAbi).toContain(name);
+  it('names contract errors by code, from the artifact', () => {
+    expect(marketErrorName('HostError: Error(Contract, #14)')).toBe('InsufficientBalance');
+    expect(marketErrorName('Error(Contract, #16)')).toBe(MARKET_ERRORS[16]);
+    expect(marketErrorName('Error(Auth, InvalidAction)')).toBeNull();
+    expect(marketErrorName('Error(Contract, #999)')).toBeNull();
+  });
+
+  it('snake-cases event struct names', () => {
+    expect(snakeCase('OrderOpened')).toBe('order_opened');
+    expect(snakeCase('order_paid')).toBe('order_paid');
+    expect(snakeCase('OwnershipTransferStarted')).toBe('ownership_transfer_started');
   });
 });

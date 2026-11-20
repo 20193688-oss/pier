@@ -6,7 +6,9 @@ import { defineConfig } from 'vitest/config';
  * Nest's dependency injection reads constructor types from decorator metadata,
  * which only SWC (not the default transformer) emits, hence the plugin.
  * `unit` runs pure and service tests; `e2e` boots the HTTP app against a real
- * Postgres and a real local EVM node started once in `test/e2e/global-setup.ts`.
+ * Postgres (started once in `test/e2e/global-setup.ts`) with a fake chain;
+ * `chain` runs the market on a real Stellar network when `E2E_STELLAR` is
+ * `testnet` or `local`, and skips otherwise.
  */
 export default defineConfig({
   plugins: [
@@ -45,6 +47,18 @@ export default defineConfig({
           fileParallelism: false,
           testTimeout: 120_000,
           hookTimeout: 180_000,
+        },
+      },
+      {
+        extends: true,
+        test: {
+          // E2E_STELLAR=testnet|local: the market on a real Stellar network (slow).
+          name: 'chain',
+          include: ['test/chain/**/*.test.ts'],
+          globalSetup: ['test/e2e/global-setup.ts'],
+          fileParallelism: false,
+          testTimeout: 600_000,
+          hookTimeout: 1_200_000,
         },
       },
     ],

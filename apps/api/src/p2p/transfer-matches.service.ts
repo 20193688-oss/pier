@@ -5,6 +5,7 @@ import { MarketReader } from '@/chain/market-reader.service';
 import type { Tier } from '@/chain/networks';
 import {
   P2P_CURRENCIES,
+  P2P_PERMISSIONS,
   P2P_TRANSFER_MATCHES_LIMIT,
   type P2pCurrency,
 } from '@/p2p/domain/constants';
@@ -64,17 +65,19 @@ export class TransferMatchesService {
     for (const row of rows) {
       if (parseDecimalUnits(row.fiatAmount, decimals) !== amount) continue;
       const view = await this.orders.merchantView(row);
+      const signer = dto.signer ?? row.sellerAddress;
       const release = buildOrderAction('release', {
         contract: row.contract,
-        from: row.sellerAddress,
+        from: signer,
         order: row,
         now,
+        releaseOperator: signer !== row.sellerAddress && (await this.canRelease(row, signer)),
       });
       if (!release.ok) continue;
       let transaction;
       try {
         const d = await this.reader.requireLive(row.tier as Tier, row.network);
-        transaction = await this.transactions.prepared(d, row.sellerAddress, release.value);
+        transaction = await this.transactions.prepared(d, signer, release.value);
       } catch {
         // Not releasable right now (the contract refuses, or the node is away).
         continue;
@@ -89,5 +92,21 @@ export class TransferMatchesService {
         a.order.createdAt.getTime() - b.order.createdAt.getTime(),
     );
     return { data: matches.slice(0, P2P_TRANSFER_MATCHES_LIMIT) };
+  }
+
+  /** Whether the indexer saw the order's merchant grant `signer` PERM_RELEASE on its network. */
+  private async canRelease(
+    row: { merchantAccountId: string | null; network: string },
+    signer: string,
+  ): Promise<boolean> {
+    if (!row.merchantAccountId) return false;
+    const account = await this.prisma.p2pAccount.findUnique({
+      where: { id: row.merchantAccountId },
+      select: { operators: true },
+    });
+    const bits = (account?.operators as Record<string, Record<string, number>> | null)?.[
+      row.network
+    ]?.[signer];
+    return typeof bits === 'number' && (bits & P2P_PERMISSIONS.release) !== 0;
   }
 }

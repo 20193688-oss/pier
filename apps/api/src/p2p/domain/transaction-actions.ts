@@ -61,6 +61,8 @@ export interface P2pOrderContext {
     paymentDeadline: Date | null;
   };
   now: Date;
+  /** `from` is an operator the seller granted PERM_RELEASE (as indexed); the contract still decides. */
+  releaseOperator?: boolean;
 }
 
 export interface P2pBuiltCall {
@@ -176,11 +178,11 @@ const ORDER_ACTIONS: Record<'accept' | 'markPaid' | 'release' | 'cancel' | 'disp
     release: {
       scope: 'order',
       call: 'release',
-      refusal: ({ order, from }) =>
+      refusal: ({ order, from, releaseOperator }) =>
         order.status !== 'awaiting_payment' && order.status !== 'paid'
           ? `only an order awaiting payment or paid can be released (this one is ${order.status})`
-          : !same(from, order.sellerAddress)
-            ? 'only the order’s seller releases it'
+          : !same(from, order.sellerAddress) && !releaseOperator
+            ? 'only the order’s seller (or its release operator) releases it'
             : null,
       describe: ({ order }) =>
         `Release order ${order.onchainId}: pays its buyer ${formatUnits(BigInt(order.netAmount), order.tokenDecimals).replace(/\.?0+$/, '')} ${order.tokenSymbol}`,
