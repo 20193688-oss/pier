@@ -3,6 +3,7 @@
    before the wallet signs, a relayed challenge is refused unsigned, and the API receives exactly
    the signed challenge. The key-backed wallets sign only what they are handed. */
 import { EMAIL_CODE_LENGTH, emailCode } from '@/lib/wallet/email-code';
+import { pollarNetworkFor } from '@/lib/wallet/pollar-store';
 import { afterEach, beforeEach, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { Account, Keypair, Operation, TransactionBuilder, hash } from '@stellar/stellar-sdk/base';
@@ -152,5 +153,14 @@ describe('Pollar email codes', () => {
     assert.equal(emailCode('649​814 '), '649814');
     assert.equal(emailCode('６４９８１４'), '649814');
     assert.notEqual(emailCode('64981').length, EMAIL_CODE_LENGTH);
+  });
+});
+
+describe('Pollar network', () => {
+  test('follows the key’s environment, and the tier only for an unprefixed key', () => {
+    assert.equal(pollarNetworkFor('pub_testnet_e4af75b8', 'live'), 'testnet');
+    assert.equal(pollarNetworkFor('pub_mainnet_e4af75b8', 'test'), 'mainnet');
+    assert.equal(pollarNetworkFor('pk_other', 'live'), 'mainnet');
+    assert.equal(pollarNetworkFor('pk_other', 'test'), 'testnet');
   });
 });

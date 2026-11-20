@@ -8,7 +8,7 @@ import { ToastProvider } from '@/components/ui/Toast';
 import { SiteLayout } from '@/components/layout/SiteFrame';
 import { Spinner } from '@/components/ui/controls';
 import LandingPage from '@/features/landing/LandingPage';
-import { POLLAR_KEY } from '@/lib/wallet/pollar-store';
+import { POLLAR_KEY, pollarNetworkFor } from '@/lib/wallet/pollar-store';
 import { MOCK } from '@/lib/env';
 import { APP_TIER } from '@/lib/api/endpoints';
 
@@ -108,8 +108,9 @@ const router = createBrowserRouter([
   },
 ]);
 
-/* Pollar's network follows the market tier: testnet for test, mainnet for live. */
-const POLLAR_NETWORK = APP_TIER === 'live' ? 'mainnet' : 'testnet';
+/* Pollar's network is the one its key was issued for (a key belongs to one environment); the
+   market tier decides only for a key without the usual prefix. */
+const POLLAR_NETWORK = pollarNetworkFor(POLLAR_KEY, APP_TIER);
 
 export function App() {
   return (
