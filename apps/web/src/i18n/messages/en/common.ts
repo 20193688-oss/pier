@@ -67,6 +67,8 @@ const common: typeof es = {
     codeSent: 'We sent a code to {email}. Type it here.',
     code: 'Code',
     badCode: 'The code is wrong or expired. Try again.',
+    codeLength: 'The code has 6 digits. Check it in the email.',
+    detail: '(Detail: {code})',
     verify: 'Sign in',
     otherEmail: 'Use another email',
     google: 'Continue with Google',
@@ -78,7 +80,8 @@ const common: typeof es = {
     noPollar: 'Email sign-in is not set up here yet.',
     loadingPollar: 'Getting sign-in ready…',
     devKey: 'Development key',
-    devKeyBody: 'Development only: paste one of the test secret keys the local stack prints. Never a real key.',
+    devKeyBody:
+      'Development only: paste one of the test secret keys the local stack prints. Never a real key.',
     devKeyField: 'Test secret key (S…)',
     devKeyInvalid: 'That is not a Stellar secret key.',
     devKeyUse: 'Sign in with this key',

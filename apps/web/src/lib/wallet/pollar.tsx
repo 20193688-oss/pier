@@ -13,7 +13,7 @@
 import '@pollar/react/styles.css';
 import { useEffect, useMemo } from 'react';
 import { PollarProvider, usePollar } from '@pollar/react';
-import type { AuthState, PollarClient } from '@pollar/core';
+import { PollarClient, type AuthState } from '@pollar/core';
 import { PASSPHRASES } from '@/lib/stellar/network';
 import { publishPollar, type ExternalWalletId } from '@/lib/wallet/pollar-store';
 import { WalletError, type StellarWallet } from '@/lib/wallet/types';
@@ -40,6 +40,8 @@ function waitFor(
         settled = true;
         clearTimeout(timer);
         off();
+        // Pollar's own reason, for whoever reads the console (the screen shows its code).
+        console.warn('[pollar] login failed:', s.errorCode, s.message);
         reject(
           new WalletError(
             /CODE_(INVALID|EXPIRED)/.test(s.errorCode) ? 'rejected' : 'failed',
@@ -163,9 +165,25 @@ function Controller({ network }: { network: Network }) {
   return null;
 }
 
+/* One client per key and network for the page's lifetime. React's StrictMode mounts the provider
+   twice in development, and a provider given a config builds a client per mount: two clients then
+   share one persisted session and DPoP key with separate refresh loops, which trips Pollar's
+   refresh-token reuse detection (Pollar warns "Another PollarClient is already active"). */
+const clients = new Map<string, PollarClient>();
+
+export function pollarClientFor(apiKey: string, network: Network): PollarClient {
+  const key = `${network}:${apiKey}`;
+  let client = clients.get(key);
+  if (!client) {
+    client = new PollarClient({ apiKey, stellarNetwork: network });
+    clients.set(key, client);
+  }
+  return client;
+}
+
 export default function PollarRoot({ apiKey, network }: { apiKey: string; network: Network }) {
   return (
-    <PollarProvider client={{ apiKey, stellarNetwork: network }}>
+    <PollarProvider client={pollarClientFor(apiKey, network)}>
       <Controller network={network} />
     </PollarProvider>
   );

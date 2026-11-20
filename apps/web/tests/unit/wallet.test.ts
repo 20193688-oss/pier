@@ -2,6 +2,7 @@
    the challenge is checked against this app's domains and this origin's stellar.toml signing key
    before the wallet signs, a relayed challenge is refused unsigned, and the API receives exactly
    the signed challenge. The key-backed wallets sign only what they are handed. */
+import { EMAIL_CODE_LENGTH, emailCode } from '@/lib/wallet/email-code';
 import { afterEach, beforeEach, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { Account, Keypair, Operation, TransactionBuilder, hash } from '@stellar/stellar-sdk/base';
@@ -89,7 +90,10 @@ describe('SEP-10 sign-in', () => {
     assert.equal(calls(), 1);
     assert.deepEqual(steps, ['challenge', 'signing', 'checking']);
     const verify = seen.find((r) => r.path === '/v1/auth/verify')!;
-    const signed = TransactionBuilder.fromXDR((verify.body as { transaction: string }).transaction, PASS);
+    const signed = TransactionBuilder.fromXDR(
+      (verify.body as { transaction: string }).transaction,
+      PASS,
+    );
     assert.equal(signed.signatures.length, 2, "the server's and the wallet's");
     assert.equal(seen.find((r) => r.path === '/.well-known/stellar.toml')?.sameOrigin, true);
   });
@@ -109,7 +113,10 @@ describe('SEP-10 sign-in', () => {
   });
 
   test('refused: our own key but another home domain, or no signing key published', async () => {
-    fakeApi({ toml: `SIGNING_KEY = "${SERVER.publicKey()}"\n`, challenge: challenge(SERVER, 'x.example') });
+    fakeApi({
+      toml: `SIGNING_KEY = "${SERVER.publicKey()}"\n`,
+      challenge: challenge(SERVER, 'x.example'),
+    });
     await assert.rejects(sep10SignIn(keypairWallet(USER, 'dev-key', 'k')), /challenge:home-domain/);
     forgetSigningKey();
     fakeApi({ toml: 'WEB_AUTH_ENDPOINT = "x"\n', challenge: challenge(SERVER, HOME) });
@@ -130,6 +137,20 @@ describe('SEP-10 sign-in', () => {
       },
     };
     await assert.rejects(sep10SignIn(evil), WalletError);
-    assert.equal(seen.some((r) => r.path === '/v1/auth/verify'), false);
+    assert.equal(
+      seen.some((r) => r.path === '/v1/auth/verify'),
+      false,
+    );
+  });
+});
+
+describe('Pollar email codes', () => {
+  test('keeps only the six letters and digits a pasted code carries', () => {
+    assert.equal(emailCode('649814'), '649814');
+    assert.equal(emailCode(' 649 814 '), '649814');
+    assert.equal(emailCode('649-814'), '649814');
+    assert.equal(emailCode('649​814 '), '649814');
+    assert.equal(emailCode('６４９８１４'), '649814');
+    assert.notEqual(emailCode('64981').length, EMAIL_CODE_LENGTH);
   });
 });

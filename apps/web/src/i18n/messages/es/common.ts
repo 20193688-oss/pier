@@ -66,6 +66,8 @@ const common = {
     codeSent: 'Te enviamos un código a {email}. Escríbelo aquí.',
     code: 'Código',
     badCode: 'El código no es correcto o venció. Prueba de nuevo.',
+    codeLength: 'El código tiene 6 dígitos. Revísalo en el email.',
+    detail: '(Detalle: {code})',
     verify: 'Ingresar',
     otherEmail: 'Usar otro email',
     google: 'Seguir con Google',
@@ -77,7 +79,8 @@ const common = {
     noPollar: 'El ingreso con email todavía no está configurado aquí.',
     loadingPollar: 'Preparando el ingreso…',
     devKey: 'Clave de desarrollo',
-    devKeyBody: 'Solo en desarrollo: pega una de las claves secretas de prueba que imprime el entorno local. Nunca una clave real.',
+    devKeyBody:
+      'Solo en desarrollo: pega una de las claves secretas de prueba que imprime el entorno local. Nunca una clave real.',
     devKeyField: 'Clave secreta de prueba (S…)',
     devKeyInvalid: 'No es una clave secreta de Stellar.',
     devKeyUse: 'Ingresar con esta clave',
@@ -100,7 +103,8 @@ const common = {
     reconnect: 'Para firmar, ingresa de nuevo con tu wallet.',
     rejected: 'Cancelaste en la wallet. No se envió nada.',
     failed: 'La wallet no pudo completar el pedido. Prueba de nuevo.',
-    pending: 'Esta wallet necesita la aprobación de tu otro dispositivo. Apruébala ahí y prueba de nuevo.',
+    pending:
+      'Esta wallet necesita la aprobación de tu otro dispositivo. Apruébala ahí y prueba de nuevo.',
     unsupported: 'Esta wallet no puede firmar aquí. Ingresa con email o Google.',
     mismatch: 'La wallet devolvió algo distinto de lo pedido. No se envió nada.',
     badChallenge: 'El desafío de ingreso no es válido. No se firmó nada.',
@@ -118,7 +122,8 @@ const common = {
     start: 'Firmar',
     retry: 'Firmar de nuevo',
     signer: 'Firma la wallet {address}',
-    wrongAccount: 'Esta acción la firma la wallet {address}. Ingresa con esa wallet y prueba otra vez.',
+    wrongAccount:
+      'Esta acción la firma la wallet {address}. Ingresa con esa wallet y prueba otra vez.',
     mismatch: 'La transacción no coincide con lo que pediste. No se firmó nada.',
     reverted: 'La red rechazó la transacción. No se movió nada.',
     revertedCode: 'El contrato rechazó la transacción ({code}). No se movió nada.',

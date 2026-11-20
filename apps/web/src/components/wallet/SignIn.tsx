@@ -22,6 +22,7 @@ import {
   type ExternalWalletId,
 } from '@/lib/wallet/pollar-store';
 import { WalletError, type StellarWallet } from '@/lib/wallet/types';
+import { EMAIL_CODE_LENGTH, emailCode } from '@/lib/wallet/email-code';
 import { ApiError } from '@/lib/api/client';
 import type { Session } from '@/lib/api/types';
 
@@ -102,7 +103,10 @@ export function SignIn({
               ? w.unsupported
               : e.kind === 'mismatch'
                 ? w.mismatch
-                : w.failed,
+                : // A wallet's own reason (Pollar's error code) helps whoever reports it.
+                  e.message && e.message !== e.kind
+                  ? `${w.failed} ${fmt(w.detail, { code: e.message })}`
+                  : w.failed,
       );
     } else if (e instanceof ApiError)
       setError(
@@ -153,9 +157,13 @@ export function SignIn({
 
   const verify = async (e: FormEvent) => {
     e.preventDefault();
-    if (!code.trim()) return;
+    // A code pasted from an email can carry spaces, dashes or invisible characters; Pollar takes
+    // exactly six.
+    const value = emailCode(code);
+    if (!value) return;
+    if (value.length !== EMAIL_CODE_LENGTH) return setError(w.codeLength);
     await run('Pollar', async () => {
-      await pollar!.verifyEmailCode(code.trim());
+      await pollar!.verifyEmailCode(value);
       return pollarWallet();
     });
   };
@@ -227,6 +235,7 @@ export function SignIn({
                 label={w.code}
                 inputMode="numeric"
                 autoComplete="one-time-code"
+                maxLength={EMAIL_CODE_LENGTH + 8}
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
                 autoFocus
@@ -259,7 +268,10 @@ export function SignIn({
               <button type="submit" className="btn btn-ink btn-lg w-full">
                 {w.sendCode}
               </button>
-              <div className="flex items-center gap-3 text-[0.8125rem] text-ink-3" aria-hidden="true">
+              <div
+                className="flex items-center gap-3 text-[0.8125rem] text-ink-3"
+                aria-hidden="true"
+              >
                 <span className="h-px flex-1 bg-line" />
                 {w.or}
                 <span className="h-px flex-1 bg-line" />
@@ -283,10 +295,18 @@ export function SignIn({
               <p className="font-semibold">{w.external}</p>
               <p className="text-[0.875rem] text-ink-3">{w.externalBody}</p>
               <div className="flex flex-wrap gap-2">
-                <button type="button" className="btn btn-line" onClick={() => external('freighter', w.freighter)}>
+                <button
+                  type="button"
+                  className="btn btn-line"
+                  onClick={() => external('freighter', w.freighter)}
+                >
                   {w.freighter}
                 </button>
-                <button type="button" className="btn btn-line" onClick={() => external('albedo', w.albedo)}>
+                <button
+                  type="button"
+                  className="btn btn-line"
+                  onClick={() => external('albedo', w.albedo)}
+                >
                   {w.albedo}
                 </button>
               </div>
