@@ -273,7 +273,11 @@ export default function Scan() {
           spellCheck={false}
         />
         <div className="flex gap-2">
-          <button type="submit" className="btn btn-ink btn-lg flex-1" disabled={!text.trim()}>
+          <button
+            type="submit"
+            className="btn btn-ink btn-lg flex-1"
+            disabled={!text.trim() || !token || !network}
+          >
             {s.read}
           </button>
           <label className="btn btn-line btn-lg cursor-pointer">

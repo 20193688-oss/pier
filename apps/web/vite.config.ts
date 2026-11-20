@@ -137,6 +137,11 @@ export default defineConfig(({ mode }) => {
       strictPort: true,
       proxy,
     },
+    // Dependencies only lazy screens import, bundled up front: otherwise the dev server finds them
+    // on first use and reloads the page mid-flow (a reloaded sign-in, a lost click in a test).
+    optimizeDeps: {
+      include: ['@stellar/stellar-sdk/base', 'jsqr', 'qrcode', 'react-router', 'react-dom/client'],
+    },
     build: { target: 'es2022', sourcemap: true },
     test: {
       include: ['tests/unit/**/*.test.ts'],

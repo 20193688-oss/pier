@@ -304,7 +304,7 @@ const app = {
     installTitle: 'Install {brand}',
     installBody: 'Open it like an app, without looking for it in the browser.',
     install: 'Install',
-    later: 'Not now',
+    later: 'Later',
     iosTitle: 'Add {brand} to your home screen',
     iosBody: 'Tap Share, then "Add to Home Screen".',
     update: 'A new version is ready.',

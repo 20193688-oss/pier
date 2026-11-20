@@ -305,7 +305,7 @@ const app = {
     installTitle: 'Instala {brand}',
     installBody: 'Ábrela como una app, sin buscarla en el navegador.',
     install: 'Instalar',
-    later: 'Ahora no',
+    later: 'Más tarde',
     iosTitle: 'Agrega {brand} a tu inicio',
     iosBody: 'Toca Compartir y luego "Agregar a inicio".',
     update: 'Hay una versión nueva.',

@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { fmt, useI18n } from '@/i18n';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { Notice } from '@/components/ui/controls';
+import { useToast } from '@/components/ui/Toast';
 import { StatusPill, Pill } from '@/components/ui/misc';
 import { SignFlow } from '@/components/wallet/SignFlow';
 import { app, appSubmitter } from '@/lib/api/app';
@@ -107,6 +108,7 @@ export function ActivationCard() {
   const a = t.app.activate;
   const { network, token, market, refresh } = useAppData();
   const { session } = useSession();
+  const toast = useToast();
   const [done, setDone] = useState(false);
   if (!network || !token || !session) return null;
   if (done) return <Notice tone="ok">{a.done}</Notice>;
@@ -135,6 +137,7 @@ export function ActivationCard() {
         ]}
         onDone={() => {
           setDone(true);
+          toast(a.done);
           refresh();
         }}
       />
