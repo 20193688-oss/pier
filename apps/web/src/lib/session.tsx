@@ -23,7 +23,7 @@ import { auth } from '@/lib/api/endpoints';
 import type { Session } from '@/lib/api/types';
 import { MOCK } from '@/lib/env';
 import { usePollarApi, POLLAR_KEY } from '@/lib/wallet/pollar-store';
-import { WalletError, type StellarWallet, type WalletKind } from '@/lib/wallet/types';
+import type { StellarWallet, WalletKind } from '@/lib/wallet/types';
 
 const KIND_KEY = 'pedospe.wallet-kind';
 
@@ -63,29 +63,22 @@ const writeKind = (k: WalletKind | null) => {
   }
 };
 
-/** SEP-10 against the API with `w`: the session. Every step a wallet signs is checked first. */
+/** SEP-10 against the API with `w`: the session. The challenge is checked against this app's
+    own domains and this origin's signing key before the wallet signs it (src/lib/stellar/sep10.ts),
+    and the wallet's answer is checked to be that same transaction. */
 export async function sep10SignIn(
   w: StellarWallet,
   progress?: (step: SignInStep) => void,
 ): Promise<Session> {
   progress?.('challenge');
   const { transaction, networkPassphrase } = await auth.challenge(w.address);
-  const [{ checkChallenge }, { assertSameTransaction }, { KNOWN_PASSPHRASES }] = await Promise.all([
-    import('@/lib/stellar/challenge'),
+  const [{ assertChallenge }, { assertSameTransaction }] = await Promise.all([
+    import('@/lib/stellar/sep10'),
     import('@/lib/wallet/signed'),
-    import('@/lib/stellar/network'),
   ]);
-  const checked = checkChallenge(transaction, {
-    account: w.address,
-    networkPassphrase,
-    allowedPassphrases: KNOWN_PASSPHRASES,
-  });
-  if (!checked.ok) throw new WalletError('mismatch', `challenge:${checked.problem}`);
+  const domains = await assertChallenge(transaction, networkPassphrase, w.address);
   progress?.('signing');
-  const signed = await w.signAuthChallenge(transaction, networkPassphrase, {
-    homeDomain: checked.info.homeDomain,
-    webAuthDomain: checked.info.webAuthDomain,
-  });
+  const signed = await w.signAuthChallenge(transaction, networkPassphrase, domains);
   assertSameTransaction(transaction, signed, networkPassphrase);
   progress?.('checking');
   return auth.verify(signed);

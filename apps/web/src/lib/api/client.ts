@@ -17,6 +17,10 @@ export interface ApiRequest {
   query?: Record<string, string | number | boolean | null | undefined>;
   body?: unknown;
   headers?: Record<string, string>;
+  /* The answer is text (a stellar.toml), not JSON. */
+  text?: boolean;
+  /* Ask this page's own origin, never VITE_API_BASE_URL (this origin's /.well-known). */
+  sameOrigin?: boolean;
 }
 
 export interface ApiResponse {
@@ -50,13 +54,13 @@ export class ApiError extends Error {
 
 const BASE = String(import.meta.env.VITE_API_BASE_URL ?? '').replace(/\/+$/, '');
 
-export function buildUrl(path: string, query?: ApiRequest['query']): string {
+export function buildUrl(path: string, query?: ApiRequest['query'], sameOrigin = false): string {
   const qs = new URLSearchParams();
   for (const [k, v] of Object.entries(query ?? {})) {
     if (v !== undefined && v !== null && v !== '') qs.set(k, String(v));
   }
   const s = qs.toString();
-  return `${BASE}${path}${s ? `?${s}` : ''}`;
+  return `${sameOrigin ? '' : BASE}${path}${s ? `?${s}` : ''}`;
 }
 
 function parseJson(text: string): unknown {
@@ -68,19 +72,19 @@ function parseJson(text: string): unknown {
 }
 
 export const fetchTransport: Transport = async (req) => {
-  const res = await fetch(buildUrl(req.path, req.query), {
+  const res = await fetch(buildUrl(req.path, req.query, req.sameOrigin), {
     method: req.method,
-    credentials: 'include',
+    credentials: req.sameOrigin ? 'same-origin' : 'include',
     cache: 'no-store',
     headers: {
-      Accept: 'application/json',
+      Accept: req.text ? 'text/plain' : 'application/json',
       ...(req.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
       ...req.headers,
     },
     body: req.body !== undefined ? JSON.stringify(req.body) : undefined,
   });
   const text = await res.text();
-  const json = parseJson(text);
+  const json = req.text && res.ok ? text : parseJson(text);
   const headers: Record<string, string> = {};
   const retry = res.headers.get('retry-after');
   if (retry) headers['retry-after'] = retry;

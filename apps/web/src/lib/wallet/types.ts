@@ -19,11 +19,12 @@ export interface StellarWallet {
   label: string;
   /** The signed envelope (base64 XDR) of `xdr`, for `networkPassphrase`. */
   signTransaction(xdr: string, networkPassphrase: string): Promise<string>;
-  /** The SEP-10 challenge `xdr`, signed. */
+  /** The SEP-10 challenge `xdr`, signed. `domains` are this app's configured ones (never values
+      read from the challenge). */
   signAuthChallenge(
     xdr: string,
     networkPassphrase: string,
-    domains?: { homeDomain: string; webAuthDomain: string | null },
+    domains: { homeDomain: string; webAuthDomain: string },
   ): Promise<string>;
   logout(): Promise<void>;
   /* Opens the wallet provider's own recovery and export screen, when it has one. */

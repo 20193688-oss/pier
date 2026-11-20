@@ -233,6 +233,21 @@ function payerCharge(c: Wire) {
 const RESERVED = [...RESERVED_HANDLES, BRAND.name.toLowerCase()];
 
 export const appRoutes: [ApiRequest['method'], string, Handler][] = [
+  // This origin's stellar.toml: the SEP-10 signing key the web checks challenges against.
+  [
+    'GET',
+    '/.well-known/stellar.toml',
+    () =>
+      ok(
+        [
+          `NETWORK_PASSPHRASE = "${PASSPHRASE}"`,
+          `WEB_AUTH_ENDPOINT = "${location.origin}/v1/auth/challenge"`,
+          `SIGNING_KEY = "${SEP10_SIGNER.publicKey()}"`,
+          '',
+        ].join('
+'),
+      ),
+  ],
   [
     'GET',
     '/v1/app/profile',

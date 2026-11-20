@@ -85,10 +85,12 @@ function pollarWallet(
     },
     async signAuthChallenge(xdr, networkPassphrase, domains) {
       sameNetwork(networkPassphrase);
+      // Pollar's embedded signer runs its own SEP-10 validation against these: this app's
+      // configured domains, the same ones src/lib/stellar/sep10.ts already checked.
       const r = await client.stellar.sep10.sign({
         challengeXdr: xdr,
-        ...(domains ? { homeDomains: domains.homeDomain } : {}),
-        ...(domains?.webAuthDomain ? { webAuthDomain: domains.webAuthDomain } : {}),
+        homeDomains: domains.homeDomain,
+        webAuthDomain: domains.webAuthDomain,
       });
       if (r.status === 'signed') return r.signedXdr;
       throw new WalletError('failed', r.code);

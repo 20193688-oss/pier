@@ -3,9 +3,10 @@
    - `@/` resolves to `src/` (the same alias as tsconfig `paths`).
    - The dev server listens on `PORT` (default 3000: the API's default SIWE domain and web
      origin are http://localhost:3000, and the root `npm run dev:stack` passes PORT=3000).
-   - Every `/v1/*` call is proxied to the API (the first of PEDOSPE_API_URL, API_URL,
-     VITE_API_URL, PUBLIC_API_URL; default http://localhost:4000), so the browser talks to one
-     origin and the API's HttpOnly session cookie works without cross-origin rules.
+   - Every `/v1/*` call and `/.well-known/*` (the API's stellar.toml, whose SEP-10 signing key the
+     sign-in checks) is proxied to the API (the first of PEDOSPE_API_URL, API_URL, VITE_API_URL,
+     PUBLIC_API_URL; default http://localhost:4000), so the browser talks to one origin and the
+     API's HttpOnly session cookie works without cross-origin rules.
    - `--mode mock` (npm run dev:mock) serves every screen from the in-browser mock API and a demo
      wallet, with no backend and no browser wallet.
    - `virtual:openapi` is the API's committed OpenAPI document (`apps/api/openapi.json`) when it
@@ -44,6 +45,10 @@ export default defineConfig(({ mode }) => {
     'http://localhost:4000';
   const port = Number(env.PORT) || 3000;
   const mock = mode === 'mock' || env.VITE_MOCK === '1';
+  const proxy = {
+    '/v1': { target: apiUrl, changeOrigin: true },
+    '/.well-known': { target: apiUrl, changeOrigin: true },
+  };
   return {
     plugins: [react(), tailwindcss(), openapi()],
     resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
@@ -53,12 +58,12 @@ export default defineConfig(({ mode }) => {
     server: {
       port,
       strictPort: true,
-      proxy: mock ? undefined : { '/v1': { target: apiUrl, changeOrigin: true } },
+      proxy: mock ? undefined : proxy,
     },
     preview: {
       port,
       strictPort: true,
-      proxy: { '/v1': { target: apiUrl, changeOrigin: true } },
+      proxy,
     },
     build: { target: 'es2022', sourcemap: true },
     test: {
