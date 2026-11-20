@@ -46,6 +46,11 @@ export function originSigningKey(): Promise<string> {
   return signingKey;
 }
 
+/** Forget the signing key read for this tab (tests; a rotated key). */
+export function forgetSigningKey() {
+  signingKey = null;
+}
+
 /** Throws unless `account` may sign `challengeXdr` (a WalletError whose message starts with
     `challenge:`); resolves with the domains to pass to the wallet. */
 export async function assertChallenge(

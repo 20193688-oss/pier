@@ -30,7 +30,10 @@ export interface TxStep {
 export function signError(common: Messages['common'], e: unknown): string {
   const s = common.sign;
   if (e instanceof Error && e.name === 'Refused') return s.mismatch;
-  if (e instanceof Error && e.name === 'SubmitFailed') return s.reverted;
+  if (e instanceof Error && e.name === 'SubmitFailed') {
+    const code = (e as Error & { contractError?: string | null }).contractError;
+    return code ? fmt(s.revertedCode, { code }) : s.reverted;
+  }
   if (e instanceof WalletError)
     return e.kind === 'rejected'
       ? common.wallet.rejected

@@ -3,6 +3,7 @@
    transaction, hand the signed envelope to the API (which fee-bumps it from its sponsor and
    submits it), and follow it until the network settles it. A transaction that fails a check is
    never signed. */
+import { MARKET_ERRORS } from '@pedospe/contracts';
 import { verifyTransaction, type TxExpectation, type VerifyProblem } from '@/lib/p2p/tx-verify';
 import { assertSameTransaction } from '@/lib/wallet/signed';
 import type { StellarWallet } from '@/lib/wallet/types';
@@ -19,13 +20,22 @@ export class Refused extends Error {
   }
 }
 
+/** The market contract's refusal in a submission error (`Error(Contract, #17)`), by name. */
+export function contractError(error: string | null): string | null {
+  const m = /Error\(Contract, #(\d+)\)/.exec(error ?? '');
+  return m ? (MARKET_ERRORS[Number(m[1])] ?? null) : null;
+}
+
 /** The network refused the transaction after it was submitted. */
 export class SubmitFailed extends Error {
   readonly hash: string;
+  /* The contract's error name (WrongStatus, Expired...), when the contract refused it. */
+  readonly contractError: string | null;
   constructor(hash: string, error: string | null) {
     super(error ?? 'failed');
     this.name = 'SubmitFailed';
     this.hash = hash;
+    this.contractError = contractError(error);
   }
 }
 

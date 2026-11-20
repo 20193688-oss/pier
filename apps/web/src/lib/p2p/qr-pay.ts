@@ -25,8 +25,8 @@ export const isQrRail = (rail: string) => (QR_RAILS as readonly string[]).includ
 
 /** What a QR payment's quote means for the person, or null when it cannot be trusted: it must be
     for the network, token and rail the QR takes, in the QR's currency, for the QR's own amount
-    (or the amount typed for a static QR), name the merchant that pays it, and carry an integrator
-    fee the contract can charge exactly. The sale is later pinned to this (tx-verify.ts). */
+    (or the amount typed for a static QR), and carry an integrator fee the contract can charge
+    exactly. The sale is later pinned to this (tx-verify.ts). */
 export function trustQrQuote(
   q: P2pQuote,
   asked: {
@@ -47,11 +47,11 @@ export function trustQrQuote(
   if (!amountUnits || !feeUnits || amountUnits === '0') return null;
   const bps = integratorBpsFor(amountUnits, feeUnits);
   if (bps === null || (bps > 0 && !isAccount(q.integrator))) return null;
-  if (!isAccount(q.merchantAddress)) return null;
   return {
     amountUnits,
     integratorFeeUnits: feeUnits,
-    buyer: q.merchantAddress,
+    // A quote need not name the merchant: the sale then pins the order's own buyer.
+    buyer: isAccount(q.merchantAddress) ? q.merchantAddress : null,
     integrator: bps > 0 ? q.integrator : null,
   };
 }

@@ -218,3 +218,13 @@ describe('what a wallet hands back', () => {
     assert.ok(USER.verify(signed.hash(), signed.signatures[0].signature.value));
   });
 });
+
+describe("the contract's refusals, by name", () => {
+  test('a submission error names the contract error', async () => {
+    const { contractError } = await import('@/lib/wallet/sign');
+    assert.equal(contractError('HostError: Error(Contract, #17)'), 'WrongStatus');
+    assert.equal(contractError('Error(Contract, #999)'), null);
+    assert.equal(contractError('tx_bad_auth'), null);
+    assert.equal(contractError(null), null);
+  });
+});

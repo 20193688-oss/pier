@@ -122,6 +122,7 @@ const common: typeof es = {
     wrongAccount: 'The wallet {address} signs this action. Sign in with that wallet and try again.',
     mismatch: 'The transaction does not match what you asked for. Nothing was signed.',
     reverted: 'The network rejected the transaction. Nothing moved.',
+    revertedCode: 'The contract refused the transaction ({code}). Nothing moved.',
     stillPending: 'The network is still processing it. Check your activity in a moment.',
     nonCustodial: 'You sign, with your own wallet. {brand} can never move your funds.',
     gasless: 'No network fee: {brand} pays it.',

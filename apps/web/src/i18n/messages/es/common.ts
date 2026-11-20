@@ -121,6 +121,7 @@ const common = {
     wrongAccount: 'Esta acción la firma la wallet {address}. Ingresa con esa wallet y prueba otra vez.',
     mismatch: 'La transacción no coincide con lo que pediste. No se firmó nada.',
     reverted: 'La red rechazó la transacción. No se movió nada.',
+    revertedCode: 'El contrato rechazó la transacción ({code}). No se movió nada.',
     stillPending: 'La red todavía la está procesando. Revisa la actividad en un momento.',
     nonCustodial: 'Firmas tú, con tu wallet. {brand} nunca puede mover tus fondos.',
     gasless: 'Sin comisión de red: la paga {brand}.',
