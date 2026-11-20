@@ -50,6 +50,7 @@ export function TradeForm({
   market,
   initialSide,
   fixedSide,
+  initialToken,
   onConnect,
   onOpened,
 }: {
@@ -57,6 +58,8 @@ export function TradeForm({
   initialSide: P2pSide;
   /* The payments app's add-money and withdraw screens: one side, no tabs. */
   fixedSide?: P2pSide;
+  /* The token to start with (the app's own); the first listed otherwise. */
+  initialToken?: string;
   onConnect: () => void;
   onOpened: (o: P2pOrder, accepted: AcceptedQuote) => void;
 }) {
@@ -68,11 +71,12 @@ export function TradeForm({
   const [currency, setCurrency] = useState(
     () => (market.currencies.find((c) => c.code === 'ARS') ?? market.currencies[0])?.code ?? '',
   );
-  const [pick, setPick] = useState(() =>
-    market.networks[0]
-      ? { network: market.networks[0].id, token: market.networks[0].tokens[0].symbol }
-      : null,
-  );
+  const [pick, setPick] = useState(() => {
+    const n = market.networks[0];
+    if (!n) return null;
+    const t = n.tokens.find((x) => x.symbol === initialToken) ?? n.tokens[0];
+    return { network: n.id, token: t.symbol };
+  });
   const [rail, setRail] = useState('');
   const [amount, setAmount] = useState('');
   const [picker, setPicker] = useState<null | 'currency' | 'token'>(null);

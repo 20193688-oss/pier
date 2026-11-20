@@ -18,6 +18,7 @@ import { useSession } from '@/lib/session';
 import { isQrRail } from '@/lib/p2p/qr-pay';
 import { toBaseUnits } from '@/lib/p2p/amounts';
 import type { AppBalances, AppProfile } from '@/lib/app/types';
+import { pickToken } from '@/lib/app/token';
 import type { P2pMarket, P2pNetwork, P2pToken } from '@/lib/p2p/types';
 
 const CURRENCY_KEY = 'pedospe.app.currency';
@@ -83,8 +84,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   }, [poke]);
 
   const network = market?.networks[0] ?? null;
-  const token = network?.tokens.find((t) => t.symbol === 'USDC') ?? network?.tokens[0] ?? null;
   const address = session?.address ?? null;
+  const token = useMemo(() => pickToken(network, balances ?? null), [network, balances]);
 
   useEffect(() => {
     if (!address || !network) {
@@ -117,11 +118,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
 
   // The local price: a sale quote for 10 USDC, kept for a minute.
   useEffect(() => {
-    if (!market || !network || !token || !address) return;
+    // After the balances: they decide which token the price is for.
+    if (!market || !network || !token || !address || balances === undefined) return;
     const cur = market.currencies.find((c) => c.code === currency);
     const rail = cur?.rails.find((r) => !isQrRail(r));
     if (!cur || !rail) return setPrice(null);
-    const hit = priceCache.get(currency);
+    const key = `${network.id}:${token.symbol}:${currency}`;
+    const hit = priceCache.get(key);
     if (hit && Date.now() - hit.at < 60_000) return setPrice(hit.price);
     let alive = true;
     trade
@@ -139,14 +142,14 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       .then((q) => {
         const p = Number(q.price);
         const v = Number.isFinite(p) && p > 0 ? p : null;
-        priceCache.set(currency, { price: v, at: Date.now() });
+        priceCache.set(key, { price: v, at: Date.now() });
         if (alive) setPrice(v);
       })
       .catch(() => alive && setPrice(null));
     return () => {
       alive = false;
     };
-  }, [market, network, token, currency, address]);
+  }, [market, network, token, currency, address, balances]);
 
   const setCurrency = useCallback((code: string) => {
     setCurrencyState(code);

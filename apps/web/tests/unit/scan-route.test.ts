@@ -10,6 +10,7 @@ import { QR_PAY_WINDOWS, qrRail, trustQrQuote } from '@/lib/p2p/qr-pay';
 import { arQr, pixQr } from '@/lib/mock/qr';
 import { normalizeQuote } from '@/lib/p2p/normalize';
 import { PASSPHRASES } from '@/lib/stellar/network';
+import { pickToken } from '@/lib/app/token';
 
 const ORIGIN = 'https://app.example';
 const G = 'GA7QYNF7SOWQ3GLR2BGMZEHXAVIRZA4KVWLTJJFC7MGXUA74P7UJVSGZ';
@@ -147,6 +148,8 @@ describe('dollars as the app shows them', () => {
     assert.equal(usdNumber('en', '2483599999'), '248.35', 'never shown bigger than it is');
     assert.equal(usdNumber('es', '12345678900000'), '1.234.567,89');
     assert.equal(usdNumber('en', '0'), '0.00');
+    assert.equal(usdNumber('es', '50000000000'), '5.000,00', 'four digits are grouped too');
+    assert.equal(usdNumber('en', '50000000000'), '5,000.00');
     assert.equal(usd('es', '125000000', 'US$ {amount}'), 'US$ 12,50');
     assert.equal(usd('en', '125000000', '${amount}'), '$12.50');
   });
@@ -215,4 +218,30 @@ describe('a QR payment quote is trusted only for the QR it was asked for', () =>
   });
   test('refused: an integrator fee no rate reproduces, or with no recipient', () =>
     assert.equal(trustQrQuote({ ...q, integratorFee: '0.5', integrator: null }, asked, 7), null));
+});
+
+describe("the app's token", () => {
+  const tok = (symbol: string, contract: string) => ({ symbol, code: symbol, issuer: null, contract, decimals: 7 });
+  const net = { tokens: [tok('USDC', 'CU'), tok('TUSD', 'CT')] };
+  const bal = (usdc: string, tusd: string, trust = true) => ({
+    tokens: [
+      { symbol: 'USDC', contract: 'CU', amount: usdc, trustline: trust, authorized: trust },
+      { symbol: 'TUSD', contract: 'CT', amount: tusd, trustline: true, authorized: true },
+    ],
+  });
+  test('a configured token wins when the market lists it', () => {
+    assert.equal(pickToken(net, bal('5', '9'), 'TUSD')?.symbol, 'TUSD');
+    assert.equal(pickToken(net, bal('5', '0'), 'EURC')?.symbol, 'USDC', 'not listed: ignored');
+  });
+  test('else the token the wallet holds, the largest holding first', () => {
+    assert.equal(pickToken(net, bal('0', '50000000000'), '')?.symbol, 'TUSD');
+    assert.equal(pickToken(net, bal('10', '5'), '')?.symbol, 'USDC');
+    assert.equal(pickToken(net, bal('10', '50'), '')?.symbol, 'TUSD');
+    assert.equal(pickToken(net, bal('99', '0', false), '')?.symbol, 'USDC', 'no trustline: not held');
+  });
+  test('else USDC, else the first listed', () => {
+    assert.equal(pickToken(net, null, '')?.symbol, 'USDC');
+    assert.equal(pickToken({ tokens: [tok('TUSD', 'CT')] }, null, '')?.symbol, 'TUSD');
+    assert.equal(pickToken(null, null, ''), null);
+  });
 });

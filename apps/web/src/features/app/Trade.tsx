@@ -14,7 +14,7 @@ export default function Trade({ side }: { side: P2pSide }) {
   const { t } = useI18n();
   const words = side === 'BUY' ? t.app.add : t.app.withdraw;
   const navigate = useNavigate();
-  const { market } = useAppData();
+  const { market, token } = useAppData();
   return (
     <Screen back title={words.title}>
       <p className="mb-4 text-ink-2">{words.lede}</p>
@@ -24,8 +24,9 @@ export default function Trade({ side }: { side: P2pSide }) {
         <Notice tone="warn">{t.trade.unavailable}</Notice>
       ) : (
         <TradeForm
-          key={side}
+          key={`${side}:${token?.symbol ?? ''}`}
           market={market}
+          initialToken={token?.symbol}
           initialSide={side}
           fixedSide={side}
           onConnect={() => navigate('/app')}

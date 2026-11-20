@@ -15,7 +15,12 @@ export function usdNumber(lang: string, units: string | bigint): string {
   const cents = BigInt(s) / 10n ** BigInt(USDC_DECIMALS - 2);
   const whole = cents / 100n;
   const frac = Number(cents % 100n);
-  const grouped = new Intl.NumberFormat(lang, { maximumFractionDigits: 0 }).format(whole);
+  // Grouped from four digits up in every language ("US$ 5.000,00", "$5,000.00"); Spanish's
+  // default would leave 5000 ungrouped.
+  const grouped = new Intl.NumberFormat(lang, {
+    maximumFractionDigits: 0,
+    useGrouping: 'always',
+  } as Intl.NumberFormatOptions).format(whole);
   const sep = new Intl.NumberFormat(lang).format(1.5).replace(/\d/g, '') || '.';
   return `${grouped}${sep}${String(frac).padStart(2, '0')}`;
 }

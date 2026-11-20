@@ -38,7 +38,7 @@ export default function Send() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { session } = useSession();
-  const { market, network, token, balance, refresh } = useAppData();
+  const { market, network, token, balance, balances, refresh } = useAppData();
   const fmtUsd = useUsd();
   const local = useLocal();
   const [step, setStep] = useState<'to' | 'amount' | 'review' | 'done'>('to');
@@ -103,17 +103,20 @@ export default function Send() {
     }
     if (next.address === me) return setToError(s.self);
     setRecipient(next);
-    setStep(dollarsToUnits(amount) ? 'review' : 'amount');
+    // A link's amount goes straight to the review only when the balance covers it.
+    const wanted = dollarsToUnits(amount);
+    setStep(wanted && BigInt(wanted) <= BigInt(balance || '0') ? 'review' : 'amount');
   };
 
   // A link or a scan that named the recipient goes straight on.
   const started = useRef(false);
   useEffect(() => {
-    if (started.current || !params.get('to') || !me) return;
+    // Wait for the balance: it decides the token and whether the amount fits.
+    if (started.current || !params.get('to') || !me || !balances) return;
     started.current = true;
     void resolve(params.get('to')!);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [me]);
+  }, [me, balances]);
 
   const units = dollarsToUnits(amount);
   const tooMuch = !!units && BigInt(units) > BigInt(balance || '0');
