@@ -225,4 +225,4 @@ export const P2P_CHECKOUT_CHARGE_WINDOW_MS = 30 * 60 * 1000;
 /** Bytes of a checkout payer token (256 bits). */
 export const P2P_PAYER_TOKEN_BYTES = 32;
 /** HKDF label of the key client addresses are MACed under on a checkout order. */
-export const P2P_CHECKOUT_CLIENT_KEY_LABEL = 'pedospe checkout client v1';
+export const P2P_CHECKOUT_CLIENT_KEY_LABEL = 'midpoint checkout client v1';

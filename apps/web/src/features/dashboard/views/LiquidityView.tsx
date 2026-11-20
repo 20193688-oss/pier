@@ -19,7 +19,7 @@ import { useSession } from '@/lib/session';
 import { WalletError } from '@/lib/wallet/types';
 import { assertSameTransaction } from '@/lib/wallet/signed';
 import { assertChallenge } from '@/lib/stellar/sep10';
-import { isStellarAddress } from '@pedospe/payment-qr';
+import { isStellarAddress } from '@midpoint/payment-qr';
 import { STELLAR_DECIMALS } from '@/lib/stellar/network';
 import { Check, Field, Notice, SelectField, Spinner, Switch } from '@/components/ui/controls';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';

@@ -21,7 +21,7 @@ import type { AppBalances, AppProfile } from '@/lib/app/types';
 import { pickToken } from '@/lib/app/token';
 import type { P2pMarket, P2pNetwork, P2pToken } from '@/lib/p2p/types';
 
-const CURRENCY_KEY = 'pedospe.app.currency';
+const CURRENCY_KEY = 'midpoint.app.currency';
 
 interface AppData {
   /* undefined while loading, null when it could not be read. */

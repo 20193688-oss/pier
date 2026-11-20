@@ -1,4 +1,4 @@
-import { MARKET_ERRORS, MARKET_SPEC } from '@pedospe/contracts';
+import { MARKET_ERRORS, MARKET_SPEC } from '@midpoint/contracts';
 import { contract, Operation, StrKey, xdr } from '@stellar/stellar-sdk';
 
 /**

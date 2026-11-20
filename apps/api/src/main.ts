@@ -24,7 +24,7 @@ async function main(): Promise<void> {
       res.json(document),
     );
   await app.listen(config.port, config.host);
-  new Logger('pedospe').log(`API listening on ${config.publicApiUrl} (${config.nodeEnv})`);
+  new Logger('Midpoint').log(`API listening on ${config.publicApiUrl} (${config.nodeEnv})`);
 }
 
 void main();

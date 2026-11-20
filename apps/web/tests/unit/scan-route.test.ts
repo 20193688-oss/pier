@@ -1,9 +1,9 @@
 /* scan-route.test.ts: what a scanned or pasted text opens (src/lib/app/scan-route.ts, on top of
-   @pedospe/payment-qr), the dollars the app shows (src/lib/app/money.ts) and when a QR payment's
+   @midpoint/payment-qr), the dollars the app shows (src/lib/app/money.ts) and when a QR payment's
    quote is trusted (src/lib/p2p/qr-pay.ts). */
 import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
-import { buildPaymentLink, buildSep7Pay, emvCrc } from '@pedospe/payment-qr';
+import { buildPaymentLink, buildSep7Pay, emvCrc } from '@midpoint/payment-qr';
 import { routeScan, sendPath, type ScanContext } from '@/lib/app/scan-route';
 import { dollarsToUnits, localValue, unitsToDecimal, usd, usdNumber } from '@/lib/app/money';
 import { QR_PAY_WINDOWS, qrRail, trustQrQuote } from '@/lib/p2p/qr-pay';

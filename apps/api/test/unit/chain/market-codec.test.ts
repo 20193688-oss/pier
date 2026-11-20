@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { MARKET_ERRORS } from '@pedospe/contracts';
+import { MARKET_ERRORS } from '@midpoint/contracts';
 import { Keypair, StrKey, nativeToScVal, xdr } from '@stellar/stellar-sdk';
 import { describe, expect, it } from 'vitest';
 import {

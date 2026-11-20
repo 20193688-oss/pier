@@ -1,7 +1,7 @@
 // Renders the app's icons (public/icons/*.png) from the SVG mark with Playwright's Chromium:
 // 192 and 512 (purpose "any"), a 512 maskable one (the mark inside the safe zone on a full ink
 // field) and the 180 apple-touch-icon (no transparency). Run after changing the mark:
-// `npm run icons -w @pedospe/web`. The PNGs are committed.
+// `npm run icons -w @midpoint/web`. The PNGs are committed.
 import { mkdirSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -18,10 +18,10 @@ const mark = ({ rounded, pad }) => {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <rect width="32" height="32" ${rounded ? 'rx="9"' : ''} fill="${INK}"/>
   <g transform="translate(${pad} ${pad}) scale(${k})">
-    <g fill="none" stroke="${PAPER}" stroke-width="3.2" stroke-linecap="round">
-      <circle cx="16" cy="16" r="6.2"/><path d="M9.8 16v10.5M22.2 16V5.5"/>
-    </g>
-    <circle cx="16" cy="16" r="2.3" fill="${MARKER}"/>
+    <path d="M9.5 22.5 22.5 9.5" stroke="${PAPER}" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="9.5" cy="22.5" r="3.3" fill="${PAPER}"/>
+    <circle cx="22.5" cy="9.5" r="3.3" fill="${PAPER}"/>
+    <circle cx="16" cy="16" r="4" fill="${MARKER}" stroke="${INK}" stroke-width="1.8"/>
   </g>
 </svg>`;
 };

@@ -246,8 +246,8 @@ export default function LandingPage() {
               {l.business.codeLabel}
             </figcaption>
             <pre className="overflow-x-auto text-[0.8125rem] leading-relaxed">
-              <code>{`curl "$PEDOSPE_API_URL/v1/p2p/charges" \\
-  -H "Authorization: Bearer $PEDOSPE_KEY" \\
+              <code>{`curl "$MIDPOINT_API_URL/v1/p2p/charges" \\
+  -H "Authorization: Bearer $MIDPOINT_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "currency": "ARS",

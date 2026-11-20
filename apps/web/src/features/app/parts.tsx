@@ -159,7 +159,7 @@ export function Facts({ rows }: { rows: [string, ReactNode][] }) {
   );
 }
 
-const INSTALL_KEY = 'pedospe.app.install-dismissed';
+const INSTALL_KEY = 'midpoint.app.install-dismissed';
 
 /** Install the app: Android's prompt when the browser offers one, else iOS's "Add to Home
     Screen" hint; dismissed for good with "Not now". */

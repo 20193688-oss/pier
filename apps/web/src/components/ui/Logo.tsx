@@ -1,7 +1,7 @@
-/* The product's mark: one bowl shared by a "p" (its stem down-left) and a "d" (its stem up-right),
-   two people meeting at one point, with the locked order as the marker-yellow dot in the middle.
-   "pe dos pe" is P2P said in Spanish. The wordmark is the product's name (src/lib/brand.ts), set in
-   lowercase, wide. */
+/* The product's mark: two points joined by one segment (the two people of a trade) and, at its
+   midpoint, the marker-yellow dot where they meet: the order the contract holds until both sides
+   are done. The geometry is shared with public/favicon.svg and scripts/gen-icons.mjs. The wordmark
+   is the product's name (src/lib/brand.ts), set in lowercase, wide. */
 import { BRAND } from '@/lib/brand';
 
 export function LogoMark({ size = 28, className = '' }: { size?: number; className?: string }) {
@@ -15,11 +15,10 @@ export function LogoMark({ size = 28, className = '' }: { size?: number; classNa
       focusable="false"
     >
       <rect width="32" height="32" rx="9" fill="var(--ink)" />
-      <g fill="none" stroke="var(--paper)" strokeWidth="3.2" strokeLinecap="round">
-        <circle cx="16" cy="16" r="6.2" />
-        <path d="M9.8 16v10.5M22.2 16V5.5" />
-      </g>
-      <circle cx="16" cy="16" r="2.3" fill="var(--marker)" />
+      <path d="M9.5 22.5 22.5 9.5" stroke="var(--paper)" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="9.5" cy="22.5" r="3.3" fill="var(--paper)" />
+      <circle cx="22.5" cy="9.5" r="3.3" fill="var(--paper)" />
+      <circle cx="16" cy="16" r="4" fill="var(--marker)" stroke="var(--ink)" strokeWidth="1.8" />
     </svg>
   );
 }
@@ -34,7 +33,7 @@ export function Logo({ size = 28, label }: { size?: number; label?: string }) {
       <LogoMark size={size} />
       <span
         aria-hidden={label ? true : undefined}
-        className="text-[1.3rem] leading-none font-[780] tracking-[-0.03em] text-ink"
+        className="text-[1.3rem] leading-none font-[780] tracking-[-0.03em] text-ink lowercase"
         style={{ fontStretch: '125%' }}
       >
         {BRAND.name}

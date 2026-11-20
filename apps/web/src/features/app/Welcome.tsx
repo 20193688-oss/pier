@@ -24,7 +24,7 @@ export default function Welcome() {
       <div className="flex items-center justify-between">
         <span className="inline-flex items-center gap-2">
           <LogoMark size={30} />
-          <b className="text-[1.25rem] tracking-[-0.03em]" style={{ fontStretch: '125%' }}>
+          <b className="text-[1.25rem] tracking-[-0.03em] lowercase" style={{ fontStretch: '125%' }}>
             {BRAND.name}
           </b>
         </span>

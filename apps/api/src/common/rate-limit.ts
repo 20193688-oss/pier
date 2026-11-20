@@ -23,7 +23,7 @@ export interface RateLimitPolicy {
   per?: 'caller' | 'ip';
 }
 
-export const RATE_LIMIT = 'pedospe:rate-limit';
+export const RATE_LIMIT = 'midpoint:rate-limit';
 export const RateLimit = (policy: RateLimitPolicy) => SetMetadata(RATE_LIMIT, policy);
 
 @Injectable()

@@ -1,11 +1,11 @@
-# @pedospe/sdk
+# @midpoint/sdk
 
-TypeScript client for the pedospe API, webhook signature verification, and a reference merchant
+TypeScript client for the Midpoint API, webhook signature verification, and a reference merchant
 bot that auto-releases purchases when the local money reaches the merchant's bank account.
 
 - **Typed client**: every route, body and response is typed from the API contract
   (`apps/api/openapi.json`) through [`openapi-fetch`](https://openapi-ts.dev/openapi-fetch/).
-- **Webhooks**: `verifyWebhook` / `parseWebhook` check the `pedospe-signature` header.
+- **Webhooks**: `verifyWebhook` / `parseWebhook` check the `midpoint-signature` header.
 - **Reference bot**: `dist/bot/auto-release.js` matches incoming bank transfers to orders and
   signs their release with the merchant bot's own key.
 
@@ -14,7 +14,7 @@ Requires Node.js 24.9 or later (ESM only).
 ## Install
 
 ```sh
-npm install @pedospe/sdk
+npm install @midpoint/sdk
 # only to run the reference bot, which signs transactions:
 npm install @stellar/stellar-sdk
 ```
@@ -25,19 +25,19 @@ do not need it.
 ## Client
 
 ```ts
-import { createPedospeClient, PedospeError, unwrap, type Order } from '@pedospe/sdk';
+import { createMidpointClient, MidpointError, unwrap, type Order } from '@midpoint/sdk';
 
-const pedospe = createPedospeClient({
-  baseUrl: 'https://api.pedospe.com',
-  apiKey: process.env.PEDOSPE_API_KEY, // pk_live_... or pk_test_...
+const Midpoint = createMidpointClient({
+  baseUrl: 'https://api.midpoint.money',
+  apiKey: process.env.MIDPOINT_API_KEY, // pk_live_... or pk_test_...
 });
 
 // Public: networks, tokens, currencies and rails.
-const market = await unwrap(pedospe.GET('/v1/market'));
+const market = await unwrap(midpoint.GET('/v1/market'));
 
 // A quote: 125050 ARS of USDC on Stellar testnet, paid by bank transfer.
 const quote = await unwrap(
-  pedospe.POST('/v1/p2p/quotes', {
+  midpoint.POST('/v1/p2p/quotes', {
     body: {
       side: 'BUY',
       network: 'testnet',
@@ -53,23 +53,23 @@ console.log(quote.id, quote.tokenAmount, quote.expiresAt);
 
 try {
   const order: Order = await unwrap(
-    pedospe.GET('/v1/p2p/orders/{id}', { params: { path: { id: 'order-id' } } }),
+    midpoint.GET('/v1/p2p/orders/{id}', { params: { path: { id: 'order-id' } } }),
   );
   console.log(order.status);
 } catch (error) {
-  if (error instanceof PedospeError) {
+  if (error instanceof MidpointError) {
     console.error(error.status, error.code, error.message, error.details);
   }
 }
 ```
 
-- `unwrap(call)` returns the success body, or throws a `PedospeError` with the HTTP `status` and the
+- `unwrap(call)` returns the success body, or throws a `MidpointError` with the HTTP `status` and the
   API's `code`, `message` and `details` (every API error is
   `{ "error": { "code", "message", "details"? } }`). Without `unwrap`, each call resolves to
   `{ data, error, response }` as in `openapi-fetch`.
 - **Wallet sessions**: pass `sessionToken` (`ps_sess_...`) instead of `apiKey`, with the
   `organizationId` and `tier` (`live` or `test`) to act for; they are sent as the
-  `Pedospe-Organization` and `Pedospe-Tier` headers. An API key already carries its organization
+  `Midpoint-Organization` and `Midpoint-Tier` headers. An API key already carries its organization
   and tier, so the client refuses those options next to one.
 - `fetch` replaces `globalThis.fetch` (tests, proxies, retries).
 - Friendly type names (`Order`, `MerchantOrder`, `Quote`, `TransferMatch`, `Transaction`, `Submission`,
@@ -79,22 +79,26 @@ try {
 ## Webhooks
 
 Each delivery is signed:
-`pedospe-signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>`. Verify the
+`midpoint-signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<raw body>")>`. Verify the
 **raw** body (not re-serialized JSON) with the endpoint's secret, which the API shows once when the
 endpoint is created.
 
 ```ts
 import express from 'express';
-import { parseWebhook, PEDOSPE_SIGNATURE_HEADER, PedospeWebhookError } from '@pedospe/sdk/webhooks';
+import {
+  parseWebhook,
+  MIDPOINT_SIGNATURE_HEADER,
+  MidpointWebhookError,
+} from '@midpoint/sdk/webhooks';
 
 const app = express();
 
-app.post('/hooks/pedospe', express.raw({ type: 'application/json' }), (req, res) => {
+app.post('/hooks/midpoint', express.raw({ type: 'application/json' }), (req, res) => {
   try {
     const event = parseWebhook({
       payload: req.body.toString('utf8'),
-      header: req.get(PEDOSPE_SIGNATURE_HEADER),
-      secret: process.env.PEDOSPE_WEBHOOK_SECRET!,
+      header: req.get(MIDPOINT_SIGNATURE_HEADER),
+      secret: process.env.MIDPOINT_WEBHOOK_SECRET!,
     });
     // Retries carry the same event id: deduplicate on it.
     if (event.type === 'P2P_ORDER_PAID') {
@@ -102,14 +106,14 @@ app.post('/hooks/pedospe', express.raw({ type: 'application/json' }), (req, res)
     }
     res.sendStatus(204);
   } catch (error) {
-    if (error instanceof PedospeWebhookError) return res.status(400).send(error.reason);
+    if (error instanceof MidpointWebhookError) return res.status(400).send(error.reason);
     throw error;
   }
 });
 ```
 
 - `verifyWebhook(options)` returns `true` or `false`; `parseWebhook(options)` returns the
-  `{ id, type, createdAt, data }` envelope or throws a `PedospeWebhookError` whose `reason` is
+  `{ id, type, createdAt, data }` envelope or throws a `MidpointWebhookError` whose `reason` is
   `malformed_header`, `timestamp_out_of_tolerance`, `signature_mismatch` or `invalid_payload`.
 - The MAC is compared in constant time. The timestamp is signed, and deliveries more than
   `toleranceSeconds` (default 300) away from the receiver's clock, in either direction, are
@@ -165,37 +169,37 @@ build each release for its own account (`signer`), as `release(caller = the oper
 cannot withdraw or move the merchant's balance. The merchant account's own secret also works, but a
 leak of it is a leak of the merchant's balance.
 
-| Variable          | Meaning                                                                                                              |
-| ----------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `PEDOSPE_API_URL` | The API origin                                                                                                       |
-| `PEDOSPE_API_KEY` | The merchant organization's API key (`p2p:read` and `p2p:write`); its prefix is the tier                             |
-| `BOT_SECRET`      | The bot's Stellar secret (`S...`): a release-only operator (best) or the merchant account; not needed with `DRY_RUN` |
-| `MARKET_CONTRACT` | Required: the market contract (`C...`, on the tier's network) or `network=C...` pairs                                |
-| `MAX_FEE_STROOPS` | The largest fee it signs, stroops (default 1 000 000 = 0.1 XLM)                                                      |
-| `MIN_SCORE`       | Lowest score that releases, 1 to 3 (default 3)                                                                       |
-| `DRY_RUN`         | `true`: decide and log, never sign or send                                                                           |
+| Variable           | Meaning                                                                                                              |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `MIDPOINT_API_URL` | The API origin                                                                                                       |
+| `MIDPOINT_API_KEY` | The merchant organization's API key (`p2p:read` and `p2p:write`); its prefix is the tier                             |
+| `BOT_SECRET`       | The bot's Stellar secret (`S...`): a release-only operator (best) or the merchant account; not needed with `DRY_RUN` |
+| `MARKET_CONTRACT`  | Required: the market contract (`C...`, on the tier's network) or `network=C...` pairs                                |
+| `MAX_FEE_STROOPS`  | The largest fee it signs, stroops (default 1 000 000 = 0.1 XLM)                                                      |
+| `MIN_SCORE`        | Lowest score that releases, 1 to 3 (default 3)                                                                       |
+| `DRY_RUN`          | `true`: decide and log, never sign or send                                                                           |
 
 ```sh
 # In this repository
-npm run build -w @pedospe/sdk
-DRY_RUN=true PEDOSPE_API_URL=http://localhost:4100 PEDOSPE_API_KEY=pk_test_... MARKET_CONTRACT=C... \
-  npm run bot -w @pedospe/sdk -- transfers.jsonl
+npm run build -w @midpoint/sdk
+DRY_RUN=true MIDPOINT_API_URL=http://localhost:4100 MIDPOINT_API_KEY=pk_test_... MARKET_CONTRACT=C... \
+  npm run bot -w @midpoint/sdk -- transfers.jsonl
 
 # Following a live feed
-tail -f bank-feed.jsonl | node node_modules/@pedospe/sdk/dist/bot/auto-release.js
+tail -f bank-feed.jsonl | node node_modules/@midpoint/sdk/dist/bot/auto-release.js
 ```
 
 Start with `DRY_RUN=true` and read the log before letting it sign.
 
 ## Development
 
-| Command                             | What it does                                                       |
-| ----------------------------------- | ------------------------------------------------------------------ |
-| `npm run generate -w @pedospe/sdk`  | Regenerates `src/generated/schema.ts` from `apps/api/openapi.json` |
-| `npm run build -w @pedospe/sdk`     | Compiles to `dist/` and rewrites the `@/` imports (`tsc-alias`)    |
-| `npm test -w @pedospe/sdk`          | Runs the tests                                                     |
-| `npm run typecheck -w @pedospe/sdk` | Type-checks sources and tests                                      |
-| `npm run lint -w @pedospe/sdk`      | ESLint and Prettier                                                |
+| Command                              | What it does                                                       |
+| ------------------------------------ | ------------------------------------------------------------------ |
+| `npm run generate -w @midpoint/sdk`  | Regenerates `src/generated/schema.ts` from `apps/api/openapi.json` |
+| `npm run build -w @midpoint/sdk`     | Compiles to `dist/` and rewrites the `@/` imports (`tsc-alias`)    |
+| `npm test -w @midpoint/sdk`          | Runs the tests                                                     |
+| `npm run typecheck -w @midpoint/sdk` | Type-checks sources and tests                                      |
+| `npm run lint -w @midpoint/sdk`      | ESLint and Prettier                                                |
 
 Run `generate` whenever the API contract changes and commit `src/generated/schema.ts`: it is the
 source the client is typed by. The build does not regenerate it.

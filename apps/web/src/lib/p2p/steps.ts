@@ -5,7 +5,7 @@ import type { P2pTransaction } from '@/lib/p2p/types';
 import type { AcceptedQuote } from '@/lib/p2p/fees';
 import { isAccount } from '@/lib/stellar/network';
 
-const KEY = (orderId: string) => `pedospe.steps:${orderId}`;
+const KEY = (orderId: string) => `midpoint.steps:${orderId}`;
 
 export function saveSteps(orderId: string, steps: P2pTransaction[] | undefined) {
   try {
@@ -28,7 +28,7 @@ export function savedSteps(orderId: string): P2pTransaction[] | undefined {
 /** What the person accepted when a sale opened (the amount they typed, the fee shown to them,
     the addresses the quote named), kept beside its steps so the signing check compares the
     transaction with what they saw, not with what a later answer says (tx-verify.ts). */
-const TERMS = (orderId: string) => `pedospe.accepted:${orderId}`;
+const TERMS = (orderId: string) => `midpoint.accepted:${orderId}`;
 
 export function saveQuoteTerms(orderId: string, accepted: AcceptedQuote | undefined) {
   try {

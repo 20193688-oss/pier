@@ -5,7 +5,7 @@ import type { OutboxEvent, WebhookEventType } from '@/webhooks/webhook-outbox';
  * The built-in organization the public app's orders belong to. It has no
  * members, keys or endpoints, and its events are not stored.
  */
-export const APP_ORGANIZATION_ID = 'pedospe_app';
+export const APP_ORGANIZATION_ID = 'midpoint_app';
 
 /** The order event an order's new status emits. */
 export const STATUS_EVENTS: Record<string, WebhookEventType | undefined> = {

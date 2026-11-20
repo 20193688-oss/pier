@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type ThemeChoice = 'light' | 'dark' | 'system';
-const KEY = 'pedospe.theme';
+const KEY = 'midpoint.theme';
 
 function read(): ThemeChoice {
   try {

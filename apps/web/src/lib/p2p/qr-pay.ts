@@ -2,7 +2,7 @@
    Brazil's PIX) through a market merchant, who pays the QR from its own banking app. It is a sale
    to that merchant with fixed windows (docs/STELLAR.md 5.6): the signing check pins
    `open_with_deposit` to these, never to an answer's. */
-import type { MerchantQr } from '@pedospe/payment-qr';
+import type { MerchantQr } from '@midpoint/payment-qr';
 import { integratorBpsFor, type AcceptedQuote } from '@/lib/p2p/fees';
 import { toBaseUnits } from '@/lib/p2p/amounts';
 import { isAccount } from '@/lib/stellar/network';

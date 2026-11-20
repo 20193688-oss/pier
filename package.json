@@ -1,7 +1,7 @@
 {
-  "name": "pedospe",
+  "name": "midpoint",
   "private": true,
-  "description": "pedospe: a peer-to-peer market for stablecoins against local money, with a public API",
+  "description": "Midpoint: a peer-to-peer market for stablecoins against local money, with a public API",
   "license": "UNLICENSED",
   "type": "module",
   "engines": {
@@ -18,7 +18,7 @@
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",
     "dev:stack": "node scripts/dev-stack.ts",
-    "dev:simulate": "npm run dev:simulate-transfer -w @pedospe/api --"
+    "dev:simulate": "npm run dev:simulate-transfer -w @midpoint/api --"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

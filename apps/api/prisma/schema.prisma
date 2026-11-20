@@ -1,4 +1,4 @@
-// pedospe: the API's datastore.
+// Midpoint: the API's datastore.
 //
 // Tenancy: an Organization (a business, a merchant, or both) owns everything
 // below it, per TIER: `live` (mainnet, `pk_live_` keys) or `test` (testnets,

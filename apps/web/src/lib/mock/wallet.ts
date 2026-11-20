@@ -5,7 +5,7 @@ import { mockKeypair, PERSONAS, type Persona } from '@/lib/mock/fixtures';
 import { keypairWallet } from '@/lib/wallet/keypair';
 import type { StellarWallet } from '@/lib/wallet/types';
 
-const KEY = 'pedospe.demo-persona';
+const KEY = 'midpoint.demo-persona';
 
 export function demoWallet(persona: Persona = 'user'): StellarWallet {
   try {

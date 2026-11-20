@@ -4,7 +4,7 @@
    - The dev server listens on `PORT` (default 3000: the API's default SIWE domain and web
      origin are http://localhost:3000, and the root `npm run dev:stack` passes PORT=3000).
    - Every `/v1/*` call and `/.well-known/*` (the API's stellar.toml, whose SEP-10 signing key the
-     sign-in checks) is proxied to the API (the first of PEDOSPE_API_URL, API_URL, VITE_API_URL,
+     sign-in checks) is proxied to the API (the first of MIDPOINT_API_URL, API_URL, VITE_API_URL,
      PUBLIC_API_URL; default http://localhost:4000), so the browser talks to one origin and the
      API's HttpOnly session cookie works without cross-origin rules.
    - `--mode mock` (npm run dev:mock) serves every screen from the in-browser mock API and a demo
@@ -23,12 +23,12 @@ import tailwindcss from '@tailwindcss/vite';
 
 const OPENAPI_ID = 'virtual:openapi';
 const OPENAPI_PATH =
-  process.env.PEDOSPE_OPENAPI_PATH ||
+  process.env.MIDPOINT_OPENAPI_PATH ||
   fileURLToPath(new URL('../api/openapi.json', import.meta.url));
 
 function openapi(): Plugin {
   return {
-    name: 'pedospe-openapi',
+    name: 'midpoint-openapi',
     resolveId: (id) => (id === OPENAPI_ID ? `\0${OPENAPI_ID}` : null),
     load(id) {
       if (id !== `\0${OPENAPI_ID}`) return null;
@@ -76,7 +76,7 @@ function pwa(): Plugin {
   const swSource = () =>
     readFileSync(fileURLToPath(new URL('./pwa/sw.js', import.meta.url)), 'utf8');
   return {
-    name: 'pedospe-pwa',
+    name: 'midpoint-pwa',
     transformIndexHtml: (html) => html.replaceAll('__BRAND__', brand().name),
     configureServer(server) {
       server.middlewares.use((req, res, next) => {
@@ -110,7 +110,7 @@ function pwa(): Plugin {
 export default defineConfig(({ mode }) => {
   const env = { ...loadEnv(mode, process.cwd(), ''), ...process.env };
   const apiUrl =
-    env.PEDOSPE_API_URL ||
+    env.MIDPOINT_API_URL ||
     env.API_URL ||
     env.VITE_API_URL ||
     env.PUBLIC_API_URL ||

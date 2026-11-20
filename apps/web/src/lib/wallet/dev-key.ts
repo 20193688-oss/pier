@@ -7,7 +7,7 @@ import { Keypair, StrKey } from '@stellar/stellar-sdk/base';
 import { keypairWallet } from '@/lib/wallet/keypair';
 import type { StellarWallet } from '@/lib/wallet/types';
 
-const KEY = 'pedospe.dev-key';
+const KEY = 'midpoint.dev-key';
 
 export function isDevSecret(text: string): boolean {
   return StrKey.isValidEd25519SecretSeed(text.trim());

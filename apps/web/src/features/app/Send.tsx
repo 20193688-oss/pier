@@ -5,7 +5,7 @@
    and note (src/lib/p2p/tx-verify.ts). */
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
-import { normalizeRecipient } from '@pedospe/payment-qr';
+import { normalizeRecipient } from '@midpoint/payment-qr';
 import { fmt, useI18n } from '@/i18n';
 import { Icon } from '@/components/ui/Icon';
 import { Field, Notice, Spinner } from '@/components/ui/controls';

@@ -1,13 +1,13 @@
 /* The mock API's starting data, in the API's wire shapes (base units, token contracts, flat
    deadlines), so mock mode exercises the same readers (src/lib/p2p/normalize.ts) as the real API.
 
-   Every key here is derived from a fixed, public seed ("pedospe-mock:<name>"): the demo wallets
+   Every key here is derived from a fixed, public seed ("midpoint-mock:<name>"): the demo wallets
    sign real Stellar transactions that only the in-browser mock API ever sees. Nothing points at
    a funded account on any network. */
 import { Asset, Keypair, StrKey, hash } from '@stellar/stellar-sdk/base';
 import { PASSPHRASES } from '@/lib/stellar/network';
 
-const seed = (name: string) => hash(new TextEncoder().encode(`pedospe-mock:${name}`));
+const seed = (name: string) => hash(new TextEncoder().encode(`midpoint-mock:${name}`));
 
 /** A demo key pair: deterministic, test data only. */
 export const mockKeypair = (name: string) => Keypair.fromRawEd25519Seed(seed(name));
@@ -261,4 +261,4 @@ export const HANDLES: Record<string, string> = {
   tiendalerma: BUSINESS_WALLET,
 };
 /** Words nobody can claim as a handle. */
-export const RESERVED_HANDLES = ['admin', 'support', 'soporte', 'pedospe', 'app', 'root'];
+export const RESERVED_HANDLES = ['admin', 'support', 'soporte', 'midpoint', 'app', 'root'];

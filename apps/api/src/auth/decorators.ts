@@ -17,7 +17,7 @@ import type { AuthedRequest, OrgPrincipal, Scope, SessionPrincipal } from '@/aut
 export type AuthPolicy =
   { kind: 'public' } | { kind: 'session' } | { kind: 'org'; scope: Scope } | { kind: 'admin' };
 
-export const AUTH_POLICY = 'pedospe:auth-policy';
+export const AUTH_POLICY = 'midpoint:auth-policy';
 
 /** No credentials: the market overview, sign-in, and the hosted charge's payer routes. */
 export const Public = () => SetMetadata(AUTH_POLICY, { kind: 'public' } satisfies AuthPolicy);
@@ -42,12 +42,12 @@ export const OrgAuth = (scope: Scope) =>
     ApiBearerAuth('bearer'),
     ApiCookieAuth('session'),
     ApiHeader({
-      name: 'Pedospe-Organization',
+      name: 'Midpoint-Organization',
       required: false,
       description: 'Wallet sessions only: the organization to act for (API keys carry theirs).',
     }),
     ApiHeader({
-      name: 'Pedospe-Tier',
+      name: 'Midpoint-Tier',
       required: false,
       enum: ['live', 'test'],
       description: 'Wallet sessions only: the tier to act on (default `test`).',

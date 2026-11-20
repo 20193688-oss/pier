@@ -49,7 +49,7 @@ function HomeGate() {
   const { profile } = useAppData();
   const offered = (() => {
     try {
-      return sessionStorage.getItem('pedospe.app.handle-offered') === '1';
+      return sessionStorage.getItem('midpoint.app.handle-offered') === '1';
     } catch {
       return true;
     }

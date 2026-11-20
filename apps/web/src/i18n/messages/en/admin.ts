@@ -57,7 +57,7 @@ const admin: typeof es = {
     create: 'Add endpoint',
     createTitle: 'New webhook endpoint',
     url: 'Endpoint URL',
-    urlPlaceholder: 'https://your-server.example/pedospe/webhooks',
+    urlPlaceholder: 'https://your-server.example/midpoint/webhooks',
     urlHint: 'https only. Your server answers 2xx to confirm each notice.',
     urlError: 'Write a URL that starts with https://',
     description: 'Description',
@@ -69,7 +69,7 @@ const admin: typeof es = {
     creating: 'Creating…',
     secretTitle: 'Copy the signing secret now',
     secretBody:
-      'Your server uses it to verify the pedospe-signature header of every notice. We will not show it again: if you lose it, delete the endpoint and create another.',
+      'Your server uses it to verify the midpoint-signature header of every notice. We will not show it again: if you lose it, delete the endpoint and create another.',
     secretLabel: 'Signing secret',
     saved: 'I saved it',
     created: 'Endpoint added',
@@ -93,7 +93,7 @@ const admin: typeof es = {
     nextAttempt: 'Next attempt: {time}',
     verifyTitle: 'Verify every notice',
     verifyBody:
-      'Each notice carries the pedospe-signature header with the time and an HMAC-SHA256 of the body. Check it before you trust the notice.',
+      'Each notice carries the midpoint-signature header with the time and an HMAC-SHA256 of the body. Check it before you trust the notice.',
     verifyLink: 'How to verify the signature',
     empty: 'No endpoints yet.',
     emptyBody: 'Add one so your server or bot learns about every change without asking.',

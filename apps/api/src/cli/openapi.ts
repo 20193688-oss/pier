@@ -9,7 +9,7 @@ import { buildOpenApi } from '@/openapi/document';
  * Writes `apps/api/openapi.json` from the controllers' decorators. Needs no
  * database or chain: the app is created, never started.
  *
- *   npm run build -w @pedospe/api && npm run openapi -w @pedospe/api
+ *   npm run build -w @midpoint/api && npm run openapi -w @midpoint/api
  */
 async function main(): Promise<void> {
   const config = loadConfig({

@@ -2,7 +2,7 @@
    proofs, profile and handles, balances and the sponsored activation, transfers, activity, paying
    a charge from the balance, QR payments, and submitting signed envelopes to the mock network. */
 import { Account, Keypair, Operation, TransactionBuilder, type Transaction } from '@stellar/stellar-sdk/base';
-import { normalizeHandle, normalizeRecipient, parseEmv } from '@pedospe/payment-qr';
+import { normalizeHandle, normalizeRecipient, parseEmv } from '@midpoint/payment-qr';
 import type { ApiRequest } from '@/lib/api/client';
 import { BRAND } from '@/lib/brand';
 import { qrRail } from '@/lib/p2p/qr-pay';

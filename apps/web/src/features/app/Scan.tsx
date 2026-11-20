@@ -1,6 +1,6 @@
 /* Scan: the camera (getUserMedia) read by the browser's BarcodeDetector, or by jsQR (Apache-2.0,
    loaded only when the browser has no detector); the flashlight where the camera has one; paste a
-   code or pick an image instead. What is read goes through @pedospe/payment-qr (routeScan) and
+   code or pick an image instead. What is read goes through @midpoint/payment-qr (routeScan) and
    opens the right screen. A secret key is never kept: the screen warns and forgets it. */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
@@ -19,7 +19,7 @@ interface Detector {
 }
 type DetectorCtor = new (o: { formats: string[] }) => Detector;
 
-const QR_KEY = 'pedospe.app.qr';
+const QR_KEY = 'midpoint.app.qr';
 
 /** Keep a merchant QR for the pay screen (this tab only). */
 export function keepQr(payload: string) {

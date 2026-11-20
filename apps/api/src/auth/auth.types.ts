@@ -21,10 +21,10 @@ export const ROLE_RANK: Record<MemberRole, number> = { member: 1, admin: 2, owne
 
 export const API_KEY_PREFIXES: Record<Tier, string> = { live: 'pk_live_', test: 'pk_test_' };
 export const SESSION_TOKEN_PREFIX = 'ps_sess_';
-export const SESSION_COOKIE = 'pedospe_session';
+export const SESSION_COOKIE = 'midpoint_session';
 /** Headers a wallet session names its organization and tier with on organization routes. */
-export const ORGANIZATION_HEADER = 'pedospe-organization';
-export const TIER_HEADER = 'pedospe-tier';
+export const ORGANIZATION_HEADER = 'midpoint-organization';
+export const TIER_HEADER = 'midpoint-tier';
 
 /** A signed-in wallet. */
 export interface SessionPrincipal {

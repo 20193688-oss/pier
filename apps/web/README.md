@@ -1,4 +1,4 @@
-# @pedospe/web
+# @midpoint/web
 
 The web app on Stellar: the payments app (an installable PWA), the hosted charge page, the
 merchant and business dashboard, and the docs. Vite + React 19 + React Router + Tailwind v4,
@@ -27,31 +27,31 @@ say `{brand}`.
 
 | Command | What it does |
 | --- | --- |
-| `npm run dev -w @pedospe/web` | dev server on `PORT` (default 3000), `/v1/*` and `/.well-known/*` proxied to the API |
-| `npm run dev:mock -w @pedospe/web` | every screen against the in-browser mock API and the demo wallet, no backend |
-| `npm run build -w @pedospe/web` | type check and production build into `dist/` (with `manifest.webmanifest` and `sw.js`) |
-| `npm test -w @pedospe/web` | unit tests (Vitest) |
-| `npm run test:e2e -w @pedospe/web` | the main flows in Chromium, mock mode, on Pixel 7, iPhone 14 and desktop profiles |
-| `npm run lint -w @pedospe/web` | ESLint (relative imports are an error) |
-| `npm run gen:api -w @pedospe/web` | regenerate `src/lib/api/openapi.gen.ts` from `apps/api/openapi.json` |
-| `npm run icons -w @pedospe/web` | render `public/icons/*.png` from the SVG mark (Playwright's Chromium) |
+| `npm run dev -w @midpoint/web` | dev server on `PORT` (default 3000), `/v1/*` and `/.well-known/*` proxied to the API |
+| `npm run dev:mock -w @midpoint/web` | every screen against the in-browser mock API and the demo wallet, no backend |
+| `npm run build -w @midpoint/web` | type check and production build into `dist/` (with `manifest.webmanifest` and `sw.js`) |
+| `npm test -w @midpoint/web` | unit tests (Vitest) |
+| `npm run test:e2e -w @midpoint/web` | the main flows in Chromium, mock mode, on Pixel 7, iPhone 14 and desktop profiles |
+| `npm run lint -w @midpoint/web` | ESLint (relative imports are an error) |
+| `npm run gen:api -w @midpoint/web` | regenerate `src/lib/api/openapi.gen.ts` from `apps/api/openapi.json` |
+| `npm run icons -w @midpoint/web` | render `public/icons/*.png` from the SVG mark (Playwright's Chromium) |
 
-`@pedospe/contracts` and `@pedospe/payment-qr` must be built first (`npm run build -w ...`): the
+`@midpoint/contracts` and `@midpoint/payment-qr` must be built first (`npm run build -w ...`): the
 signing check decodes contract calls with `MARKET_SPEC`, and every scanned or pasted text is read
-by `@pedospe/payment-qr`.
+by `@midpoint/payment-qr`.
 
 ## Environment
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
 | `PORT` | `3000` | dev server port |
-| `PEDOSPE_API_URL`, `API_URL`, `VITE_API_URL`, `PUBLIC_API_URL` | `http://localhost:4000` | the API the dev server proxies `/v1/*` and `/.well-known/*` to (first one set) |
+| `MIDPOINT_API_URL`, `API_URL`, `VITE_API_URL`, `PUBLIC_API_URL` | `http://localhost:4000` | the API the dev server proxies `/v1/*` and `/.well-known/*` to (first one set) |
 | `VITE_APP_TIER` | `live` | the app's tier (the API's `APP_TIER`); a dev server falls back to `test` when `live` has no market. Pollar's network follows it: `testnet` for test, `mainnet` for live |
 | `VITE_POLLAR_PUBLISHABLE_KEY` | empty | the Pollar app's publishable key. Empty: no Pollar (mock mode, or the dev-key wallet) |
 | `VITE_SEP10_HOME_DOMAIN` | this page's host | the home domain a sign-in challenge must name (the API's `SEP10_HOME_DOMAIN`) |
 | `VITE_SEP10_WEB_AUTH_DOMAIN` | the home domain | the `web_auth_domain` a sign-in challenge must name |
 | `VITE_API_BASE_URL` | empty | production: the API's origin when it is not the web app's own (`/.well-known/stellar.toml` is still read from this origin) |
-| `PEDOSPE_OPENAPI_PATH` | `../api/openapi.json` | the spec the docs reference and `gen:api` read |
+| `MIDPOINT_OPENAPI_PATH` | `../api/openapi.json` | the spec the docs reference and `gen:api` read |
 
 ## Wallets and sign-in
 
@@ -118,7 +118,7 @@ Use a Pollar app created for this product, never another company's app.
 - **After the wallet signs**, the signed envelope must be that same transaction
   (`src/lib/wallet/signed.ts`); only then is it handed to `POST /v1/app/submit` (or
   `/v1/p2p/submit`), which fee-bumps it from the sponsor.
-- Scanned and pasted text goes through `@pedospe/payment-qr` only. A secret key is never kept; a
+- Scanned and pasted text goes through `@midpoint/payment-qr` only. A secret key is never kept; a
   SEP-7 `tx` request, another asset or network, or a non-text memo is refused; only this app's own
   links are followed.
 

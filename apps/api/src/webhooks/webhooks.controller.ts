@@ -30,7 +30,7 @@ export class WebhooksController {
   @ApiOperation({
     summary: 'Register a webhook endpoint',
     description:
-      'Receives the events of your organization on this tier, signed with `pedospe-signature`. The secret is in this response only.',
+      'Receives the events of your organization on this tier, signed with `midpoint-signature`. The secret is in this response only.',
   })
   @ApiCreatedResponse({ type: CreatedWebhookEndpointView })
   @ApiErrors(400, 409)

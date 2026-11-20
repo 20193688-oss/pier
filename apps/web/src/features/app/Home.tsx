@@ -14,7 +14,7 @@ import { ActionTile } from '@/features/app/shell';
 import { ActivationCard, ActivityRow, InstallBanner, useLocal, useUsd } from '@/features/app/parts';
 import type { ActivityItem } from '@/lib/app/types';
 
-const HIDE_KEY = 'pedospe.app.hide-balance';
+const HIDE_KEY = 'midpoint.app.hide-balance';
 
 export default function Home() {
   const { t } = useI18n();

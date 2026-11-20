@@ -6,7 +6,7 @@ import { WEBHOOK_EVENT_TYPES } from '@/webhooks/webhook-outbox';
 @ApiSchema({ name: 'CreateWebhookEndpoint' })
 export class CreateWebhookEndpointDto {
   @ApiProperty({
-    example: 'https://merchant.example/hooks/pedospe',
+    example: 'https://merchant.example/hooks/midpoint',
     description: 'https only; it must resolve to public addresses.',
   })
   @IsString()
@@ -32,7 +32,7 @@ export class CreateWebhookEndpointDto {
 
 @ApiSchema({ name: 'UpdateWebhookEndpoint' })
 export class UpdateWebhookEndpointDto {
-  @ApiPropertyOptional({ example: 'https://merchant.example/hooks/pedospe' })
+  @ApiPropertyOptional({ example: 'https://merchant.example/hooks/midpoint' })
   @IsOptional()
   @IsString()
   @MaxLength(2000)
@@ -76,7 +76,7 @@ export class CreatedWebhookEndpointView extends WebhookEndpointView {
   @ApiProperty({
     example: 'whsec_9x...',
     description:
-      'The signing secret, shown once. Verify `pedospe-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`.',
+      'The signing secret, shown once. Verify `midpoint-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`.',
   })
   secret!: string;
 }

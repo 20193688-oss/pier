@@ -1,5 +1,5 @@
 /* How the mock API shows an order to each side, and which orders are the app user's own. */
-import { parseEmv } from '@pedospe/payment-qr';
+import { parseEmv } from '@midpoint/payment-qr';
 import { db, pub, tick, type Wire } from '@/lib/mock/db';
 
 /** A QR payment's QR as its merchant sees it, only while the order is live. */

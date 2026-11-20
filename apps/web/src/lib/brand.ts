@@ -1,14 +1,13 @@
-/* The product's name, in one place: the product will be renamed, so no component or translation
-   writes it. Translation strings say `{brand}` and the i18n provider fills it in from here
-   (src/i18n/index.tsx); code that needs the name outside a translation imports BRAND. Technical
-   names that are part of the API contract (the `pedospe-signature` webhook header, the
-   `Pedospe-Organization` request header, storage keys, the `@pedospe/*` packages) are not the
-   brand and do not change with it. */
+/* The product's name, in one place: no component or translation writes it. Translation strings say
+   `{brand}` and the i18n provider fills it in from here (src/i18n/index.tsx); code that needs the
+   name outside a translation imports BRAND. Technical names that are part of the API contract (the
+   `midpoint-signature` webhook header, the `Midpoint-Organization` request header, storage keys,
+   the `@midpoint/*` packages) are not the display name and do not change with it. */
 export const BRAND = {
-  /* The name as people read it, set lower-case like the wordmark. */
-  name: 'pedospe',
+  /* The name as people read it in a sentence. The wordmark sets it in lowercase (Logo.tsx). */
+  name: 'Midpoint',
   /* The installed app's short name (home screen label). */
-  shortName: 'pedospe',
+  shortName: 'Midpoint',
 } as const;
 
 /** Every `{brand}` placeholder in a translation catalog, filled with the product's name. */

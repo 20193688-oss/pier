@@ -2,7 +2,7 @@
    camera opens; with the SEP-7 switch, a standard `web+stellar:pay` request for other Stellar
    wallets. An optional amount and note go in both. Copy and share (Web Share API). */
 import { useMemo, useState } from 'react';
-import { buildPaymentLink, buildSep7Pay } from '@pedospe/payment-qr';
+import { buildPaymentLink, buildSep7Pay } from '@midpoint/payment-qr';
 import { fmt, useI18n } from '@/i18n';
 import { Field, Notice, Switch } from '@/components/ui/controls';
 import { CopyButton, CopyRow, Qr } from '@/components/ui/misc';

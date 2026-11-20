@@ -1,6 +1,6 @@
-# @pedospe/api
+# @midpoint/api
 
-The pedospe public API: a peer-to-peer market for stablecoins against local money, and the
+The Midpoint public API: a peer-to-peer market for stablecoins against local money, and the
 backend of the mobile payments app. NestJS 12, Prisma 7 on Postgres, `@stellar/stellar-sdk` 17
 over Soroban RPC for every chain interaction, ESM.
 
@@ -42,12 +42,12 @@ liquidity through offers, and every matcher transaction is recorded before it is
 
 ## Credentials
 
-| Who                 | How                                                                                                                                                                                                        | Reaches                                                                                                                                   |
-| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| Anyone              | nothing                                                                                                                                                                                                    | `GET /v1/market`, `/v1/auth/challenge`, `/v1/auth/verify`, `/v1/auth/sep10`, `/.well-known/stellar.toml`, `/v1/p2p-checkout/*`, `/health` |
-| An account          | SEP-10 session: HttpOnly cookie `pedospe_session` or `Authorization: Bearer ps_sess_...`                                                                                                                   | `/v1/auth/session`, `/v1/auth/logout`, `/v1/organizations/*`, `/v1/app/*`                                                                 |
-| An organization     | `Authorization: Bearer pk_test_...` / `pk_live_...` (scopes `p2p:read`, `p2p:write`), or a member's session with `Pedospe-Organization` and `Pedospe-Tier` headers (owner/admin: read+write, member: read) | `/v1/p2p/*`, `/v1/webhook-endpoints/*`                                                                                                    |
-| A platform operator | a session whose account is in `ADMIN_ADDRESSES`                                                                                                                                                            | `/v1/admin/p2p/*`                                                                                                                         |
+| Who                 | How                                                                                                                                                                                                          | Reaches                                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Anyone              | nothing                                                                                                                                                                                                      | `GET /v1/market`, `/v1/auth/challenge`, `/v1/auth/verify`, `/v1/auth/sep10`, `/.well-known/stellar.toml`, `/v1/p2p-checkout/*`, `/health` |
+| An account          | SEP-10 session: HttpOnly cookie `midpoint_session` or `Authorization: Bearer ps_sess_...`                                                                                                                    | `/v1/auth/session`, `/v1/auth/logout`, `/v1/organizations/*`, `/v1/app/*`                                                                 |
+| An organization     | `Authorization: Bearer pk_test_...` / `pk_live_...` (scopes `p2p:read`, `p2p:write`), or a member's session with `Midpoint-Organization` and `Midpoint-Tier` headers (owner/admin: read+write, member: read) | `/v1/p2p/*`, `/v1/webhook-endpoints/*`                                                                                                    |
+| A platform operator | a session whose account is in `ADMIN_ADDRESSES`                                                                                                                                                              | `/v1/admin/p2p/*`                                                                                                                         |
 
 Every route declares its policy; a route without one is refused. A key's prefix is its tier, and
 every query filters by organization **and** tier: another tier's row is the 404 of a missing one.
@@ -72,7 +72,7 @@ challenge never registers a wallet and a registration never signs in or register
 ## Routes
 
 The contract is [`openapi.json`](openapi.json) (also served at `GET /v1/openapi.json`), generated
-from the controllers: `npm run build -w @pedospe/api && npm run openapi -w @pedospe/api`.
+from the controllers: `npm run build -w @midpoint/api && npm run openapi -w @midpoint/api`.
 
 | Method               | Path                                                               | Auth                                                  |
 | -------------------- | ------------------------------------------------------------------ | ----------------------------------------------------- |
@@ -210,7 +210,7 @@ stay locked in the sponsored entries, not spent. The routes also carry per-calle
 - **QR payments** (`QR_PAY`): rails `ar_qr` (ARS, Argentina's interoperable QR) and `br_pix_qr`
   (BRL, PIX). A merchant opts in with a `BUY_TOKEN` offer on these rails (they take no payment
   method). `POST /v1/app/quotes { kind: 'QR_PAY', network, token, qr, fiatAmount? }` parses the QR
-  with `@pedospe/payment-qr`'s `parseEmv` (CRC, ambiguity checks), requires the rail's standard and
+  with `@midpoint/payment-qr`'s `parseEmv` (CRC, ambiguity checks), requires the rail's standard and
   currency, and lets a QR's own amount win (`fiatAmount` must then equal it). `POST /v1/app/orders
 { kind: 'QR_PAY', quoteId, qr }` (the same QR) answers the order and its `open_with_deposit`, with
   a bond as a sale. Windows: accept 2 min, payment 10 min, settle 1 h. The QR is sealed at rest;
@@ -252,7 +252,7 @@ never carry personal data or a scanned QR. Each event is written to an outbox **
 transaction** as the change it reports, then POSTed as `{ id, type, createdAt, data }` with
 
 ```
-pedospe-signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>
+midpoint-signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>
 ```
 
 Non-2xx answers are retried (30 s, 2 min, 10 min, 30 min, 1 h, 3 h, 6 h, 12 h, 24 h; then
@@ -264,11 +264,11 @@ connection is made.
 ```sh
 npm install
 npm run dev:stack          # from the repo root: the whole market (see below)
-npm run build -w @pedospe/api
-npm test -w @pedospe/api   # unit + e2e wiring (embedded Postgres, fake chain)
-npm run typecheck -w @pedospe/api
-npm run lint -w @pedospe/api
-E2E_STELLAR=testnet npm run test:chain -w @pedospe/api   # the market on testnet (minutes)
+npm run build -w @midpoint/api
+npm test -w @midpoint/api   # unit + e2e wiring (embedded Postgres, fake chain)
+npm run typecheck -w @midpoint/api
+npm run lint -w @midpoint/api
+E2E_STELLAR=testnet npm run test:chain -w @midpoint/api   # the market on testnet (minutes)
 ```
 
 `test:unit` runs the pure and service tests; `test:e2e` boots the HTTP app against a real Postgres
@@ -301,9 +301,9 @@ or accept and mark paid) on a test network.
 ## Deploy a contract
 
 ```sh
-npm run build -w @pedospe/api
-npm run deploy:contract -w @pedospe/api -- --network testnet \
-  --secrets-file C:/Users/<you>/.pedospe/deployer.json \
+npm run build -w @midpoint/api
+npm run deploy:contract -w @midpoint/api -- --network testnet \
+  --secrets-file C:/Users/<you>/.midpoint/deployer.json \
   --treasury G... --arbiter G... --fee-bps 50 [--owner G...] [--token CODE:ISSUER]
 ```
 

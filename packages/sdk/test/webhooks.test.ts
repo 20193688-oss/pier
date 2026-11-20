@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
-  PEDOSPE_SIGNATURE_HEADER,
-  PedospeWebhookError,
+  MIDPOINT_SIGNATURE_HEADER,
+  MidpointWebhookError,
   parseWebhook,
   signWebhook,
   verifyWebhook,
@@ -26,7 +26,7 @@ function header(body: string, timestamp = t, key = secret): string {
 
 describe('verifyWebhook', () => {
   it('names the header the API signs in', () => {
-    expect(PEDOSPE_SIGNATURE_HEADER).toBe('pedospe-signature');
+    expect(MIDPOINT_SIGNATURE_HEADER).toBe('midpoint-signature');
   });
 
   it('accepts a delivery signed with the secret within the tolerance', () => {
@@ -140,8 +140,8 @@ describe('parseWebhook', () => {
       } catch (error) {
         caught = error;
       }
-      expect(caught).toBeInstanceOf(PedospeWebhookError);
-      expect((caught as PedospeWebhookError).reason).toBe(c.reason);
+      expect(caught).toBeInstanceOf(MidpointWebhookError);
+      expect((caught as MidpointWebhookError).reason).toBe(c.reason);
     }
   });
 

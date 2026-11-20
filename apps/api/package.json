@@ -1,8 +1,8 @@
 {
-  "name": "@pedospe/api",
+  "name": "@midpoint/api",
   "version": "0.1.0",
   "private": true,
-  "description": "The pedospe public API: accounts, offers, matching, orders, charges, payouts, webhooks, the indexer and the matcher",
+  "description": "The Midpoint public API: accounts, offers, matching, orders, charges, payouts, webhooks, the indexer and the matcher",
   "license": "UNLICENSED",
   "type": "module",
   "exports": {
@@ -29,8 +29,8 @@
     "@nestjs/core": "12.5.1",
     "@nestjs/platform-express": "12.5.1",
     "@nestjs/swagger": "12.1.2",
-    "@pedospe/contracts": "0.1.0",
-    "@pedospe/payment-qr": "0.1.0",
+    "@midpoint/contracts": "0.1.0",
+    "@midpoint/payment-qr": "0.1.0",
     "@prisma/adapter-pg": "7.10.1",
     "@prisma/client": "7.10.1",
     "@stellar/stellar-sdk": "17.4.0",

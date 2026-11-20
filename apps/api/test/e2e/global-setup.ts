@@ -20,11 +20,11 @@ declare module 'vitest' {
 }
 
 export default async function setup(project: TestProject) {
-  const dir = mkdtempSync(join(tmpdir(), 'pedospe-e2e-'));
+  const dir = mkdtempSync(join(tmpdir(), 'midpoint-e2e-'));
   const pg = await startEmbeddedPostgres({
     dataDir: join(dir, 'pg'),
     port: await freePort(),
-    database: 'pedospe',
+    database: 'midpoint',
     persistent: false,
   });
   try {

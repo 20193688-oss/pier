@@ -1,6 +1,6 @@
 /* The Stellar networks the market runs on (docs/STELLAR.md section 3), and the links a screen
    shows for an account, a contract or a transaction. Pure; tests/unit/format.test.ts. */
-import { isStellarAddress, strKeyKind } from '@pedospe/payment-qr';
+import { isStellarAddress, strKeyKind } from '@midpoint/payment-qr';
 
 export const PASSPHRASES = {
   local: 'Standalone Network ; February 2017',

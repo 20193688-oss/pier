@@ -35,7 +35,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { DevAccounts, DevChain, DevMarket, SeedResult } from '@pedospe/api/dev';
+import type { DevAccounts, DevChain, DevMarket, SeedResult } from '@midpoint/api/dev';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STATE_DIR = join(ROOT, '.dev-stack');
@@ -151,14 +151,14 @@ async function main(): Promise<void> {
       'run',
       'build',
       '-w',
-      '@pedospe/contracts',
+      '@midpoint/contracts',
       '-w',
-      '@pedospe/payment-qr',
+      '@midpoint/payment-qr',
       '-w',
-      '@pedospe/api',
+      '@midpoint/api',
     ]);
   }
-  const dev = await import('@pedospe/api/dev');
+  const dev = await import('@midpoint/api/dev');
 
   for (const [port, what] of [
     [API_PORT, 'the API'],
@@ -190,7 +190,7 @@ async function main(): Promise<void> {
       ['compose', '-f', 'docker-compose.dev.yml', 'up', '-d', '--wait', 'postgres'],
       env,
     );
-    databaseUrl = `postgresql://pedospe:pedospe@127.0.0.1:${PG_PORT}/pedospe`;
+    databaseUrl = `postgresql://midpoint:midpoint@127.0.0.1:${PG_PORT}/midpoint`;
     stopPostgres = async () =>
       run('docker', ['compose', '-f', 'docker-compose.dev.yml', 'stop', 'postgres'], env);
   } else {
@@ -201,7 +201,7 @@ async function main(): Promise<void> {
     const pg = await dev.startEmbeddedPostgres({
       dataDir: join(STATE_DIR, 'pg'),
       port: PG_PORT,
-      database: 'pedospe',
+      database: 'midpoint',
       persistent: true,
     });
     databaseUrl = pg.databaseUrl;
@@ -345,7 +345,7 @@ async function main(): Promise<void> {
         env: {
           ...process.env,
           PORT: String(WEB_PORT),
-          PEDOSPE_API_URL: API_URL,
+          MIDPOINT_API_URL: API_URL,
           API_URL,
           VITE_API_URL: API_URL,
           PUBLIC_API_URL: API_URL,
@@ -363,7 +363,7 @@ async function main(): Promise<void> {
       chain.network === 'testnet' ? 'https://stellar.expert/explorer/testnet' : '(none on local)';
     const lines = [
       '',
-      '================ pedospe dev stack ================',
+      '================ Midpoint dev stack ================',
       `API            ${API_URL}   (OpenAPI: /v1/openapi.json)`,
       `Market         ${API_URL}/v1/market?tier=test`,
       `Web app        ${webDev && !flags.has('--no-web') ? WEB_ORIGIN : '(not started)'}`,

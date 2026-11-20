@@ -1,24 +1,24 @@
 /**
- * @pedospe/sdk: a typed client for the pedospe API, webhook verification and
+ * @midpoint/sdk: a typed client for the Midpoint API, webhook verification and
  * the decision rule of the reference auto-release bot. The bot itself
  * (`dist/bot/auto-release.js`) needs `viem`; nothing exported here does.
  */
 export {
-  createPedospeClient,
+  createMidpointClient,
   ORGANIZATION_HEADER,
-  PedospeError,
+  MidpointError,
   TIER_HEADER,
   UNEXPECTED_RESPONSE,
   unwrap,
-  type PedospeClient,
-  type PedospeClientOptions,
+  type MidpointClient,
+  type MidpointClientOptions,
   type Unwrapped,
 } from '@/client';
 export {
   DEFAULT_WEBHOOK_TOLERANCE_SECONDS,
   parseWebhook,
-  PEDOSPE_SIGNATURE_HEADER,
-  PedospeWebhookError,
+  MIDPOINT_SIGNATURE_HEADER,
+  MidpointWebhookError,
   signWebhook,
   verifyWebhook,
   type VerifyWebhookOptions,

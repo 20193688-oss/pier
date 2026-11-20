@@ -348,7 +348,7 @@ function CreatePayouts({
     );
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'pedospe-payouts.csv';
+    link.download = 'midpoint-payouts.csv';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };

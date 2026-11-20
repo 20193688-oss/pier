@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable, Logger } from '@nestjs/common';
-import { normalizeHandle, normalizeRecipient } from '@pedospe/payment-qr';
+import { normalizeHandle, normalizeRecipient } from '@midpoint/payment-qr';
 import { Address, nativeToScVal, scValToNative, type rpc } from '@stellar/stellar-sdk';
 import type { SessionPrincipal } from '@/auth/auth.types';
 import { ChainCallReverted, ChainClient } from '@/chain/chain-client.service';
@@ -42,7 +42,7 @@ export const RESERVED_HANDLES = new Set([
   'me',
   'merchant',
   'official',
-  'pedospe',
+  'midpoint',
   'root',
   'security',
   'sponsor',
@@ -57,7 +57,7 @@ export const RESERVED_HANDLES = new Set([
 /** Whether a normalised handle is reserved (the product's name included). */
 export function isReservedHandle(handle: string, brandName: string): boolean {
   const brand = brandName.toLowerCase().replace(/[^a-z0-9_]/g, '');
-  return RESERVED_HANDLES.has(handle) || handle === brand || handle.startsWith('pedospe');
+  return RESERVED_HANDLES.has(handle) || handle === brand || handle.startsWith('midpoint');
 }
 
 /**

@@ -74,7 +74,7 @@ test("a payout batch's progress and the figures over batches", () => {
 });
 
 test('a webhook URL is https with a host and no credentials', () => {
-  assert.ok(isWebhookUrl('https://bot.example/hooks/pedospe'));
+  assert.ok(isWebhookUrl('https://bot.example/hooks/midpoint'));
   assert.ok(isWebhookUrl(' https://bot.example:8443/x?y=1 '));
   for (const bad of [
     'http://bot.example/hooks',

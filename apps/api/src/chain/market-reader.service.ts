@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { MARKET_WASM_HASH } from '@pedospe/contracts';
+import { MARKET_WASM_HASH } from '@midpoint/contracts';
 import {
   Account,
   BASE_FEE,

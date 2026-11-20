@@ -1,4 +1,4 @@
-import { emvCrc } from '@pedospe/payment-qr';
+import { emvCrc } from '@midpoint/payment-qr';
 import { describe, expect, it } from 'vitest';
 import { isReservedHandle } from '@/p2p/app-wallet.service';
 import { qrHash, readQrPayment } from '@/p2p/domain/qr-pay';
@@ -94,9 +94,9 @@ describe('QR payments', () => {
 
 describe('handles', () => {
   it('reserves the product’s and the platform’s words', () => {
-    expect(isReservedHandle('admin', 'pedospe')).toBe(true);
-    expect(isReservedHandle('pedospe_team', 'pedospe')).toBe(true);
+    expect(isReservedHandle('admin', 'midpoint')).toBe(true);
+    expect(isReservedHandle('midpoint_team', 'midpoint')).toBe(true);
     expect(isReservedHandle('newbrand', 'New Brand')).toBe(true);
-    expect(isReservedHandle('maria_salta', 'pedospe')).toBe(false);
+    expect(isReservedHandle('maria_salta', 'midpoint')).toBe(false);
   });
 });

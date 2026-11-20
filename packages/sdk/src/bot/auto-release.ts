@@ -33,17 +33,17 @@
  *
  * Environment:
  *
- * - `PEDOSPE_API_URL`  the API origin
- * - `PEDOSPE_API_KEY`  the merchant organization's API key (`pk_live_...` / `pk_test_...`)
+ * - `MIDPOINT_API_URL`  the API origin
+ * - `MIDPOINT_API_KEY`  the merchant organization's API key (`pk_live_...` / `pk_test_...`)
  * - `BOT_SECRET`       its Stellar secret (S...): an operator with PERM_RELEASE, or the merchant; not needed with `DRY_RUN`
  * - `MIN_SCORE`        1 to 3 (default 3)
  * - `DRY_RUN`          `true`: decide and log, never sign or send
  * - `MARKET_CONTRACT`  required: the market contract (C...), or `network=C...` pairs
  * - `MAX_FEE_STROOPS`  optional: the largest fee it signs (default 1000000)
  *
- * Run (after `npm run build -w @pedospe/sdk`):
+ * Run (after `npm run build -w @midpoint/sdk`):
  *
- *     DRY_RUN=true PEDOSPE_API_URL=... PEDOSPE_API_KEY=... npm run bot -w @pedospe/sdk -- transfers.jsonl
+ *     DRY_RUN=true MIDPOINT_API_URL=... MIDPOINT_API_KEY=... npm run bot -w @midpoint/sdk -- transfers.jsonl
  *     tail -f bank-feed.jsonl | node packages/sdk/dist/bot/auto-release.js
  *
  * Every outcome is logged as one JSON line on stdout. Keys are never logged. The exit code is 1
@@ -59,7 +59,7 @@ import {
   releaseProblem,
   type ReleaseSender,
 } from '@/bot/release';
-import { createPedospeClient, PedospeError, unwrap, type PedospeClient } from '@/client';
+import { createMidpointClient, MidpointError, unwrap, type MidpointClient } from '@/client';
 import type { TransferMatchRequest } from '@/types';
 
 type SkipReason = Extract<MatchDecision, { action: 'skip' }>['reason'];
@@ -73,7 +73,7 @@ export type TransferOutcome =
   | { status: 'reverted'; orderId: string; hash: string };
 
 export interface BotContext {
-  client: PedospeClient;
+  client: MidpointClient;
   minScore: number;
   /** Null in a dry run. */
   sender: ReleaseSender | null;
@@ -148,13 +148,13 @@ function log(level: 'info' | 'warn' | 'error', msg: string, fields: object = {})
 
 /** A one-line reason that never carries request details. */
 function describeError(error: unknown): string {
-  if (error instanceof PedospeError) return `${error.code}: ${error.message}`;
+  if (error instanceof MidpointError) return `${error.code}: ${error.message}`;
   return error instanceof Error ? error.message : String(error);
 }
 
 async function main(): Promise<void> {
   const config = readBotConfig(process.env);
-  const client = createPedospeClient({ baseUrl: config.apiUrl, apiKey: config.apiKey });
+  const client = createMidpointClient({ baseUrl: config.apiUrl, apiKey: config.apiKey });
   const sender =
     config.dryRun || config.secret === null
       ? null

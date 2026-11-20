@@ -1,7 +1,7 @@
 {
-  "name": "@pedospe/sdk",
+  "name": "@midpoint/sdk",
   "version": "0.1.0",
-  "description": "TypeScript client for the pedospe API, webhook verification and a reference merchant bot",
+  "description": "TypeScript client for the Midpoint API, webhook verification and a reference merchant bot",
   "license": "MIT",
   "type": "module",
   "exports": {

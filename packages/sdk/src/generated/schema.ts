@@ -1306,7 +1306,7 @@ export interface paths {
     put?: never;
     /**
      * Register a webhook endpoint
-     * @description Receives the events of your organization on this tier, signed with `pedospe-signature`. The secret is in this response only.
+     * @description Receives the events of your organization on this tier, signed with `midpoint-signature`. The secret is in this response only.
      */
     post: operations['webhooksCreate'];
     delete?: never;
@@ -2073,7 +2073,7 @@ export interface components {
       updatedAt: string;
       /**
        * @description The payer’s page. Share it, or show it as a QR.
-       * @example https://pedospe.app/pay/9b7e2c41-3f5a-4d8e-a1b2-c3d4e5f60718
+       * @example https://midpoint.money/pay/9b7e2c41-3f5a-4d8e-a1b2-c3d4e5f60718
        */
       url: string;
     };
@@ -2603,7 +2603,7 @@ export interface components {
       )[];
       /**
        * @description https only; it must resolve to public addresses.
-       * @example https://merchant.example/hooks/pedospe
+       * @example https://merchant.example/hooks/midpoint
        */
       url: string;
     };
@@ -2793,7 +2793,7 @@ export interface components {
       )[];
       id: string;
       /**
-       * @description The signing secret, shown once. Verify `pedospe-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`.
+       * @description The signing secret, shown once. Verify `midpoint-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`.
        * @example whsec_9x...
        */
       secret: string;
@@ -4134,7 +4134,7 @@ export interface components {
         | 'P2P_CHARGE_SUCCEEDED'
         | 'P2P_PAYOUT_BATCH_COMPLETED'
       )[];
-      /** @example https://merchant.example/hooks/pedospe */
+      /** @example https://merchant.example/hooks/midpoint */
       url?: string;
     };
     /** @description One event sent (or being sent) to one endpoint. */
@@ -6977,9 +6977,9 @@ export interface operations {
       };
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7028,9 +7028,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7092,9 +7092,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7147,9 +7147,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -7218,9 +7218,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -7287,9 +7287,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -7358,9 +7358,9 @@ export interface operations {
       };
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7409,9 +7409,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7482,9 +7482,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -7544,9 +7544,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -7634,9 +7634,9 @@ export interface operations {
       };
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7685,9 +7685,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -7747,9 +7747,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7818,9 +7818,9 @@ export interface operations {
       };
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7869,9 +7869,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -7933,9 +7933,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -7993,9 +7993,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -8078,9 +8078,9 @@ export interface operations {
       };
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -8129,9 +8129,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -8220,9 +8220,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -8282,9 +8282,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -8353,9 +8353,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -8424,9 +8424,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -8506,9 +8506,9 @@ export interface operations {
       };
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -8557,9 +8557,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -8621,9 +8621,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -8681,9 +8681,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -8752,9 +8752,9 @@ export interface operations {
       };
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -8803,9 +8803,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -8885,9 +8885,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -8947,9 +8947,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -9038,9 +9038,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         hash: string;
@@ -9100,9 +9100,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -9173,9 +9173,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -9246,9 +9246,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -9288,9 +9288,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path?: never;
       cookie?: never;
@@ -9352,9 +9352,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -9405,9 +9405,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -9456,9 +9456,9 @@ export interface operations {
       query?: never;
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;
@@ -9527,9 +9527,9 @@ export interface operations {
       };
       header?: {
         /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
-        'Pedospe-Organization'?: string;
+        'Midpoint-Organization'?: string;
         /** @description Wallet sessions only: the tier to act on (default `test`). */
-        'Pedospe-Tier'?: 'live' | 'test';
+        'Midpoint-Tier'?: 'live' | 'test';
       };
       path: {
         id: string;

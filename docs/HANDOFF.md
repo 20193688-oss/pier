@@ -1,11 +1,11 @@
-# pedospe: handoff
+# Midpoint: handoff
 
 The state of the project and everything a new session needs to continue it. Last updated at the
 end of 2026-11-19, after the move to Stellar and the mobile payments app. Read this first, then
 [`AGENTS.md`](../AGENTS.md) (binding conventions), [`docs/STELLAR.md`](STELLAR.md) (the design
 contract of the Stellar port and the app) and the workspace READMEs.
 
-## 1. What pedospe is
+## 1. What Midpoint is
 
 A peer-to-peer market for stablecoins (USDC) against local money (bank transfers, PIX, Argentina's
 interoperable QR...), modelled on p2p.me but with a **public API**, running on **Stellar**. On top
@@ -23,26 +23,26 @@ The owner's requests (Spanish), in order:
 
 Owner decisions so far:
 
-| Topic                 | Decision                                                                                                        |
-| --------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Product               | Independent project named **pedospe** (not part of any other company's product); **to be renamed soon**         |
-| Chain                 | **Stellar** (Soroban contract `P2PMarket`), replacing the first EVM build entirely                              |
-| User wallets          | **Pollar** (`@pollar/react` / `@pollar/core` 0.12): email or Google login gives a classic G account             |
-| Fees                  | **Gasless**: the API fee-bumps every user transaction and sponsors activation reserves                          |
-| Mobile                | An installable **PWA** inside `apps/web` (Capacitor later if the stores are needed)                             |
-| App features (v1)     | Send/receive dollars, `@handles`, pay charges by QR, pay shop QRs (AR interoperable, PIX) through a merchant    |
-| Who confirms the fiat | The party that receives the local money (or its bot) releases; deadlines refund; disputes go to an arbiter      |
-| Matching              | The user types an amount and the market picks the merchant (no ads book)                                        |
-| Client tools          | Merchant bots via API, embedded buy/sell for businesses, collections (charges) and payouts                      |
-| Repo                  | Private `Emanuel250YT/pedospe`, local folder `C:\Users\emanu\OneDrive\Desktop\pedospe`, npm workspaces monorepo |
-| UI languages          | Spanish (default) and English                                                                                   |
+| Topic                 | Decision                                                                                                                                        |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Product               | Independent project named **Midpoint** (renamed from "pedospe" on 2026-11-20; not part of any other company's product)                          |
+| Chain                 | **Stellar** (Soroban contract `P2PMarket`), replacing the first EVM build entirely                                                              |
+| User wallets          | **Pollar** (`@pollar/react` / `@pollar/core` 0.12): email or Google login gives a classic G account                                             |
+| Fees                  | **Gasless**: the API fee-bumps every user transaction and sponsors activation reserves                                                          |
+| Mobile                | An installable **PWA** inside `apps/web` (Capacitor later if the stores are needed)                                                             |
+| App features (v1)     | Send/receive dollars, `@handles`, pay charges by QR, pay shop QRs (AR interoperable, PIX) through a merchant                                    |
+| Who confirms the fiat | The party that receives the local money (or its bot) releases; deadlines refund; disputes go to an arbiter                                      |
+| Matching              | The user types an amount and the market picks the merchant (no ads book)                                                                        |
+| Client tools          | Merchant bots via API, embedded buy/sell for businesses, collections (charges) and payouts                                                      |
+| Repo                  | Private `Emanuel250YT/pedospe`, local folder `C:\Users\emanu\OneDrive\Desktop\pedospe` (both still under the old name), npm workspaces monorepo |
+| UI languages          | Spanish (default) and English                                                                                                                   |
 
 ## 2. History you should know
 
 1. The market was first built inside another company's repositories (the owner's employer,
    Cosmos Pay); the owner then said it must be independent. Those pull requests were closed
-   unmerged. **Never put pedospe work in Cosmos Pay repositories, never copy their infrastructure,
-   and never use Cosmos Pay's Pollar app**: pedospe needs its own.
+   unmerged. **Never put Midpoint work in Cosmos Pay repositories, never copy their infrastructure,
+   and never use Cosmos Pay's Pollar app**: Midpoint needs its own.
 2. 2026-11-19, first build (EVM): Solidity contract, NestJS API with viem and SIWE, React web with
    browser wallets, all merged into `main` (`1dcd8a1`, handoff `a52dd3f`).
 3. 2026-11-19 evening, the pivot: everything moved to Stellar and the payments app was added, on
@@ -56,13 +56,13 @@ Owner decisions so far:
 
 ## 3. Layout and stack
 
-| Workspace                                     | Stack                                                                                                                                               | Docs                                                              |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `packages/contracts` (`@pedospe/contracts`)   | Soroban contract in Rust (`soroban-sdk` 29.0.1, Rust 1.97.1 pinned, `wasm32v1-none`); committed wasm + spec as a TS artifact; Vitest + `cargo test` | [`packages/contracts/README.md`](../packages/contracts/README.md) |
-| `packages/payment-qr` (`@pedospe/payment-qr`) | Dependency-free TS: StrKey, SEP-7, the app's payment/charge links, handles, EMVCo merchant QRs (PIX, AR interoperable) behind `parseScan`           | source docblocks                                                  |
-| `apps/api` (`@pedospe/api`)                   | NestJS 12, Prisma 7 + Postgres, `@stellar/stellar-sdk` 17.4 (Soroban RPC), Vitest + SWC; OpenAPI `apps/api/openapi.json` (89 operations)            | [`apps/api/README.md`](../apps/api/README.md)                     |
-| `packages/sdk` (`@pedospe/sdk`)               | openapi-fetch client typed from the spec, webhook verification, reference merchant bot (signs `release` with a Stellar key)                         | [`packages/sdk/README.md`](../packages/sdk/README.md)             |
-| `apps/web` (`@pedospe/web`)                   | Vite 8 + React 19 + React Router 8 + Tailwind 4, stellar-sdk, Pollar (lazy chunk), jsQR fallback, hand-written service worker, Playwright           | [`apps/web/README.md`](../apps/web/README.md)                     |
+| Workspace                                      | Stack                                                                                                                                               | Docs                                                              |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `packages/contracts` (`@midpoint/contracts`)   | Soroban contract in Rust (`soroban-sdk` 29.0.1, Rust 1.97.1 pinned, `wasm32v1-none`); committed wasm + spec as a TS artifact; Vitest + `cargo test` | [`packages/contracts/README.md`](../packages/contracts/README.md) |
+| `packages/payment-qr` (`@midpoint/payment-qr`) | Dependency-free TS: StrKey, SEP-7, the app's payment/charge links, handles, EMVCo merchant QRs (PIX, AR interoperable) behind `parseScan`           | source docblocks                                                  |
+| `apps/api` (`@midpoint/api`)                   | NestJS 12, Prisma 7 + Postgres, `@stellar/stellar-sdk` 17.4 (Soroban RPC), Vitest + SWC; OpenAPI `apps/api/openapi.json` (89 operations)            | [`apps/api/README.md`](../apps/api/README.md)                     |
+| `packages/sdk` (`@midpoint/sdk`)               | openapi-fetch client typed from the spec, webhook verification, reference merchant bot (signs `release` with a Stellar key)                         | [`packages/sdk/README.md`](../packages/sdk/README.md)             |
+| `apps/web` (`@midpoint/web`)                   | Vite 8 + React 19 + React Router 8 + Tailwind 4, stellar-sdk, Pollar (lazy chunk), jsQR fallback, hand-written service worker, Playwright           | [`apps/web/README.md`](../apps/web/README.md)                     |
 
 Tooling: Node 26, TypeScript **6.0.3**, ESLint (forbids relative imports in `src`/`test`),
 Prettier, `cargo fmt` + `clippy -D warnings` for the contract. Root scripts `build`, `test`,
@@ -79,7 +79,7 @@ npm run dev:stack -- --reset            # fresh database and a fresh deployment
 npm run dev:stack -- --no-web
 npm run dev:stack -- --api-port 4300 --web-port 3300 --pg-port 54349   # other ports
 npm run dev:simulate -- <orderId> --api http://localhost:4100           # play the merchant
-npm run dev:mock -w @pedospe/web        # the whole web with no backend (demo wallet)
+npm run dev:mock -w @midpoint/web        # the whole web with no backend (demo wallet)
 ```
 
 - Defaults: API **:4100**, web **:3100**, embedded Postgres **:54339**. Network: Stellar `local`
@@ -111,7 +111,7 @@ npm run dev:mock -w @pedospe/web        # the whole web with no backend (demo wa
 | payment-qr                                          | 16 pass (PIX manual CRC vector, SEP-23 vectors, duplicate-field and fail-closed cases)                                    | orchestrator                                                          |
 | SDK                                                 | 56 pass                                                                                                                   | orchestrator                                                          |
 | API unit + e2e wiring (embedded Postgres)           | 473 pass (every route vs wrong callers, scopes, roles, tiers, orgs, CSRF, revoked keys, SEP-10 replay and cross-purpose)  | orchestrator                                                          |
-| API chain e2e on **testnet**                        | 5/5: sponsored activation, gasless transfer to an `@handle`, BUY, SELL, QR_PAY, a charge paid from the balance            | API agent (`E2E_STELLAR=testnet npm run test:chain -w @pedospe/api`)  |
+| API chain e2e on **testnet**                        | 5/5: sponsored activation, gasless transfer to an `@handle`, BUY, SELL, QR_PAY, a charge paid from the balance            | API agent (`E2E_STELLAR=testnet npm run test:chain -w @midpoint/api`) |
 | Web unit                                            | 224 pass (102 are the ported transaction checks)                                                                          | orchestrator                                                          |
 | Web Playwright (mock mode)                          | 54 pass: 18 flows × Pixel 7, iPhone 14 (Chromium) and desktop, es/en                                                      | orchestrator                                                          |
 | Web against the real testnet stack                  | dev-key sign-in, send, BUY, QR_PAY, charge from the balance, dashboard sign-in and deposit                                | web agent; sign-in → home with balance re-checked by the orchestrator |
@@ -164,8 +164,8 @@ offered to liquidity merchants.
 ### 6.3 API
 
 - **Tenancy/auth:** organizations with members, API keys `pk_live_` / `pk_test_` (tier by prefix,
-  every query filtered by organization AND tier), members' headers `Pedospe-Organization` /
-  `Pedospe-Tier`. Wallet sign-in is **SEP-10** (`GET /v1/auth/challenge`, `POST /v1/auth/verify`,
+  every query filtered by organization AND tier), members' headers `Midpoint-Organization` /
+  `Midpoint-Tier`. Wallet sign-in is **SEP-10** (`GET /v1/auth/challenge`, `POST /v1/auth/verify`,
   plus the standard `/v1/auth/sep10` pair and `/.well-known/stellar.toml`); wallet proofs for
   account registration use SEP-10-shaped challenges bound to the organization.
 - **Transactions:** every user transaction is built by the API as a prepared XDR (source = the
@@ -184,7 +184,7 @@ offered to liquidity merchants.
   ledger); the indexer reads `getEvents` from a persisted cursor with compare-and-swap transitions
   committed with their webhook outbox rows; refusals are named after the contract that raised
   them (market error, or `Token…` for a SAC).
-- **Webhooks:** transactional outbox, `pedospe-signature: t=<unix>,v1=<HMAC-SHA256(secret, t.body)>`,
+- **Webhooks:** transactional outbox, `midpoint-signature: t=<unix>,v1=<HMAC-SHA256(secret, t.body)>`,
   backoff, SSRF guard, per-role allowlisted bodies (no personal details, no `chainId` now).
 - **Payment details and QR payloads** sealed at rest with AES-256-GCM (`DATA_ENCRYPTION_KEY`).
 
@@ -230,13 +230,13 @@ offered to liquidity merchants.
 
 ## 8. Open decisions and set-up for the owner
 
-1. **Pollar app for pedospe** (never another company's): publishable key
+1. **Pollar app for Midpoint** (never another company's): publishable key
    (`VITE_POLLAR_PUBLISHABLE_KEY`), allowed origins (`http://localhost:3100`, `:3000` and
    production), email OTP + Google, signing rules allowlisting only the market contract's user
    functions, the USDC/TUSD SAC `transfer`, classic `payment` / `change_trust` of those assets and
    SEP-10 for our home domain; a prompt-style confirmation policy; Pollar's own fee sponsorship
    off (our API sponsors). Checklist in `apps/web/README.md`.
-2. **The new product name** (one constant per workspace, then the `@pedospe/*` scope, repo and
+2. **The new product name** (one constant per workspace, then the `@midpoint/*` scope, repo and
    domain).
 3. Protocol fee value (contract cap 3%).
 4. Owner and arbiter multisig addresses and the treasury address.
@@ -277,17 +277,17 @@ offered to liquidity merchants.
 - Landing not prerendered (SEO); admin dispute screen not built; payout extras cut (CSV, retries).
 - A build with Stellar CLI ≥ 25.2 (`stellar contract build`) has not been compared byte for byte
   with `npm run compile`.
-- After an API spec change: `npm run openapi -w @pedospe/api`, then `npm run gen:api -w
-@pedospe/web` and `npm run generate -w @pedospe/sdk`.
+- After an API spec change: `npm run openapi -w @midpoint/api`, then `npm run gen:api -w
+@midpoint/web` and `npm run generate -w @midpoint/sdk`.
 
 ## 10. Environment gotchas (this Windows machine)
 
 - Shell tools: the Bash tool is Git Bash (POSIX); never kill processes by name, only single PIDs
   (`taskkill //PID <pid> //F`). Never start Docker Desktop or other GUI apps from a session.
 - `soroban-sdk` 28+ refuses to build except through `stellar contract build` from CLI ≥ 25.2 (it
-  shakes the contract spec); this machine has CLI 25.1, so `npm run compile -w @pedospe/contracts`
+  shakes the contract spec); this machine has CLI 25.1, so `npm run compile -w @midpoint/contracts`
   does the shaking itself. The `wasm32v1-none` target was added to the pinned Rust 1.97.1.
-- `npm test -w @pedospe/contracts` takes about 1.5 minutes (cargo).
+- `npm test -w @midpoint/contracts` takes about 1.5 minutes (cargo).
 - stellar-sdk 17's XDR objects expose plain properties (`event.contractId`, `body.v0.topics`), not
   the accessor functions of older versions.
 - Testnet: friendbot funds dev accounts; SDF's RPC keeps about 7 days of events.
@@ -296,6 +296,6 @@ offered to liquidity merchants.
 - Worktrees from the 2026-11-19 sessions (remove with `git worktree remove <path>` when done):
   `C:/Users/emanu/wt/pst-contracts`, `pst-api`, `pst-web` (the agents' branches, merged),
   `pst-gates` (clean gate runs), `pst-preview` (a preview stack on :4300/:3300/:54349 with a
-  throwaway patch), and the older `pedospe-api`, `pedospe-web`, `p2p-cs`, `p2p-dp`.
+  throwaway patch), and the older `midpoint-api`, `midpoint-web`, `p2p-cs`, `p2p-dp`.
 - The first EVM dev stack may still be running from the main folder (web :3000, API :4000, anvil
   :8545) and locks `node_modules` (anvil.exe): stop it before `npm install` there.

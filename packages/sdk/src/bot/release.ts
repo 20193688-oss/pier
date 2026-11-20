@@ -8,7 +8,7 @@ import {
   xdr,
   type Transaction as StellarTransaction,
 } from '@stellar/stellar-sdk';
-import { unwrap, type PedospeClient } from '@/client';
+import { unwrap, type MidpointClient } from '@/client';
 import type { Transaction, TransferMatch } from '@/types';
 
 /**
@@ -166,7 +166,7 @@ export interface ReleaseSender {
  */
 export function createReleaseSender(options: {
   secret: string;
-  client: PedospeClient;
+  client: MidpointClient;
   pollMs?: number;
   timeoutMs?: number;
 }): ReleaseSender {

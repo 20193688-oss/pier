@@ -4,7 +4,7 @@
    quote and the QR payment's fixed windows), then the order's own screen follows the merchant. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { parseEmv } from '@pedospe/payment-qr';
+import { parseEmv } from '@midpoint/payment-qr';
 import { fmt, useI18n } from '@/i18n';
 import { Icon } from '@/components/ui/Icon';
 import { Notice, Skeleton } from '@/components/ui/controls';
@@ -30,7 +30,7 @@ import type { P2pOrder, P2pQuote } from '@/lib/p2p/types';
 /** What the payer screen keeps about a QR order (the payer never sees the QR again). */
 export function keepQrOrder(id: string, info: { name: string | null; city: string | null }) {
   try {
-    sessionStorage.setItem(`pedospe.app.qr-order:${id}`, JSON.stringify(info));
+    sessionStorage.setItem(`midpoint.app.qr-order:${id}`, JSON.stringify(info));
   } catch {
     /* the order screen shows the merchant only */
   }

@@ -4,9 +4,9 @@ import type { TransferMatchRequest } from '@/types';
 
 /** The reference bot's settings, read from the environment. */
 export interface BotConfig {
-  /** `PEDOSPE_API_URL`: the API origin. */
+  /** `MIDPOINT_API_URL`: the API origin. */
   apiUrl: string;
-  /** `PEDOSPE_API_KEY`: the merchant organization's API key (`p2p:read` and `p2p:write`). */
+  /** `MIDPOINT_API_KEY`: the merchant organization's API key (`p2p:read` and `p2p:write`). */
   apiKey: string;
   /** `BOT_SECRET`: the merchant account's Stellar secret (S...), absent in a dry run. */
   secret: string | null;
@@ -51,12 +51,12 @@ export function readBotConfig(env: Env): BotConfig {
   const problems: string[] = [];
   const dryRun = parseFlag(value(env, 'DRY_RUN'), 'DRY_RUN');
 
-  const apiUrl = value(env, 'PEDOSPE_API_URL');
-  if (!apiUrl || !URL.canParse(apiUrl)) problems.push('PEDOSPE_API_URL must be an absolute URL.');
+  const apiUrl = value(env, 'MIDPOINT_API_URL');
+  if (!apiUrl || !URL.canParse(apiUrl)) problems.push('MIDPOINT_API_URL must be an absolute URL.');
 
-  const apiKey = value(env, 'PEDOSPE_API_KEY');
+  const apiKey = value(env, 'MIDPOINT_API_KEY');
   if (!apiKey || !/^pk_(?:live|test)_\S+$/.test(apiKey)) {
-    problems.push('PEDOSPE_API_KEY must be an API key (pk_live_... or pk_test_...).');
+    problems.push('MIDPOINT_API_KEY must be an API key (pk_live_... or pk_test_...).');
   }
 
   const secret = value(env, 'BOT_SECRET');

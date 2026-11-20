@@ -126,8 +126,8 @@ export async function startEmbeddedPostgres(options: {
   persistent: boolean;
 }): Promise<RunningPostgres> {
   const { default: EmbeddedPostgres } = await import('embedded-postgres');
-  const user = 'pedospe';
-  const password = 'pedospe';
+  const user = 'midpoint';
+  const password = 'midpoint';
   const fresh = !existsSync(join(options.dataDir, 'PG_VERSION'));
   const pg = new EmbeddedPostgres({
     databaseDir: options.dataDir,

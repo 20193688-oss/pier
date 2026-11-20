@@ -1,12 +1,12 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 /** The header every delivery is signed in. */
-export const SIGNATURE_HEADER = 'pedospe-signature';
+export const SIGNATURE_HEADER = 'midpoint-signature';
 /** How far a receiver should accept a delivery's timestamp from its own clock. */
 export const DEFAULT_TOLERANCE_SECONDS = 300;
 
 /**
- * `pedospe-signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`.
+ * `midpoint-signature: t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`.
  * The timestamp is inside the MAC, so a captured delivery cannot be replayed
  * later with a fresh one; receivers check it within a tolerance.
  */

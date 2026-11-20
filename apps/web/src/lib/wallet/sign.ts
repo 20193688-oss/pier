@@ -3,7 +3,7 @@
    transaction, hand the signed envelope to the API (which fee-bumps it from its sponsor and
    submits it), and follow it until the network settles it. A transaction that fails a check is
    never signed. */
-import { MARKET_ERRORS } from '@pedospe/contracts';
+import { MARKET_ERRORS } from '@midpoint/contracts';
 import { verifyTransaction, type TxExpectation, type VerifyProblem } from '@/lib/p2p/tx-verify';
 import { assertSameTransaction } from '@/lib/wallet/signed';
 import type { StellarWallet } from '@/lib/wallet/types';

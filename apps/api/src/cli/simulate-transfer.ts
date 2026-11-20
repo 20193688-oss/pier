@@ -11,7 +11,7 @@ async function main(): Promise<void> {
   const apiIndex = args.indexOf('--api');
   const api =
     (apiIndex >= 0 ? args[apiIndex + 1] : undefined) ??
-    process.env.PEDOSPE_API_URL ??
+    process.env.MIDPOINT_API_URL ??
     'http://localhost:4100';
   if (!orderId) {
     console.error('usage: simulate-transfer <orderId> [--api <url>]');

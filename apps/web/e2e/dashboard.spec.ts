@@ -26,7 +26,7 @@ test('liquidity: deposit with one signature and authorise the matcher (Spanish)'
   await page.getByRole('dialog').getByRole('button', { name: 'Firmar' }).click();
   await expect(page.getByText('12.700,5 USDC')).toBeVisible({ timeout: 20_000 });
 
-  await page.getByRole('button', { name: 'Autorizar a pedospe' }).first().click();
+  await page.getByRole('button', { name: 'Autorizar a Midpoint' }).first().click();
   await page.getByRole('dialog').getByLabel('Límite por orden').fill('750');
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Firmar' }).click();

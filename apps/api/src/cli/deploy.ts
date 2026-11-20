@@ -2,7 +2,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { MARKET_WASM_HASH } from '@pedospe/contracts';
+import { MARKET_WASM_HASH } from '@midpoint/contracts';
 import {
   Account,
   BASE_FEE,
@@ -21,8 +21,8 @@ import { P2P_MAX_PROTOCOL_FEE_BPS } from '@/p2p/domain/constants';
  * Deploys `P2PMarket` (the committed wasm) on ONE Stellar network, or verifies
  * a deployment that exists, and prints the environment entries the API reads.
  *
- *   npm run deploy:contract -w @pedospe/api -- --network testnet \
- *     --secrets-file C:/Users/<you>/.pedospe/deployer.json \
+ *   npm run deploy:contract -w @midpoint/api -- --network testnet \
+ *     --secrets-file C:/Users/<you>/.midpoint/deployer.json \
  *     --treasury G... --arbiter G... --fee-bps 50 [--owner G...] [--token CODE:ISSUER] [--rpc <url>]
  *   ... --contract C...                       verify only
  *   ... --network mainnet --i-understand-mainnet --owner G... --rpc <url>

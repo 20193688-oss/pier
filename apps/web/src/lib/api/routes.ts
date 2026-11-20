@@ -13,8 +13,8 @@ const enc = encodeURIComponent;
 
 /** Headers that scope a member's session call to one organization and one tier (an API key
     carries both). */
-export const ORG_HEADER = 'Pedospe-Organization';
-export const TIER_HEADER = 'Pedospe-Tier';
+export const ORG_HEADER = 'Midpoint-Organization';
+export const TIER_HEADER = 'Midpoint-Tier';
 /** The hosted charge page's capability for one order. */
 export const PAYER_TOKEN_HEADER = 'X-Payer-Token';
 

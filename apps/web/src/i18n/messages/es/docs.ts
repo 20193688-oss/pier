@@ -334,7 +334,7 @@ const docs = {
         '@@code webhookPayload',
         'Usa `id` para procesar cada evento una sola vez. Vuelve a leer la orden con la API antes de mover dinero o tokens: un evento te dice que algo cambió; la orden te dice cómo está ahora.',
         '## Verifica la firma',
-        'Cada entrega lleva el encabezado `pedospe-signature: t=<unix>,v1=<hex>`: `v1` es un HMAC-SHA256, en hexadecimal, de `t`, un punto y el cuerpo sin procesar, con el secreto de tu endpoint. Verifícalo antes de confiar en el evento:',
+        'Cada entrega lleva el encabezado `midpoint-signature: t=<unix>,v1=<hex>`: `v1` es un HMAC-SHA256, en hexadecimal, de `t`, un punto y el cuerpo sin procesar, con el secreto de tu endpoint. Verifícalo antes de confiar en el evento:',
         '@@code webhookVerify',
         '- Usa el cuerpo tal como llegó, antes de convertirlo en JSON: un espacio de más cambia la firma.',
         '- Compara con `timingSafeEqual`, nunca con `===`.',

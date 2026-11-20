@@ -225,7 +225,7 @@ const schema = z.object({
   PORT: int(4000, 1, 65535),
   HOST: z.string().default('0.0.0.0'),
   DATABASE_URL: z.string().min(1, 'is required'),
-  BRAND_NAME: z.string().min(1).max(40).default('pedospe'),
+  BRAND_NAME: z.string().min(1).max(40).default('Midpoint'),
   PUBLIC_API_URL: z.string().url().optional(),
   WEB_ORIGINS: list(),
   TRUST_PROXY: int(0, 0, 10),

@@ -1,4 +1,4 @@
-/* The API's OpenAPI document, provided at build time by the `pedospe-openapi` plugin in
+/* The API's OpenAPI document, provided at build time by the `midpoint-openapi` plugin in
    vite.config.ts: the parsed apps/api/openapi.json, or null while the API has not published it. */
 declare module 'virtual:openapi' {
   const spec: Record<string, unknown> | null;

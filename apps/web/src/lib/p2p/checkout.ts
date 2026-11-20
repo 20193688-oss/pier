@@ -184,7 +184,7 @@ export function parseCreatedOrder(
 
 /* The payer's order on a charge, kept for this tab so a reload resumes it (sessionStorage, keyed
    by charge; the token reads only that order). */
-const STORE = (chargeId: string) => `pedospe.charge:${chargeId}`;
+const STORE = (chargeId: string) => `midpoint.charge:${chargeId}`;
 export function savedOrder(chargeId: string): { orderId: string; payerToken: string } | null {
   try {
     const raw = JSON.parse(sessionStorage.getItem(STORE(chargeId)) ?? 'null');

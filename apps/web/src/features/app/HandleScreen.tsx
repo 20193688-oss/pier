@@ -1,7 +1,7 @@
 /* Claim (or change) the @handle people find you by. Skippable; offered once after sign-in. */
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { normalizeHandle } from '@pedospe/payment-qr';
+import { normalizeHandle } from '@midpoint/payment-qr';
 import { fmt, useI18n } from '@/i18n';
 import { app } from '@/lib/api/app';
 import { ApiError } from '@/lib/api/client';
@@ -13,7 +13,7 @@ import { Screen } from '@/features/app/shell';
 
 export const markHandleOffered = () => {
   try {
-    sessionStorage.setItem('pedospe.app.handle-offered', '1');
+    sessionStorage.setItem('midpoint.app.handle-offered', '1');
   } catch {
     /* offered again next time */
   }

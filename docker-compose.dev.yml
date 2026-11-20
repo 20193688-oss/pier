@@ -4,18 +4,18 @@ services:
   postgres:
     image: postgres:17-alpine
     environment:
-      POSTGRES_USER: pedospe
-      POSTGRES_PASSWORD: pedospe
-      POSTGRES_DB: pedospe
+      POSTGRES_USER: midpoint
+      POSTGRES_PASSWORD: midpoint
+      POSTGRES_DB: midpoint
     ports:
       - '127.0.0.1:${DEV_STACK_PG_PORT:-54339}:5432'
     volumes:
-      - pedospe-dev-pg:/var/lib/postgresql/data
+      - midpoint-dev-pg:/var/lib/postgresql/data
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U pedospe']
+      test: ['CMD-SHELL', 'pg_isready -U midpoint']
       interval: 2s
       timeout: 2s
       retries: 30
 
 volumes:
-  pedospe-dev-pg:
+  midpoint-dev-pg:

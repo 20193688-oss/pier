@@ -1,4 +1,4 @@
-# pedospe
+# Midpoint
 
 A peer-to-peer market for stablecoins against local money, with a public API.
 
