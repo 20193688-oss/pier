@@ -22,7 +22,7 @@ import { Field, Notice, SelectField, Skeleton, Spinner } from '@/components/ui/c
 import { Icon } from '@/components/ui/Icon';
 import { CopyRow, figureSize, useNow } from '@/components/ui/misc';
 import { accountRows, errorText, railName } from '@/components/p2p/parts';
-import { LangToggle, MockBanner, ThemeToggle } from '@/components/layout/SiteFrame';
+import { LangToggle, ThemeToggle } from '@/components/layout/SiteFrame';
 
 export default function ChargePage() {
   const { t, lang } = useI18n();
@@ -56,7 +56,6 @@ export default function ChargePage() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <MockBanner />
       <header className="mx-auto flex w-full max-w-xl items-center justify-between px-4 py-4">
         <Link to="/" aria-label={t.common.nav.home} className="rounded-[10px]">
           <Logo size={26} />

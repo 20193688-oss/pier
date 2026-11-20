@@ -64,9 +64,11 @@ A `StellarWallet` (`src/lib/wallet/types.ts`) is one of:
   `stellar.sep10.sign` and this app's configured domains. A passkey smart wallet (a C address)
   cannot sign SEP-10 or classic transactions and is refused.
 - **`demo`** (mock mode only): a key derived from a fixed public seed per demo persona (a person,
-  Norte Cambios, Tienda Lerma, a new wallet).
+  Norte Cambios, Tienda Lerma, a new wallet). The sign-in screens look as in production: any
+  email and any 6-digit code; `<persona>@demo.test` picks the persona (`personaForEmail`).
 - **`dev-key`** (development builds only): one of the dev stack's printed test secret keys, signed
-  in this tab, to use a local or testnet stack without Pollar. Kept in this tab's sessionStorage so
+  in this tab, to use a local or testnet stack without Pollar. Shown under the sign-in form only
+  with `?dev` in the URL or when the build has no Pollar key. Kept in this tab's sessionStorage so
   a reload keeps the session; never a real key.
 
 Mock mode, the demo wallet and the dev key are guarded at compile time: a production build holds

@@ -1,5 +1,5 @@
-/* Pieces several app screens share: an activity row, the activation card, a dollar amount with its
-   local-money equivalent, and a key/value list. */
+/* Pieces several app screens share: an activity row and the list that groups rows by day, the
+   activation card, a dollar amount with its local-money equivalent, and a key/value list. */
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { fmt, useI18n } from '@/i18n';
@@ -9,7 +9,7 @@ import { useToast } from '@/components/ui/Toast';
 import { StatusPill, Pill } from '@/components/ui/misc';
 import { SignFlow } from '@/components/wallet/SignFlow';
 import { app, appSubmitter } from '@/lib/api/app';
-import { dateTime, money, shortAddress } from '@/lib/format';
+import { groupByDay, money, shortAddress, timeOnly } from '@/lib/format';
 import { localValue, usd } from '@/lib/app/money';
 import { toBaseUnits } from '@/lib/p2p/amounts';
 import { useAppData } from '@/features/app/data';
@@ -36,6 +36,11 @@ export function useLocal() {
 const who = (handle: string | null, address: string, outside: string) =>
   handle ? `@${handle}` : address ? shortAddress(address) : outside;
 
+const itemDate = (item: ActivityItem) =>
+  item.type === 'transfer' ? item.transfer.createdAt : item.order.createdAt;
+const itemKey = (item: ActivityItem) =>
+  `${item.type}-${item.type === 'order' ? item.order.id : item.transfer.id}`;
+
 /** One movement: what it was, who, when, the amount signed in or out. */
 export function ActivityRow({ item }: { item: ActivityItem }) {
   const { t, lang } = useI18n();
@@ -57,7 +62,7 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
     title = incoming
       ? fmt(a.received, { who: who(tr.fromHandle, tr.from, a.outside) })
       : fmt(a.sent, { who: who(tr.toHandle, tr.to, a.outside) });
-    sub = [tr.note, dateTime(lang, tr.createdAt)].filter(Boolean).join(' · ');
+    sub = [tr.note, timeOnly(lang, tr.createdAt)].filter(Boolean).join(' · ');
     amount = fmtUsd(tr.amount);
     to = `/app/activity/transfer/${tr.id}`;
     if (tr.status !== 'COMPLETED')
@@ -69,7 +74,9 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
     incoming = o.kind === 'BUY';
     icon = o.kind === 'BUY' ? 'plus' : o.kind === 'QR_PAY' ? 'store' : 'bank';
     title = (a.kinds as Record<string, string>)[o.kind] ?? o.kind;
-    sub = `${money(lang, o.fiatAmount, o.currency)} · ${dateTime(lang, o.createdAt)}`;
+    sub = [money(lang, o.fiatAmount, o.currency), timeOnly(lang, o.createdAt)]
+      .filter(Boolean)
+      .join(' · ');
     amount = fmtUsd(toBaseUnits(o.tokenAmount, decimals) ?? '0');
     to = `/app/activity/order/${o.id}`;
     if (o.status !== 'completed')
@@ -82,23 +89,49 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
   return (
     <Link
       to={to}
-      className="flex min-h-[64px] items-center gap-3 rounded-[14px] px-1 py-2 transition-colors hover:bg-well"
+      className="-mx-2 flex min-h-[64px] items-center gap-3 rounded-[14px] px-2 py-2 transition-colors hover:bg-well"
     >
-      <span className="grid size-11 shrink-0 place-items-center rounded-full bg-well" aria-hidden="true">
-        <Icon name={icon} size={20} />
+      <span className="icon-tile" aria-hidden="true">
+        <Icon name={icon} size={19} strokeWidth={2.1} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <b className="truncate font-semibold">{title}</b>
+        <b className="truncate font-medium">{title}</b>
         <span className="truncate text-[0.8125rem] text-ink-3">{sub}</span>
       </span>
       <span className="flex flex-col items-end gap-1">
-        <b className={`num font-semibold ${incoming ? 'text-ok' : ''}`}>
+        <b className={`num font-medium ${incoming ? 'text-ok' : ''}`}>
           {incoming ? '+' : '−'}
           {amount}
         </b>
         {pill}
       </span>
     </Link>
+  );
+}
+
+/** Movements under a heading per day ("Hoy", "Ayer", "18 de noviembre"), each day its own list. */
+export function ActivityList({ items, level = 3 }: { items: ActivityItem[]; level?: 2 | 3 }) {
+  const { lang } = useI18n();
+  const Heading = level === 2 ? 'h2' : 'h3';
+  return (
+    <div className="flex flex-col">
+      {groupByDay(items, itemDate, lang).map((g) => (
+        <section key={`${g.label}-${itemKey(g.items[0])}`}>
+          {g.label && (
+            <Heading className="mt-3 mb-0.5 text-[0.8125rem] font-medium tracking-normal text-ink-3">
+              {g.label}
+            </Heading>
+          )}
+          <ul className="flex flex-col" role="list">
+            {g.items.map((it) => (
+              <li key={itemKey(it)}>
+                <ActivityRow item={it} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -113,11 +146,18 @@ export function ActivationCard() {
   if (!network || !token || !session) return null;
   if (done) return <Notice tone="ok">{a.done}</Notice>;
   return (
-    <section className="rounded-[18px] border border-line bg-sheet p-4" aria-labelledby="activate-h">
-      <h2 id="activate-h" className="text-[1.1rem]">
-        {a.title}
-      </h2>
-      <p className="mt-1 mb-3 text-[0.9375rem] text-ink-2">{a.body}</p>
+    <section className="sheet p-4" aria-labelledby="activate-h">
+      <div className="flex items-start gap-3">
+        <span className="tile-icon mt-0.5 shrink-0" aria-hidden="true">
+          <Icon name="bolt" size={15} strokeWidth={2.3} />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 id="activate-h" className="text-[1.0625rem]">
+            {a.title}
+          </h2>
+          <p className="mt-1 mb-3 text-[0.9375rem] text-ink-2">{a.body}</p>
+        </div>
+      </div>
       <SignFlow
         network={network}
         signer={session.address}
@@ -145,14 +185,14 @@ export function ActivationCard() {
   );
 }
 
-/** A list of labelled values (a receipt). */
+/** A list of labelled values (a receipt): the label quiet on the left, the value on the right. */
 export function Facts({ rows }: { rows: [string, ReactNode][] }) {
   return (
-    <dl className="divide-y divide-line rounded-[18px] bg-well px-4">
+    <dl className="sheet px-4 py-1">
       {rows.map(([k, v]) => (
         <div key={k} className="flex items-start justify-between gap-4 py-3">
           <dt className="text-ink-3">{k}</dt>
-          <dd className="num min-w-0 text-right font-semibold break-words">{v}</dd>
+          <dd className="num min-w-0 text-right font-medium break-words">{v}</dd>
         </div>
       ))}
     </dl>
@@ -184,13 +224,20 @@ export function InstallBanner() {
     }
   };
   return (
-    <section className="flex items-start gap-3 rounded-[18px] border border-line bg-sheet p-4" aria-labelledby="install-h">
-      <Icon name="download" size={22} />
+    <section
+      className="flex items-start gap-3 rounded-[18px] bg-well p-4"
+      aria-labelledby="install-h"
+    >
+      <span className="tile-icon mt-0.5 shrink-0" aria-hidden="true">
+        <Icon name="download" size={15} strokeWidth={2.3} />
+      </span>
       <div className="flex-1">
-        <h2 id="install-h" className="text-[1.05rem]">
+        <h2 id="install-h" className="text-[1.0625rem]">
           {pwa.canInstall ? p.installTitle : p.iosTitle}
         </h2>
-        <p className="mt-0.5 text-[0.9375rem] text-ink-2">{pwa.canInstall ? p.installBody : p.iosBody}</p>
+        <p className="mt-0.5 text-[0.9375rem] text-ink-2">
+          {pwa.canInstall ? p.installBody : p.iosBody}
+        </p>
         <div className="mt-3 flex gap-2">
           {pwa.canInstall && (
             <button type="button" className="btn btn-ink btn-sm" onClick={() => void install()}>

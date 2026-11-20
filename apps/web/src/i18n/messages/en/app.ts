@@ -1,8 +1,8 @@
 /* The payments app (/app/*), in English: mirrors es/app.ts key for key. */
 const app = {
-  metaTitle: '{brand}: your dollars, in your pocket',
+  metaTitle: '{brand}: international payments between people',
   metaDescription:
-    'Send and receive digital dollars (USDC) with your @handle, pay shop QR codes and cash out to your bank with a transfer.',
+    'Send money to people in other countries and pay in each place’s currency, by bank transfer or QR.',
   tabs: {
     label: 'App sections',
     home: 'Home',
@@ -16,14 +16,8 @@ const app = {
   usd: '${amount}',
   approx: '≈ {amount}',
   welcome: {
-    title: 'Your dollars, in your pocket',
-    lede: 'Send to an @handle, pay any shop by QR and switch to local money whenever you want. No network fees.',
-    points: {
-      send: 'Send and receive in seconds',
-      qr: 'Pay shop QR codes in pesos or reais',
-      safe: 'Your wallet is yours: nobody else can move your funds',
-    },
-    start: 'Get started',
+    title: 'Pay like a local in any country',
+    lede: 'Send money to people in other countries and pay in each place’s currency, by bank transfer or QR.',
   },
   handle: {
     title: 'Pick your @handle',
@@ -80,10 +74,12 @@ const app = {
     gallery: 'Pick an image',
     noCodeInImage: 'We found no QR code in that image.',
     secretTitle: 'That is a secret key',
-    secretBody: 'A secret key gives full control of a wallet. Never share it or scan it in a payments app. We did not keep it or send it anywhere.',
+    secretBody:
+      'A secret key gives full control of a wallet. Never share it or scan it in a payments app. We did not keep it or send it anywhere.',
     secretOk: 'Got it',
     unsupported: {
-      'sep7-tx': 'That code asks to sign an arbitrary transaction. For your safety, the app only takes payment requests.',
+      'sep7-tx':
+        'That code asks to sign an arbitrary transaction. For your safety, the app only takes payment requests.',
       'sep7-invalid': 'That Stellar payment request is not valid.',
       'emv-invalid': 'That shop QR is not valid or is damaged.',
       'foreign-link': 'That link is not from {brand}. We did not open it.',
@@ -92,7 +88,8 @@ const app = {
     otherAsset: 'That request is for another asset ({asset}). The app only sends USDC.',
     otherNetwork: 'That request is for another Stellar network.',
     memo: 'That request carries a memo the app cannot send (an exchange ID, for example). Pay from the exchange’s app.',
-    qrNotTaken: 'We do not take that kind of QR yet. For now: Argentina’s interoperable QR and Brazil’s PIX.',
+    qrNotTaken:
+      'We do not take that kind of QR yet. For now: Argentina’s interoperable QR and Brazil’s PIX.',
     again: 'Scan another',
   },
   send: {
@@ -201,9 +198,11 @@ const app = {
     no: 'No, it did not arrive',
     releaseStep: 'Release {amount} to {merchant}',
     disputeTitle: 'Open a dispute',
-    disputeBody: 'Your USDC stay locked until {brand} reviews the payment. Keep the receipt or a screenshot.',
+    disputeBody:
+      'Your USDC stay locked until {brand} reviews the payment. Keep the receipt or a screenshot.',
     disputeStep: 'Open the dispute',
-    settleNote: 'If nobody acts, the payment is released by itself {time} after it was marked paid.',
+    settleNote:
+      'If nobody acts, the payment is released by itself {time} after it was marked paid.',
     doneTitle: 'Paid',
     doneBody: 'The shop got {amount}.',
     cancelledTitle: 'Payment cancelled',

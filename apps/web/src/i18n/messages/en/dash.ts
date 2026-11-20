@@ -4,9 +4,8 @@ import type es from '@/i18n/messages/es/dash';
 const dash: typeof es = {
   metaTitle: 'Dashboard | {brand}',
   signIn: {
-    title: 'Sign in to the dashboard with your wallet',
-    body: 'The dashboard is for merchants and businesses: liquidity, offers, orders, charges, payouts and the API. You sign in with your Stellar wallet (email, Google or an extension); there is no password.',
-    cta: 'Connect wallet',
+    title: 'Sign in to the dashboard',
+    body: 'For merchants and businesses: liquidity, offers, orders, charges, payouts and the API.',
     back: 'Back to the site',
   },
   orgs: {

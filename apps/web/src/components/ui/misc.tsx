@@ -101,7 +101,7 @@ export function Qr({ value, label, size = 192 }: { value: string; label: string;
       type: 'svg',
       margin: 1,
       errorCorrectionLevel: 'M',
-      color: { dark: '#10261f', light: '#ffffff' },
+      color: { dark: '#0a0b0e', light: '#ffffff' },
     })
       .then((s) => alive && setSvg(s))
       .catch(() => alive && setSvg(null));

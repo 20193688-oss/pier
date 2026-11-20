@@ -4,9 +4,8 @@
 const dash = {
   metaTitle: 'Panel | {brand}',
   signIn: {
-    title: 'Entra al panel con tu wallet',
-    body: 'El panel es para comerciantes y empresas: liquidez, ofertas, órdenes, cobros, pagos a terceros y la API. Entras con tu wallet de Stellar (email, Google o una extensión); no hay contraseña.',
-    cta: 'Conectar wallet',
+    title: 'Inicia sesión en el panel',
+    body: 'Para comerciantes y empresas: liquidez, ofertas, órdenes, cobros, pagos a terceros y la API.',
     back: 'Volver al sitio',
   },
   orgs: {

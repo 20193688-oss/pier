@@ -2,13 +2,13 @@
 import type es from '@/i18n/messages/es/landing';
 
 const landing: typeof es = {
-  metaTitle: '{brand}: USDC by bank transfer, and payments in dollars',
+  metaTitle: '{brand}: international payments between people',
   metaDescription:
-    'Type an amount, transfer from your bank and receive USDC in your Stellar wallet. Send, receive and pay by QR from the app. Funds stay locked in a contract until the payment is confirmed.',
+    'Send money to people in other countries and pay in each place’s currency, by bank transfer or QR. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
   hero: {
-    title: 'USDC by bank transfer, person to person',
-    body: 'Type how much you want to buy, transfer from your bank to the account we show you, and the USDC arrives in your wallet on the Stellar network. Meanwhile it stays locked in a smart contract, in nobody’s hands.',
-    open: 'Open the app',
+    title: 'International payments between people',
+    body: 'Send money to someone in another country, pay by QR wherever you are or switch to your currency with a bank transfer. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
+    open: 'Create account',
     merchant: 'I am a merchant',
     rails:
       'Bank transfer, CVU or alias in Argentina, PIX in Brazil, SPEI in Mexico, and banks in Colombia, Peru and Chile.',
@@ -46,8 +46,8 @@ const landing: typeof es = {
     sell: 'Selling is the same in reverse: you lock your USDC in the order, the merchant transfers to your account, and you release the USDC once you see the money.',
   },
   app: {
-    title: 'A payments app in dollars',
-    body: 'Install it on your phone from the browser. Your USDC balance lives in your wallet on the Stellar network, and {brand} pays the network fees.',
+    title: 'The app',
+    body: 'It installs on your phone from the browser. Your balance is in digital dollars (USDC), and {brand} pays the network fees.',
     points: [
       {
         title: 'Send and receive',
@@ -69,7 +69,7 @@ const landing: typeof es = {
     cta: 'Open the app',
   },
   trust: {
-    title: 'Nobody keeps your funds',
+    title: 'How each payment is protected',
     items: [
       {
         title: 'Locked in a contract',
@@ -126,7 +126,7 @@ const landing: typeof es = {
       },
       {
         q: 'Do I need an account?',
-        a: 'No password needed: you sign in with your email or Google account and your Stellar wallet is created on the spot. If you already have a Stellar wallet, you can use it in the dashboard.',
+        a: 'Yes. You sign up with your email or your Google account, with no password. If you already have a Stellar wallet, you can use it in the dashboard.',
       },
       {
         q: 'Which network does it run on?',
@@ -151,8 +151,8 @@ const landing: typeof es = {
     ],
   },
   closing: {
-    title: 'Start with any amount',
-    body: 'Sign in with your email, type an amount and see the price before you decide.',
+    title: 'Create your account',
+    body: 'With your email or your Google account. You see the price of each payment before you confirm it.',
   },
 };
 

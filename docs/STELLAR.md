@@ -43,8 +43,9 @@ silently.
   `BRAND_NAME` config value). Technical names (the `@midpoint/*` packages, the `Midpoint-*` request
   headers, the `midpoint-signature` webhook header, `MIDPOINT_*` variables, storage keys) are part
   of the API contract: change them only with a versioned migration.
-- The UI stays in Spanish (default) and English, with the same look ("paper and ink", Archivo,
-  yellow highlighter for the exact amount).
+- The UI stays in Spanish (default) and English. Its look ("night and aura" since 2026-11-20:
+  near-black ink, white sheets, an ice-to-night gradient textured with dots, Archivo, an ice
+  highlighter for the exact amount) is described in the handoff, section 6.4.
 
 ## 2. What stays and what is replaced
 

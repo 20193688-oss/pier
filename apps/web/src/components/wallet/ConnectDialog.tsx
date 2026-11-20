@@ -17,7 +17,7 @@ export function ConnectDialog({
   const t = useT();
   const w = t.common.wallet;
   return (
-    <Dialog title={w.title} onClose={onClose}>
+    <Dialog title={w.signInTitle} onClose={onClose}>
       <p className="mb-4 text-ink-2">{w.body}</p>
       <SignIn
         variant={variant}

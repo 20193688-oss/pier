@@ -77,7 +77,9 @@ test('scan a pasted payload: a payment link opens send, a secret key warns (Engl
   await page.getByRole('button', { name: 'Read' }).click();
   await expect(page.getByRole('heading', { name: 'That is a secret key' })).toBeVisible();
   await page.getByRole('button', { name: 'Got it' }).click();
-  await page.getByLabel('Code, link, address or @handle').fill('https://evil.example/app/send?to=%40lucia');
+  await page
+    .getByLabel('Code, link, address or @handle')
+    .fill('https://evil.example/app/send?to=%40lucia');
   await page.getByRole('button', { name: 'Read' }).click();
   await expect(page.getByText(/That link is not from/)).toBeVisible();
   await page
@@ -194,6 +196,8 @@ test('profile: address, language, and sign out (English)', async ({ page }) => {
   await expect(page.getByText(/^G[A-Z2-7]{55}$/)).toBeVisible();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Sign out' }).click();
-  await expect(page.getByRole('heading', { name: 'Your dollars, in your pocket' })).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Pay like a local in any country' }),
+  ).toBeVisible();
   expect(errors).toEqual([]);
 });

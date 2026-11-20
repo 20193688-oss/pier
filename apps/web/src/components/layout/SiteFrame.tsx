@@ -1,5 +1,5 @@
 /* The public site's frame: a header with the mark, the main sections, language, theme and the
-   wallet; the demo-mode banner; the footer. On a phone the sections fold into a menu. */
+   wallet; the footer. On a phone the sections fold into a menu. */
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, useLocation } from 'react-router';
 import { Logo } from '@/components/ui/Logo';
@@ -9,29 +9,6 @@ import { ConnectDialog } from '@/components/wallet/ConnectDialog';
 import { fmt, useI18n, type Lang } from '@/i18n';
 import { useTheme } from '@/lib/theme';
 import { useSession } from '@/lib/session';
-import { MOCK } from '@/lib/env';
-
-export function MockBanner() {
-  const { t } = useI18n();
-  if (!(import.meta.env.DEV || import.meta.env.VITE_MOCK === '1') || !MOCK) return null;
-  return (
-    <div className="bg-marker px-4 py-1.5 text-center text-[0.8125rem] font-semibold text-marker-ink">
-      {t.common.mock.banner}{' '}
-      <button
-        type="button"
-        className="underline underline-offset-2"
-        onClick={async () => {
-          if (!(import.meta.env.DEV || import.meta.env.VITE_MOCK === '1')) return;
-          const { resetMock } = await import('@/lib/mock');
-          resetMock();
-          location.reload();
-        }}
-      >
-        {t.common.mock.reset}
-      </button>
-    </div>
-  );
-}
 
 export function LangToggle() {
   const { t, lang, setLang } = useI18n();
@@ -270,7 +247,6 @@ export function SiteLayout({ children }: { children: ReactNode }) {
       >
         {t.common.skip}
       </a>
-      <MockBanner />
       <SiteHeader />
       <main id="main" className="flex-1">
         {children}

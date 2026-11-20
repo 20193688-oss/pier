@@ -91,10 +91,16 @@ npm run dev:mock -w @midpoint/web        # the whole web with no backend (demo w
   methods, ARS/BRL offers and `ar_qr`/`br_pix_qr` QR offers, 100 000 TUSD of liquidity, the
   matcher authorised, a charge, the user activated by the sponsor with 5 000 TUSD). It prints the
   URLs, keys and the dev secret keys (testnet only).
-- Clicking through: open the web's `/app`, choose **"Clave de desarrollo"** (the dev-key wallet,
-  compiled out of production builds) and paste the printed `user` secret. The dashboard
-  (`/dashboard`) takes the `merchant` or `business` secret the same way. Pollar login needs
-  `VITE_POLLAR_PUBLISHABLE_KEY` (section 8).
+- Clicking through: open the web's `/app` and sign up or sign in with Pollar (email code or
+  Google; needs `VITE_POLLAR_PUBLISHABLE_KEY`, section 8, and the web on an origin the Pollar app
+  allows, today `http://localhost:3300`). To use a printed dev secret instead, open
+  `/app?dev` (or have no Pollar key): **"Clave de desarrollo"** appears under the form (the
+  dev-key wallet, compiled out of production builds); paste the `user` secret, or the
+  `merchant` / `business` secret on `/dashboard?dev`.
+- Mock mode (`dev:mock`) shows no demo banner: sign up or sign in with any email and any 6-digit
+  code. `<persona>@demo.test` picks a demo persona (`user`, `merchant`, `business`, `fresh`);
+  any other email is a new wallet on sign-up, the funded person on the app's sign-in and the
+  merchant on the dashboard's (`personaForEmail` in `apps/web/src/lib/mock/wallet.ts`).
 - To try a shop QR, paste an EMV payload in the app's scan screen (the tests in
   `packages/payment-qr/test` show how to build one with a valid CRC).
 - A phone cannot use the local stack: the camera, the service worker and installing need HTTPS,
@@ -192,9 +198,9 @@ offered to liquidity merchants.
 
 - `/app/*` (the payments app): welcome/sign-in, handle, home, scan, send, receive, add (BUY),
   withdraw (SELL), pay a shop QR, pay a charge, order and activity detail, me. Phone-width column
-  on desktop, bottom tabs with a raised scan button. PWA: manifest named from `src/lib/brand.ts`,
-  icons from `scripts/gen-icons.mjs`, hand-written `pwa/sw.js` (never caches `/v1` or
-  `/.well-known`), install prompts, offline page.
+  on desktop, a floating dock for the tabs with the scan button at its centre. PWA: manifest
+  named from `src/lib/brand.ts`, icons from `scripts/gen-icons.mjs`, hand-written `pwa/sw.js`
+  (never caches `/v1` or `/.well-known`), install prompts, offline page.
 - Also: `/` landing, `/dashboard` (liquidity, offers incl. QR rails, payment methods, orders incl.
   the QR to pay for QR_PAY, charges, payouts, keys, webhooks, team), `/pay/{id}` and `/c/{id}`
   charge page, `/docs`.
@@ -202,6 +208,16 @@ offered to liquidity merchants.
   through Pollar's built-in adapters), `demo` (mock mode only), `dev-key` (dev builds only). The
   app's token is `VITE_APP_TOKEN`, else the one the wallet holds, else USDC.
 - The brand name lives in `apps/web/src/lib/brand.ts` and the API's `BRAND_NAME`.
+- The look ("night and aura", 2026-11-20, after a Dribbble banking-app reference the owner chose)
+  is defined in `apps/web/src/styles/global.css`: near-black ink on a cool white page with white
+  sheets; one atmospheric gradient textured with halftone dots and grain (`.aura`,
+  `.aura-screen`, `.aura-night`, `.aura-card` + `.grain`) only for the welcome, the home balance,
+  the wallet cards (receive, me) and the landing's hero and closing; `.tone-light`,
+  `.tone-dark` and `.tone-glass` set the palette for part of a page whatever the theme; pill
+  buttons (`.btn-white`, `.btn-glass` on the aura);
+  action `.tile`s with tracked capitals (`.caps`); wide uppercase `.display` headlines on the aura;
+  an ice highlighter (`.marker`) for the exact amount. The mark is the glyph on an aura tile
+  (`Logo.tsx`, `public/favicon.svg`, `scripts/gen-icons.mjs`).
 
 ## 7. Security invariants (keep them)
 

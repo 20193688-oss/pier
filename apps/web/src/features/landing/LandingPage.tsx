@@ -1,6 +1,6 @@
-/* The home page. The hero's second half is the thing the product is about: an order slip with
-   the exact amount to transfer marked like a receipt someone highlighted, the account to pay, and
-   the clock. Then how a purchase works (a real sequence, so numbered), the payments app (/app),
+/* The home page. The hero sits on the night aura; its second half is the thing the product is
+   about: an order slip (a white sheet) with the exact amount to transfer marked like a receipt
+   someone highlighted, the account to pay, and the clock. Then how a purchase works (a real sequence, so numbered), the payments app (/app),
    why nobody keeps the funds, merchants, businesses and the API, and the questions people ask
    first. The market runs on Stellar. */
 import { Link } from 'react-router';
@@ -24,7 +24,7 @@ function OrderSlip() {
   return (
     <figure className="relative mx-auto w-full max-w-[25rem]">
       <div
-        className="slip shadow-[0_30px_60px_-30px_rgb(16_38_31/0.45)] sm:rotate-[-1.2deg]"
+        className="tone-light slip text-ink [--notch:transparent] shadow-[0_40px_80px_-30px_rgb(0_0_0/0.7)] sm:rotate-[-1.2deg]"
         aria-hidden="true"
       >
         <div className="flex items-center justify-between px-6 pt-5">
@@ -64,7 +64,7 @@ function OrderSlip() {
           </p>
         </div>
       </div>
-      <figcaption className="mt-5 text-center text-[0.875rem] text-ink-3">{s.caption}</figcaption>
+      <figcaption className="mt-5 text-center text-[0.875rem] text-ink-2">{s.caption}</figcaption>
     </figure>
   );
 }
@@ -78,29 +78,26 @@ export default function LandingPage() {
   useDocumentMeta(l.metaTitle, l.metaDescription);
   return (
     <>
-      <section className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-10 pb-16 md:pt-16 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:pt-24">
-        <div className="flex flex-col gap-6">
-          <h1
-            className="text-[2.2rem] leading-[1.04] sm:text-[3rem] lg:text-[3.5rem]"
-            style={{ fontStretch: '118%', fontWeight: 780 }}
-          >
-            {l.hero.title}
-          </h1>
-          <p className="max-w-[34rem] text-[1.125rem] text-ink-2">{l.hero.body}</p>
-          <div className="flex flex-wrap gap-3">
-            <Link to="/app" className="btn btn-ink btn-lg">
-              {l.hero.open}
-            </Link>
-            <Link to="/dashboard" className="btn btn-line btn-lg">
-              {l.hero.merchant}
-            </Link>
+      <section className="tone-dark aura-night grain text-ink">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-12 pb-20 md:pt-16 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:pt-24 lg:pb-28">
+          <div className="flex flex-col gap-6">
+            <h1 className="display text-[clamp(1.7rem,7.2vw,3.6rem)]">{l.hero.title}</h1>
+            <p className="max-w-[34rem] text-[1.125rem] text-ink-2">{l.hero.body}</p>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/app" className="btn btn-white btn-lg">
+                {l.hero.open}
+              </Link>
+              <Link to="/dashboard" className="btn btn-glass btn-lg">
+                {l.hero.merchant}
+              </Link>
+            </div>
+            <p className="max-w-[34rem] text-[0.9375rem] text-ink-3">{l.hero.rails}</p>
           </div>
-          <p className="max-w-[34rem] text-[0.9375rem] text-ink-3">{l.hero.rails}</p>
+          <OrderSlip />
         </div>
-        <OrderSlip />
       </section>
 
-      <section aria-labelledby="how-h" className="border-y border-line bg-sheet">
+      <section aria-labelledby="how-h" className="border-b border-line bg-sheet">
         <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
           <h2 id="how-h" className="text-[1.9rem] sm:text-[2.3rem]">
             {l.how.title}
@@ -183,31 +180,25 @@ export default function LandingPage() {
       <section
         id="merchants"
         aria-labelledby="merchants-h"
-        className="scroll-mt-20 bg-ink text-on-ink"
+        className="tone-dark scroll-mt-20 bg-paper text-ink"
       >
         <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 md:grid-cols-2 md:py-20">
           <div className="flex flex-col gap-5">
             <h2 id="merchants-h" className="text-[1.9rem] sm:text-[2.3rem]">
               {l.merchants.title}
             </h2>
-            <p className="text-[1.0625rem] opacity-85">{l.merchants.body}</p>
+            <p className="text-[1.0625rem] text-ink-2">{l.merchants.body}</p>
             <div>
-              <Link
-                to="/dashboard"
-                className="btn btn-lg bg-marker text-marker-ink hover:brightness-95"
-              >
+              <Link to="/dashboard" className="btn btn-white btn-lg">
                 {l.merchants.cta}
               </Link>
             </div>
           </div>
           <ul className="flex flex-col gap-4" role="list">
             {l.merchants.points.map((p) => (
-              <li
-                key={p}
-                className="flex gap-3 border-b border-[color-mix(in_oklab,var(--on-ink)_18%,transparent)] pb-4 last:border-0"
-              >
+              <li key={p} className="flex gap-3 border-b border-line pb-4 last:border-0">
                 <Icon name="check" className="mt-0.5 shrink-0 text-marker" />
-                <span className="opacity-90">{p}</span>
+                <span className="text-ink-2">{p}</span>
               </li>
             ))}
           </ul>
@@ -241,10 +232,8 @@ export default function LandingPage() {
               </Link>
             </div>
           </div>
-          <figure className="min-w-0 self-start rounded-[22px] bg-ink p-5 text-on-ink sm:p-6">
-            <figcaption className="mb-3 text-[0.875rem] font-semibold opacity-75">
-              {l.business.codeLabel}
-            </figcaption>
+          <figure className="tone-dark min-w-0 self-start rounded-[22px] border border-line bg-paper p-5 text-ink sm:p-6">
+            <figcaption className="caps mb-4 text-ink-3">{l.business.codeLabel}</figcaption>
             <pre className="overflow-x-auto text-[0.8125rem] leading-relaxed">
               <code>{`curl "$MIDPOINT_API_URL/v1/p2p/charges" \\
   -H "Authorization: Bearer $MIDPOINT_KEY" \\
@@ -288,12 +277,12 @@ export default function LandingPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-4">
-        <div className="flex flex-col items-start gap-5 rounded-[28px] bg-well px-6 py-10 sm:px-10 md:flex-row md:items-center md:justify-between">
+        <div className="tone-dark aura-night grain flex flex-col items-start gap-5 overflow-hidden rounded-[28px] px-6 py-12 text-ink sm:px-10 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-[1.6rem] sm:text-[2rem]">{l.closing.title}</h2>
-            <p className="mt-2 text-ink-2">{l.closing.body}</p>
+            <h2 className="display text-[clamp(1.6rem,4vw,2.4rem)]">{l.closing.title}</h2>
+            <p className="mt-3 text-ink-2">{l.closing.body}</p>
           </div>
-          <Link to="/app" className="btn btn-ink btn-lg">
+          <Link to="/app" className="btn btn-white btn-lg">
             {l.hero.open}
           </Link>
         </div>

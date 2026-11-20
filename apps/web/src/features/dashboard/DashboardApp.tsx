@@ -12,8 +12,8 @@ import { Icon, type IconName } from '@/components/ui/Icon';
 import { Field, Notice, Spinner } from '@/components/ui/controls';
 import { Address } from '@/components/ui/misc';
 import { useToast } from '@/components/ui/Toast';
-import { ConnectDialog } from '@/components/wallet/ConnectDialog';
-import { LangToggle, MockBanner, ThemeToggle } from '@/components/layout/SiteFrame';
+import { SignIn } from '@/components/wallet/SignIn';
+import { LangToggle, ThemeToggle } from '@/components/layout/SiteFrame';
 import { DashProvider, useDash } from '@/features/dashboard/context';
 import { OverviewView } from '@/features/dashboard/views/OverviewView';
 import { LiquidityView } from '@/features/dashboard/views/LiquidityView';
@@ -83,7 +83,6 @@ function Bare({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   return (
     <div className="flex min-h-dvh flex-col">
-      <MockBanner />
       <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-4">
         <Link to="/" aria-label={t.common.nav.home}>
           <Logo />
@@ -105,25 +104,16 @@ function Bare({ children }: { children: ReactNode }) {
 
 function SignInGate() {
   const { t } = useI18n();
-  const { expired } = useSession();
-  const [open, setOpen] = useState(false);
   return (
     <Bare>
-      <div className="sheet flex flex-col gap-4 p-6 sm:p-8">
+      <div className="sheet mx-auto flex w-full max-w-md flex-col gap-2 p-6 sm:p-8">
         <h1 className="text-[1.75rem]">{t.dash.signIn.title}</h1>
-        <p className="text-ink-2">{t.dash.signIn.body}</p>
-        {expired && <Notice tone="warn">{t.common.wallet.expired}</Notice>}
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className="btn btn-ink btn-lg" onClick={() => setOpen(true)}>
-            <Icon name="wallet" />
-            {t.dash.signIn.cta}
-          </button>
-          <Link to="/" className="btn btn-line btn-lg">
-            {t.dash.signIn.back}
-          </Link>
-        </div>
+        <p className="mb-4 text-ink-2">{t.dash.signIn.body}</p>
+        <SignIn variant="dashboard" mode="signin" />
+        <Link to="/" className="btn btn-quiet mt-2 self-center">
+          {t.dash.signIn.back}
+        </Link>
       </div>
-      {open && <ConnectDialog onClose={() => setOpen(false)} />}
     </Bare>
   );
 }
@@ -193,7 +183,6 @@ function Shell() {
       >
         {t.common.skip}
       </a>
-      <MockBanner />
       <div className="flex flex-1">
         <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 flex-col border-r border-line bg-sheet lg:flex">
           <SideNav />

@@ -1,5 +1,5 @@
-/* Activity: every movement of the wallet, newest first (transfers in and out, purchases, sales,
-   QR payments), a page at a time. */
+/* Activity: every movement of the wallet, newest first and by day (transfers in and out,
+   purchases, sales, QR payments), a page at a time. */
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { Notice, Skeleton, Spinner } from '@/components/ui/controls';
@@ -7,7 +7,7 @@ import { app } from '@/lib/api/app';
 import { decimalsFrom } from '@/lib/p2p/normalize';
 import { useAppData } from '@/features/app/data';
 import { Screen } from '@/features/app/shell';
-import { ActivityRow } from '@/features/app/parts';
+import { ActivityList } from '@/features/app/parts';
 import type { ActivityItem } from '@/lib/app/types';
 
 export default function Activity() {
@@ -50,16 +50,17 @@ export default function Activity() {
       {items === null && <Notice tone="error">{a.loadError}</Notice>}
       {items && items.length === 0 && <p className="text-ink-3">{a.empty}</p>}
       {items && items.length > 0 && (
-        <ul className="flex flex-col" role="list" aria-label={a.title}>
-          {items.map((it) => (
-            <li key={`${it.type}-${it.type === 'order' ? it.order.id : it.transfer.id}`}>
-              <ActivityRow item={it} />
-            </li>
-          ))}
-        </ul>
+        <div className="sheet px-4 pb-2">
+          <ActivityList items={items} level={2} />
+        </div>
       )}
       {cursor && (
-        <button type="button" className="btn btn-line mt-3 mb-4" disabled={busy} onClick={() => void load(cursor)}>
+        <button
+          type="button"
+          className="btn btn-line mt-4 mb-4"
+          disabled={busy}
+          onClick={() => void load(cursor)}
+        >
           {busy && <Spinner />}
           {a.more}
         </button>

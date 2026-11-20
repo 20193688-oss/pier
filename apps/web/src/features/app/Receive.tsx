@@ -1,4 +1,4 @@
-/* Receive: my QR. By default a payment link (this app's /app/send?to=@handle...), which any phone
+/* Receive: my QR, on a wallet card. By default a payment link (this app's /app/send?to=@handle...), which any phone
    camera opens; with the SEP-7 switch, a standard `web+stellar:pay` request for other Stellar
    wallets. An optional amount and note go in both. Copy and share (Web Share API). */
 import { useMemo, useState } from 'react';
@@ -7,6 +7,8 @@ import { fmt, useI18n } from '@/i18n';
 import { Field, Notice, Switch } from '@/components/ui/controls';
 import { CopyButton, CopyRow, Qr } from '@/components/ui/misc';
 import { Icon } from '@/components/ui/Icon';
+import { LogoGlyph } from '@/components/ui/Logo';
+import { shortAddress } from '@/lib/format';
 import { useSession } from '@/lib/session';
 import { parseDecimal } from '@/lib/p2p/amounts';
 import { useAppData } from '@/features/app/data';
@@ -60,29 +62,42 @@ export default function Receive() {
             <ActivationCard />
           </>
         )}
-        <div className="flex flex-col items-center gap-3 rounded-[22px] border border-line bg-sheet p-5">
-          {profile?.handle && <b className="text-[1.35rem]">@{profile.handle}</b>}
-          {value ? <Qr value={value} label={r.qrLabel} size={232} /> : <div className="skeleton size-[232px]" />}
-          {value && (
-            <div className="flex w-full gap-2">
-              <CopyButton value={value} label={r.copyLink} className="btn-lg flex-1" />
-              {typeof navigator.share === 'function' && (
-                <button
-                  type="button"
-                  className="btn btn-ink btn-lg flex-1"
-                  onClick={() =>
-                    void navigator
-                      .share({ text: fmt(r.shareText, { brand: t.common.brand, link: value }) })
-                      .catch(() => {})
-                  }
-                >
-                  <Icon name="share" size={20} />
-                  {r.share}
-                </button>
-              )}
-            </div>
+        {/* The QR on a wallet card: the aura from ice to night, the handle at its foot. */}
+        <div className="tone-dark aura-card grain flex flex-col items-center gap-4 overflow-hidden rounded-[24px] px-5 pt-4 pb-5 text-ink shadow-[var(--shadow-float)]">
+          <div className="flex w-full items-center justify-between text-[#0a0b0e]">
+            <span className="num text-[0.875rem] font-medium">{shortAddress(address)}</span>
+            <LogoGlyph size={22} />
+          </div>
+          {value ? (
+            <Qr value={value} label={r.qrLabel} size={224} />
+          ) : (
+            <div className="skeleton size-[224px]" />
+          )}
+          {profile?.handle ? (
+            <b className="text-[1.375rem] font-semibold tracking-[-0.02em]">@{profile.handle}</b>
+          ) : (
+            <span className="text-[0.9375rem] text-ink-2">{network?.name}</span>
           )}
         </div>
+        {value && (
+          <div className="flex w-full gap-2">
+            <CopyButton value={value} label={r.copyLink} className="btn-lg flex-1" />
+            {typeof navigator.share === 'function' && (
+              <button
+                type="button"
+                className="btn btn-ink btn-lg flex-1"
+                onClick={() =>
+                  void navigator
+                    .share({ text: fmt(r.shareText, { brand: t.common.brand, link: value }) })
+                    .catch(() => {})
+                }
+              >
+                <Icon name="share" size={20} />
+                {r.share}
+              </button>
+            )}
+          </div>
+        )}
         {!profile?.handle && <p className="text-[0.875rem] text-ink-3">{r.noHandle}</p>}
         <div className="grid grid-cols-2 gap-3">
           <Field
@@ -101,14 +116,14 @@ export default function Receive() {
             error={noteOk ? null : t.app.send.noteTooLong}
           />
         </div>
-        <div className="flex items-center justify-between gap-4 rounded-[18px] border border-line px-4 py-3">
+        <div className="sheet flex items-center justify-between gap-4 px-4 py-3">
           <span className="flex flex-col">
             <b className="font-semibold">{r.sep7}</b>
             <span className="text-[0.875rem] text-ink-3">{r.sep7Hint}</span>
           </span>
           <Switch label={r.sep7} checked={sep7} onChange={setSep7} />
         </div>
-        <div className="divide-y divide-line rounded-[18px] bg-well px-4">
+        <div className="sheet divide-y divide-line px-4">
           {value && !sep7 && <CopyRow label={r.link} value={value} />}
           <CopyRow label={r.address} value={address} />
         </div>

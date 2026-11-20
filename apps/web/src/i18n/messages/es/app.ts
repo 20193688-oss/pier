@@ -1,9 +1,9 @@
-/* The payments app (/app/*): a wallet of digital dollars to send, receive, scan and pay. Spanish
-   is the source; en/app.ts mirrors it key for key. */
+/* The payments app (/app/*): international payments between people (send, receive, scan and pay
+   in other countries' money). Spanish is the source; en/app.ts mirrors it key for key. */
 const app = {
-  metaTitle: '{brand}: tus dólares, en el bolsillo',
+  metaTitle: '{brand}: pagos internacionales entre personas',
   metaDescription:
-    'Envía y recibe dólares digitales (USDC) con tu @usuario, paga con QR en comercios y cambia a pesos con una transferencia.',
+    'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR.',
   tabs: {
     label: 'Secciones de la app',
     home: 'Inicio',
@@ -17,14 +17,8 @@ const app = {
   usd: 'US$ {amount}',
   approx: '≈ {amount}',
   welcome: {
-    title: 'Tus dólares, en el bolsillo',
-    lede: 'Envía a un @usuario, paga con QR en cualquier comercio y pasa a pesos cuando quieras. Sin comisiones de red.',
-    points: {
-      send: 'Envía y recibe al instante',
-      qr: 'Paga QR de comercios en pesos o reales',
-      safe: 'Tu wallet es tuya: nadie más puede mover tus fondos',
-    },
-    start: 'Empezar',
+    title: 'Paga como local en cualquier país',
+    lede: 'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR.',
   },
   handle: {
     title: 'Elige tu @usuario',
@@ -81,10 +75,12 @@ const app = {
     gallery: 'Elegir una imagen',
     noCodeInImage: 'No encontramos un código QR en esa imagen.',
     secretTitle: 'Eso es una clave secreta',
-    secretBody: 'Una clave secreta da control total de una wallet. Nunca la compartas ni la escanees en una app de pagos. No la guardamos ni la enviamos.',
+    secretBody:
+      'Una clave secreta da control total de una wallet. Nunca la compartas ni la escanees en una app de pagos. No la guardamos ni la enviamos.',
     secretOk: 'Entendido',
     unsupported: {
-      'sep7-tx': 'Ese código pide firmar una transacción arbitraria. Por seguridad, la app solo acepta pedidos de pago.',
+      'sep7-tx':
+        'Ese código pide firmar una transacción arbitraria. Por seguridad, la app solo acepta pedidos de pago.',
       'sep7-invalid': 'Ese pedido de pago de Stellar no es válido.',
       'emv-invalid': 'Ese QR de comercio no es válido o está dañado.',
       'foreign-link': 'Ese enlace no es de {brand}. No lo abrimos.',
@@ -93,7 +89,8 @@ const app = {
     otherAsset: 'Ese pedido es por otro activo ({asset}). La app envía solo USDC.',
     otherNetwork: 'Ese pedido es para otra red de Stellar.',
     memo: 'Ese pedido trae un memo que la app no puede enviar (por ejemplo, el ID de un exchange). Paga desde la app del exchange.',
-    qrNotTaken: 'Todavía no aceptamos ese tipo de QR. Por ahora: QR interoperable de Argentina y PIX de Brasil.',
+    qrNotTaken:
+      'Todavía no aceptamos ese tipo de QR. Por ahora: QR interoperable de Argentina y PIX de Brasil.',
     again: 'Escanear otro',
   },
   send: {
@@ -202,7 +199,8 @@ const app = {
     no: 'No, no llegó',
     releaseStep: 'Liberar {amount} a {merchant}',
     disputeTitle: 'Abrir una disputa',
-    disputeBody: 'Tus USDC siguen bloqueados hasta que {brand} revise el pago. Guarda el ticket o la captura.',
+    disputeBody:
+      'Tus USDC siguen bloqueados hasta que {brand} revise el pago. Guarda el ticket o la captura.',
     disputeStep: 'Abrir la disputa',
     settleNote: 'Si nadie hace nada, el pago se libera solo {time} después de marcado como pagado.',
     doneTitle: 'Pagado',

@@ -74,6 +74,50 @@ export function dateOnly(lang: string, iso: string | null | undefined): string {
   return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString(lang, { dateStyle: 'medium' });
 }
 
+/** A time of day alone ("14:05"). */
+export function timeOnly(lang: string, iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleTimeString(lang, { timeStyle: 'short' });
+}
+
+/** The day something happened, as a list heading: "Hoy" / "Today", "Ayer" / "Yesterday" (the
+    words come from Intl), else the date ("18 de noviembre"), with the year when it is not this
+    year's. Days are the reader's local days. Empty for a missing or broken date. */
+export function dayLabel(lang: string, iso: string | null | undefined, now = new Date()): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const start = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((start(d) - start(now)) / 86_400_000);
+  if (days === 0 || days === -1) {
+    const word = new Intl.RelativeTimeFormat(lang, { numeric: 'auto' }).format(days, 'day');
+    return word.charAt(0).toLocaleUpperCase(lang) + word.slice(1);
+  }
+  return d.toLocaleDateString(lang, {
+    day: 'numeric',
+    month: 'long',
+    ...(d.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+  });
+}
+
+/** Items in their order, cut into runs that share a day heading (dayLabel). */
+export function groupByDay<T>(
+  items: readonly T[],
+  dateOf: (item: T) => string | null | undefined,
+  lang: string,
+  now = new Date(),
+): { label: string; items: T[] }[] {
+  const groups: { label: string; items: T[] }[] = [];
+  for (const item of items) {
+    const label = dayLabel(lang, dateOf(item), now);
+    const last = groups[groups.length - 1];
+    if (last && last.label === label) last.items.push(item);
+    else groups.push({ label, items: [item] });
+  }
+  return groups;
+}
+
 export interface TimeWords {
   seconds: string;
   minutes: string;

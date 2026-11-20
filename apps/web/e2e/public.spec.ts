@@ -7,13 +7,13 @@ test('the landing reads in Spanish by default and in English after switching', a
   const errors = trackErrors(page);
   await page.goto('/');
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'USDC por transferencia bancaria, de persona a persona',
+    'Pagos internacionales entre personas',
   );
   await expect(page.locator('html')).toHaveAttribute('lang', 'es');
   await expectNoHorizontalScroll(page);
   await page.getByRole('button', { name: 'Ver en English' }).click();
   await expect(page.getByRole('heading', { level: 1 })).toHaveText(
-    'USDC by bank transfer, person to person',
+    'International payments between people',
   );
   await expect(page.locator('html')).toHaveAttribute('lang', 'en');
   await expect(page.getByRole('heading', { name: 'How a purchase works' })).toBeVisible();

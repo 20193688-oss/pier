@@ -6,13 +6,16 @@ import {
   ago,
   amountOnly,
   currencyName,
+  dayLabel,
   duration,
+  groupByDay,
   money,
   NBSP,
   percent,
   plainAmount,
   rate,
   shortAddress,
+  timeOnly,
   units,
 } from '@/lib/format';
 import { fmt } from '@/i18n/format';
@@ -65,4 +68,48 @@ test('placeholders are filled by name; unknown ones stay', () => {
   assert.equal(fmt('Pay within {time}', { time: '29:54' }), 'Pay within 29:54');
   assert.equal(fmt('{a} and {b}', { a: 1 }), '1 and {b}');
   assert.equal(fmt('{toString}', {}), '{toString}', 'no prototype keys');
+});
+
+test('dayLabel: today and yesterday in the reader language, else the date (with the year when not this year)', () => {
+  const now = new Date(2026, 10, 20, 9, 30);
+  const at = (y: number, m: number, d: number, h = 12) => new Date(y, m, d, h).toISOString();
+  assert.equal(dayLabel('es', at(2026, 10, 20, 0), now), 'Hoy');
+  assert.equal(dayLabel('en', at(2026, 10, 20, 23), now), 'Today');
+  assert.equal(dayLabel('es', at(2026, 10, 19, 23), now), 'Ayer');
+  assert.equal(dayLabel('en', at(2026, 10, 19, 0), now), 'Yesterday');
+  assert.equal(dayLabel('es', at(2026, 10, 18), now), '18 de noviembre');
+  assert.equal(dayLabel('en', at(2026, 10, 18), now), 'November 18');
+  assert.equal(dayLabel('en', at(2025, 11, 31), now), 'December 31, 2025');
+  assert.equal(dayLabel('es', null, now), '');
+  assert.equal(dayLabel('es', 'not a date', now), '');
+});
+
+test('groupByDay: keeps the order and cuts it into runs under one heading each', () => {
+  const now = new Date(2026, 10, 20, 9, 30);
+  const at = (d: number, h: number) => new Date(2026, 10, d, h).toISOString();
+  const items = [
+    { id: 'a', at: at(20, 8) },
+    { id: 'b', at: at(20, 1) },
+    { id: 'c', at: at(19, 22) },
+    { id: 'd', at: at(17, 10) },
+    { id: 'e', at: at(17, 9) },
+  ];
+  const groups = groupByDay(items, (i) => i.at, 'en', now);
+  assert.deepEqual(
+    groups.map((g) => [g.label, g.items.map((i) => i.id).join('')]),
+    [
+      ['Today', 'ab'],
+      ['Yesterday', 'c'],
+      ['November 17', 'de'],
+    ],
+  );
+  assert.deepEqual(
+    groupByDay([], (i: { at: string }) => i.at, 'en', now),
+    [],
+  );
+});
+
+test('timeOnly: the time of day, empty for a missing date', () => {
+  assert.match(timeOnly('es', new Date(2026, 10, 20, 14, 5).toISOString()), /^14:05$/);
+  assert.equal(timeOnly('es', undefined), '');
 });

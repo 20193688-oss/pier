@@ -1,92 +1,116 @@
-/* Midpoint's look: paper and ink.
+/* Midpoint's look: night and aura.
 
-   - Paper: a cool mineral off-white page; sheets (cards, slips) a touch lighter; wells (inputs)
-     a touch darker. Dark mode turns the paper into a deep green-black ink-stone.
-   - Ink: a deep greenback green for text and primary actions, two lighter inks for secondary text.
-   - Marker: one highlighter yellow, kept for the one thing a person must not get wrong (the exact
-     amount to transfer, the active step). Never decoration.
-   - Type: one family, Archivo, with its width axis as the voice: wide and heavy for amounts and
-     headings (banknote numerals), normal width for reading. Tabular figures wherever numbers
-     line up.
-   - Radius follows hierarchy: sheets 22px, controls 12px, chips round. Depth comes from paper
-     tones and a hairline, not from shadows. */
+   - Night: the base is near-black ink on a cool white page; sheets are white and float on soft
+     shadows. Dark mode turns the page black and the sheets a lifted graphite.
+   - Aura: one atmospheric gradient (ice, sky, royal blue, indigo, night) textured with halftone
+     dots and grain, kept for the moments that carry the product: the welcome, the balance, the
+     wallet card, the landing's hero. Never behind body text that is not set on it on purpose.
+   - Marker: an ice highlighter for the one thing a person must not get wrong (the exact amount to
+     transfer, the active step). Never decoration.
+   - Type: one family, Archivo. Headlines on the aura are uppercase and wide; screen titles and
+     amounts are normal width and medium weight; small action labels are tracked capitals.
+     Tabular figures wherever numbers line up.
+   - Shape: pills for actions and inputs that stand alone, 20px sheets, 12px tiles, 7px icon
+     tiles. Depth comes from a soft shadow on light and a lifted tone on dark.
+   - Tones: `.tone-light` and `.tone-dark` set the palette for a part of the page whatever the
+     theme (the aura's top is light, its bottom dark); `.tone-glass` turns sheets and wells into
+     frosted glass for controls set on the aura. */
 @import 'tailwindcss';
 @import '@fontsource-variable/archivo/wdth.css';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-:root {
-  --paper: #f1f3ee;
-  --sheet: #fbfcf9;
-  --well: #e6eae3;
-  --ink: #10261f;
-  --ink-2: #3f514a;
-  --ink-3: #5c6d66;
-  --line: #d3d9d0;
-  --line-2: #b4beb1;
-  --marker: #ffd23f;
-  --marker-ink: #10261f;
-  --on-ink: #f6f8f3;
-  --ok: #17734a;
-  --ok-soft: #dcefe3;
-  --warn: #8a5a00;
-  --warn-soft: #f8ebcc;
-  --bad: #b0341d;
-  --bad-soft: #f6e0da;
-  --info: #22579e;
-  --info-soft: #dfe8f4;
-  --focus: #2f6fd6;
+:root,
+.tone-light {
+  --paper: #f2f3f5;
+  --sheet: #ffffff;
+  --well: #eceef1;
+  --ink: #0a0b0e;
+  --ink-2: #444952;
+  --ink-3: #686d76;
+  --line: #e3e5e9;
+  --line-2: #c9ced6;
+  --marker: #a6ecfa;
+  --marker-ink: #0a0b0e;
+  --on-ink: #ffffff;
+  --ok: #12804a;
+  --ok-soft: #ddf3e5;
+  --warn: #8a5800;
+  --warn-soft: #fbf0d6;
+  --bad: #bf3219;
+  --bad-soft: #fce4de;
+  --info: #1f55c7;
+  --info-soft: #e2eafb;
+  --focus: #2563eb;
+  --shadow-sheet: 0 1px 2px rgb(10 11 14 / 0.04), 0 14px 34px -20px rgb(10 11 14 / 0.22);
+  --shadow-float: 0 2px 6px rgb(10 11 14 / 0.06), 0 18px 40px -14px rgb(10 11 14 / 0.3);
   color-scheme: light;
 }
 
-:root[data-theme='dark'] {
-  --paper: #0c1714;
-  --sheet: #13211d;
-  --well: #0a1310;
-  --ink: #e8eee8;
-  --ink-2: #b3c1ba;
-  --ink-3: #8c9c95;
-  --line: #22342e;
-  --line-2: #34493f;
-  --marker: #ffd23f;
-  --marker-ink: #10261f;
-  --on-ink: #0c1714;
-  --ok: #57c993;
-  --ok-soft: #133426;
-  --warn: #e8b04f;
-  --warn-soft: #3a2c10;
-  --bad: #f2836f;
-  --bad-soft: #3d1c16;
-  --info: #84b2f0;
-  --info-soft: #162a44;
-  --focus: #84b2f0;
+:root[data-theme='dark'],
+.tone-dark {
+  --paper: #050506;
+  --sheet: #111215;
+  --well: #1b1c21;
+  --ink: #f3f4f6;
+  --ink-2: #b4b8c0;
+  --ink-3: #8b9099;
+  --line: #24262c;
+  --line-2: #373a42;
+  --marker: #a6ecfa;
+  --marker-ink: #0a0b0e;
+  --on-ink: #0a0b0e;
+  --ok: #4fd28d;
+  --ok-soft: #0f2a1b;
+  --warn: #f0b54e;
+  --warn-soft: #33260c;
+  --bad: #ff8b74;
+  --bad-soft: #3a1711;
+  --info: #8fb4ff;
+  --info-soft: #14213d;
+  --focus: #8fb4ff;
+  --shadow-sheet: 0 0 0 1px rgb(255 255 255 / 0.02);
+  --shadow-float: 0 18px 40px -12px rgb(0 0 0 / 0.7);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --paper: #0c1714;
-    --sheet: #13211d;
-    --well: #0a1310;
-    --ink: #e8eee8;
-    --ink-2: #b3c1ba;
-    --ink-3: #8c9c95;
-    --line: #22342e;
-    --line-2: #34493f;
-    --marker: #ffd23f;
-    --marker-ink: #10261f;
-    --on-ink: #0c1714;
-    --ok: #57c993;
-    --ok-soft: #133426;
-    --warn: #e8b04f;
-    --warn-soft: #3a2c10;
-    --bad: #f2836f;
-    --bad-soft: #3d1c16;
-    --info: #84b2f0;
-    --info-soft: #162a44;
-    --focus: #84b2f0;
+    --paper: #050506;
+    --sheet: #111215;
+    --well: #1b1c21;
+    --ink: #f3f4f6;
+    --ink-2: #b4b8c0;
+    --ink-3: #8b9099;
+    --line: #24262c;
+    --line-2: #373a42;
+    --marker: #a6ecfa;
+    --marker-ink: #0a0b0e;
+    --on-ink: #0a0b0e;
+    --ok: #4fd28d;
+    --ok-soft: #0f2a1b;
+    --warn: #f0b54e;
+    --warn-soft: #33260c;
+    --bad: #ff8b74;
+    --bad-soft: #3a1711;
+    --info: #8fb4ff;
+    --info-soft: #14213d;
+    --focus: #8fb4ff;
+    --shadow-sheet: 0 0 0 1px rgb(255 255 255 / 0.02);
+    --shadow-float: 0 18px 40px -12px rgb(0 0 0 / 0.7);
     color-scheme: dark;
   }
+}
+
+/* Frosted controls on the aura (set together with .tone-dark). */
+.tone-glass {
+  --paper: rgb(255 255 255 / 0.07);
+  --sheet: rgb(255 255 255 / 0.1);
+  --well: rgb(255 255 255 / 0.11);
+  --line: rgb(255 255 255 / 0.16);
+  --line-2: rgb(255 255 255 / 0.3);
+  --ink-2: rgb(255 255 255 / 0.82);
+  --ink-3: rgb(255 255 255 / 0.66);
 }
 
 @theme inline {
@@ -110,8 +134,8 @@
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
   --font-sans: 'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, sans-serif;
-  --radius-sheet: 22px;
-  --radius-ctl: 12px;
+  --radius-sheet: 20px;
+  --radius-ctl: 14px;
 }
 
 @layer base {
@@ -123,6 +147,7 @@
     line-height: 1.5;
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
   }
   body {
     margin: 0;
@@ -142,10 +167,9 @@
   h2,
   h3,
   h4 {
-    font-stretch: 112%;
-    font-weight: 700;
-    letter-spacing: -0.015em;
-    line-height: 1.12;
+    font-weight: 620;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
     text-wrap: balance;
   }
   p {
@@ -175,22 +199,170 @@
   .num {
     font-variant-numeric: tabular-nums lining-nums;
   }
-  /* Banknote numerals: the wide, heavy cut for amounts people act on. */
+  /* Amounts people act on: large, medium weight, tight. */
   .figure {
-    font-stretch: 125%;
-    font-weight: 750;
-    letter-spacing: -0.02em;
+    font-weight: 520;
+    letter-spacing: -0.035em;
     font-variant-numeric: tabular-nums lining-nums;
     line-height: 1;
   }
   .wide {
     font-stretch: 118%;
   }
+  /* The aura's headline voice: wide capitals. */
+  .display {
+    text-transform: uppercase;
+    font-stretch: 116%;
+    font-weight: 720;
+    letter-spacing: -0.012em;
+    line-height: 1;
+  }
+  /* Small action labels: tracked capitals. */
+  .caps {
+    text-transform: uppercase;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    line-height: 1.2;
+  }
 
   .sheet {
     background: var(--sheet);
     border: 1px solid var(--line);
     border-radius: var(--radius-sheet);
+    box-shadow: var(--shadow-sheet);
+  }
+
+  /* The aura: ice at the top through sky and royal blue into indigo and night (the welcome, the
+     landing's hero). */
+  .aura {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(80% 42% at 50% 30%, rgb(255 255 255 / 0.5), transparent 72%),
+      linear-gradient(
+        180deg,
+        #b4f1fc 0%,
+        #93dcf3 20%,
+        #6fb0ea 40%,
+        #4361cf 58%,
+        #2a2492 70%,
+        #120f45 82%,
+        #050509 100%
+      );
+  }
+  /* The aura over a whole screen that may scroll: the stops follow the viewport, so whatever runs
+     past the first screen sits on night. */
+  .aura-screen {
+    position: relative;
+    isolation: isolate;
+    background-color: #050509;
+    background-image:
+      radial-gradient(62vh 30vh at 50% 22vh, rgb(255 255 255 / 0.5), transparent 72%),
+      linear-gradient(
+        180deg,
+        #b4f1fc 0,
+        #93dcf3 14vh,
+        #6fb0ea 28vh,
+        #4361cf 44vh,
+        #2a2492 56vh,
+        #120f45 72vh,
+        #050509 90vh
+      );
+    background-repeat: no-repeat;
+  }
+  /* Night with the glow rising from below (the balance). */
+  .aura-night {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(
+        70% 70% at 88% 108%,
+        rgb(226 242 255 / 0.95) 0%,
+        rgb(120 170 255 / 0.55) 32%,
+        transparent 68%
+      ),
+      radial-gradient(75% 80% at 8% 110%, rgb(46 52 196 / 0.85), transparent 70%),
+      linear-gradient(180deg, #000 0%, #030409 38%, #0d1650 74%, #2346c6 100%);
+  }
+  /* The wallet card: ice on top, deep navy in the middle, night at the bottom. */
+  .aura-card {
+    position: relative;
+    isolation: isolate;
+    background:
+      radial-gradient(90% 50% at 30% 0%, rgb(220 246 255 / 0.65), transparent 70%),
+      linear-gradient(180deg, #9ed6ee 0%, #5d93d8 26%, #1d2f91 54%, #080b29 78%, #000 100%);
+  }
+  /* The aura's texture, as in print: a halftone screen (a dot every 4px) under a stipple of grain
+     (dots of a pixel or two, strong enough to see). Both sit between the aura and the content. */
+  .grain::before,
+  .grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .grain::before {
+    background-image: radial-gradient(circle, rgb(255 255 255 / 0.55) 0.75px, transparent 1.35px);
+    background-size: 4px 4px;
+    mix-blend-mode: soft-light;
+  }
+  .grain::after {
+    opacity: 0.6;
+    mix-blend-mode: overlay;
+    background-size: 160px 160px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncG type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncB type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* An action tile (the home's send, receive, add, withdraw): a pale square, a black icon tile at
+     its top and a tracked capital label at its foot. */
+  .tile {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 0.9rem;
+    min-height: 88px;
+    padding: 0.6rem;
+    border-radius: 12px;
+    background: rgb(255 255 255 / 0.92);
+    color: #0a0b0e;
+    text-decoration: none;
+    box-shadow: 0 10px 24px -16px rgb(0 0 0 / 0.5);
+    transition:
+      transform 120ms,
+      background-color 120ms;
+  }
+  .tile:hover {
+    background: #fff;
+  }
+  .tile:active {
+    transform: scale(0.97);
+  }
+  .tile .caps {
+    font-size: 0.65rem;
+    letter-spacing: 0.035em;
+  }
+  .tile-icon {
+    display: grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    background: #0a0b0e;
+    color: #fff;
+  }
+  /* An icon in a soft square (list rows, settings). */
+  .icon-tile {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 42px;
+    height: 42px;
+    border-radius: 11px;
+    background: var(--well);
+    color: var(--ink);
   }
 
   /* The highlighter: a marker stroke behind the exact amount. It sweeps in once when the order
@@ -227,22 +399,25 @@
     }
   }
 
-  /* A slip: a sheet with a perforated tear line, used for the order a person pays (a receipt). */
+  /* A slip: a sheet with a perforated tear line, used for the order a person pays (a receipt). The
+     notches take the colour behind the slip (--notch, the page by default; transparent drops them,
+     for a slip set on the aura). */
   .slip {
     position: relative;
     background: var(--sheet);
     border: 1px solid var(--line);
     border-radius: var(--radius-sheet);
+    box-shadow: var(--shadow-sheet);
   }
   .tear {
     position: relative;
     height: 22px;
     margin: 0 -1px;
     background:
-      radial-gradient(circle at 0 50%, var(--paper) 10px, transparent 10.5px) left / 22px 22px
-        no-repeat,
-      radial-gradient(circle at 100% 50%, var(--paper) 10px, transparent 10.5px) right / 22px 22px
-        no-repeat;
+      radial-gradient(circle at 0 50%, var(--notch, var(--paper)) 10px, transparent 10.5px) left /
+        22px 22px no-repeat,
+      radial-gradient(circle at 100% 50%, var(--notch, var(--paper)) 10px, transparent 10.5px)
+        right / 22px 22px no-repeat;
   }
   .tear::after {
     content: '';
@@ -256,19 +431,21 @@
   /* Form controls */
   .field {
     width: 100%;
-    min-height: 48px;
-    padding: 0.7rem 0.9rem;
+    min-height: 50px;
+    padding: 0.7rem 1rem;
     background: var(--well);
     color: var(--ink);
     border: 1px solid transparent;
     border-radius: var(--radius-ctl);
     font: inherit;
     font-size: 1rem;
-    transition: border-color 120ms;
+    transition:
+      border-color 120ms,
+      background-color 120ms;
   }
   .field::placeholder {
     color: var(--ink-3);
-    opacity: 0.8;
+    opacity: 0.85;
   }
   .field:hover {
     border-color: var(--line-2);
@@ -284,35 +461,40 @@
   select.field {
     appearance: none;
     padding-right: 2.4rem;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235c6d66' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23868b94' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
-    background-position: right 0.8rem center;
+    background-position: right 0.85rem center;
     background-size: 1.1rem;
   }
+  select.field option {
+    background: var(--sheet);
+    color: var(--ink);
+  }
 
-  /* Buttons: ink is the primary action, outline the secondary, quiet the tertiary. */
+  /* Buttons are pills: ink is the primary action (white on the dark), line the secondary, quiet
+     the tertiary; white and glass sit on the aura whatever the theme. */
   .btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 0.5rem;
     min-height: 44px;
-    padding: 0.6rem 1.1rem;
-    border-radius: var(--radius-ctl);
+    padding: 0.6rem 1.2rem;
+    border-radius: 999px;
     border: 1px solid transparent;
     font: inherit;
     font-weight: 600;
-    font-stretch: 108%;
     line-height: 1.2;
     text-decoration: none;
     transition:
       background-color 120ms,
       border-color 120ms,
+      color 120ms,
       transform 80ms;
     white-space: nowrap;
   }
   .btn:active:not(:disabled) {
-    transform: translateY(1px);
+    transform: scale(0.985);
   }
   .btn:disabled {
     opacity: 0.5;
@@ -322,7 +504,7 @@
     color: var(--on-ink);
   }
   .btn-ink:hover:not(:disabled) {
-    background: color-mix(in oklab, var(--ink) 88%, var(--paper));
+    background: color-mix(in oklab, var(--ink) 86%, var(--paper));
   }
   .btn-line {
     background: transparent;
@@ -344,16 +526,37 @@
     background: var(--bad);
     color: #fff;
   }
+  .btn-white {
+    background: #fff;
+    color: #0a0b0e;
+  }
+  .btn-white:hover:not(:disabled) {
+    background: #eef1f5;
+  }
+  .btn-glass {
+    background: rgb(255 255 255 / 0.12);
+    color: #fff;
+    border-color: rgb(255 255 255 / 0.22);
+    backdrop-filter: blur(10px);
+  }
+  .btn-glass:hover:not(:disabled) {
+    background: rgb(255 255 255 / 0.2);
+  }
   .btn-lg {
-    min-height: 56px;
-    padding: 0.9rem 1.4rem;
+    min-height: 54px;
+    padding: 0.9rem 1.5rem;
     font-size: 1.0625rem;
-    border-radius: 14px;
   }
   .btn-sm {
     min-height: 36px;
-    padding: 0.4rem 0.8rem;
+    padding: 0.4rem 0.85rem;
     font-size: 0.875rem;
+  }
+  /* A round icon button. */
+  .btn-icon {
+    width: 44px;
+    min-width: 44px;
+    padding: 0;
   }
 
   /* Status pills */
@@ -370,8 +573,8 @@
   }
   .pill::before {
     content: '';
-    width: 0.5rem;
-    height: 0.5rem;
+    width: 0.45rem;
+    height: 0.45rem;
     border-radius: 999px;
     background: currentColor;
   }
@@ -404,23 +607,21 @@
     padding: 4px;
     gap: 4px;
     background: var(--well);
-    border-radius: 14px;
+    border-radius: 999px;
   }
   .seg > button {
-    min-height: 44px;
-    border-radius: 10px;
+    min-height: 42px;
+    border-radius: 999px;
     border: 0;
     background: transparent;
     color: var(--ink-2);
     font: inherit;
-    font-weight: 650;
-    font-stretch: 110%;
+    font-weight: 620;
   }
   .seg > button[aria-selected='true'],
   .seg > button[aria-pressed='true'] {
-    background: var(--sheet);
-    color: var(--ink);
-    box-shadow: 0 1px 0 var(--line);
+    background: var(--ink);
+    color: var(--on-ink);
   }
 
   /* Data tables in the dashboard */
@@ -432,14 +633,16 @@
   .table th {
     text-align: left;
     font-weight: 600;
-    font-size: 0.8125rem;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
     color: var(--ink-3);
     padding: 0.6rem 0.75rem;
     border-bottom: 1px solid var(--line);
     white-space: nowrap;
   }
   .table td {
-    padding: 0.75rem;
+    padding: 0.8rem 0.75rem;
     border-bottom: 1px solid var(--line);
     vertical-align: middle;
   }
@@ -451,7 +654,7 @@
     background: linear-gradient(90deg, var(--well), var(--line), var(--well));
     background-size: 200% 100%;
     animation: shimmer 1.4s linear infinite;
-    border-radius: 8px;
+    border-radius: 10px;
   }
   @keyframes shimmer {
     to {
@@ -513,14 +716,14 @@
     color: var(--ink);
   }
   .prose-doc pre {
-    background: var(--well);
+    background: #0a0b0e;
+    color: #e9ecf1;
     border-radius: 14px;
     padding: 1rem 1.1rem;
     overflow-x: auto;
     font-size: 0.8125rem;
     line-height: 1.6;
     margin: 0 0 1.2rem;
-    color: var(--ink);
   }
   .prose-doc a {
     text-decoration: underline;
@@ -528,8 +731,8 @@
   }
 }
 
-/* The payments app (/app/*): a phone-width column, centred on a desktop against a darker paper,
-   with the phone's safe areas (notch, home indicator) kept clear. */
+/* The payments app (/app/*): a phone-width column, centred on a desktop against the page, with the
+   phone's safe areas (notch, home indicator) kept clear and a floating dock for the tabs. */
 @layer components {
   .app-backdrop {
     background: var(--paper);
@@ -540,32 +743,44 @@
       padding: 0;
     }
     .app-column {
-      border-left: 1px solid var(--line);
-      border-right: 1px solid var(--line);
+      box-shadow: 0 0 0 1px var(--line);
     }
   }
   .app-top-inset {
     height: env(safe-area-inset-top, 0px);
   }
   .app-with-tabs {
-    padding-bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
   }
   .app-without-tabs {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   }
-  .app-tabbar {
-    padding-bottom: env(safe-area-inset-bottom, 0px);
+  /* The dock: the tabs as one floating pill above the home indicator. */
+  .app-dock {
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+    background: color-mix(in oklab, var(--sheet) 94%, transparent);
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-float);
+    backdrop-filter: blur(14px);
   }
   .app-column {
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
+  }
+  /* A sheet that rises over the aura above it. */
+  .rise {
+    position: relative;
+    z-index: 1;
+    margin-top: -22px;
+    border-radius: 24px 24px 0 0;
+    background: var(--sheet);
   }
   /* The scanner: the camera fills its frame; the viewfinder corners sit on top. */
   .scan-frame {
     position: relative;
     overflow: hidden;
     border-radius: var(--radius-sheet);
-    background: #08120f;
+    background: #050509;
     aspect-ratio: 1 / 1;
   }
   .scan-frame video {
@@ -577,22 +792,21 @@
     position: absolute;
     inset: 18%;
     border-radius: 18px;
-    box-shadow: 0 0 0 999px rgb(8 18 15 / 0.45);
+    box-shadow: 0 0 0 999px rgb(5 5 9 / 0.5);
     outline: 3px solid rgb(255 255 255 / 0.9);
     outline-offset: -3px;
   }
-  /* A keypad-style amount: wide banknote figures, no spinner, no zoom on focus (16px+). */
+  /* A keypad-style amount: large figures, no spinner, no zoom on focus (16px+). */
   .amount-input {
     width: 100%;
     min-width: 0;
     background: transparent;
     outline: none;
     text-align: center;
-    font-stretch: 125%;
-    font-weight: 750;
-    letter-spacing: -0.02em;
+    font-weight: 520;
+    letter-spacing: -0.035em;
     font-variant-numeric: tabular-nums lining-nums;
-    font-size: clamp(2.4rem, 13vw, 3.6rem);
+    font-size: clamp(2.6rem, 14vw, 3.8rem);
     line-height: 1.1;
   }
   .amount-input::placeholder {

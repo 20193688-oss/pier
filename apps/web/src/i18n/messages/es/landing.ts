@@ -1,12 +1,12 @@
 /* The public home page. */
 const landing = {
-  metaTitle: '{brand}: USDC por transferencia bancaria y pagos en dólares',
+  metaTitle: '{brand}: pagos internacionales entre personas',
   metaDescription:
-    'Escribe un monto, transfiere desde tu banco y recibe USDC en tu wallet de Stellar. Envía, recibe y paga con QR desde la app. Los fondos quedan bloqueados en un contrato hasta que el pago se confirma.',
+    'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR. Cada pago lo completa un comerciante local y el dinero queda en un contrato hasta que se confirma.',
   hero: {
-    title: 'USDC por transferencia bancaria, de persona a persona',
-    body: 'Escribe cuánto quieres comprar, transfiere desde tu banco a la cuenta que te mostramos y los USDC llegan a tu wallet en la red Stellar. Mientras tanto quedan bloqueados en un contrato inteligente, no en manos de nadie.',
-    open: 'Abrir la app',
+    title: 'Pagos internacionales entre personas',
+    body: 'Envía dinero a alguien en otro país, paga con QR donde estés o cambia a tu moneda con una transferencia bancaria. Cada pago lo completa un comerciante local, y el dinero queda en un contrato hasta que se confirma.',
+    open: 'Crear cuenta',
     merchant: 'Soy comerciante',
     rails:
       'Transferencia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia, Perú y Chile.',
@@ -43,8 +43,8 @@ const landing = {
     sell: 'Vender es lo mismo al revés: bloqueas tus USDC en la orden, el comerciante te transfiere a tu cuenta y tú liberas los USDC cuando ves el dinero.',
   },
   app: {
-    title: 'Una app de pagos en dólares',
-    body: 'Instálala en tu teléfono desde el navegador. Tu saldo en USDC vive en tu wallet de la red Stellar y las comisiones de red las paga {brand}.',
+    title: 'La app',
+    body: 'Se instala en el teléfono desde el navegador. Tu saldo está en dólares digitales (USDC) y las comisiones de red las paga {brand}.',
     points: [
       {
         title: 'Envía y recibe',
@@ -66,7 +66,7 @@ const landing = {
     cta: 'Abrir la app',
   },
   trust: {
-    title: 'Nadie se queda con tus fondos',
+    title: 'Cómo se protege cada pago',
     items: [
       {
         title: 'Bloqueados en un contrato',
@@ -126,7 +126,7 @@ const landing = {
       },
       {
         q: '¿Necesito crear una cuenta?',
-        a: 'No hace falta contraseña: entras con tu email o tu cuenta de Google y tu wallet de Stellar se crea al instante. Si ya tienes una wallet de Stellar, puedes usarla en el panel.',
+        a: 'Sí. Te registras con tu email o tu cuenta de Google, sin contraseña. Si ya tienes una wallet de Stellar, puedes usarla en el panel.',
       },
       {
         q: '¿En qué red funciona?',
@@ -151,8 +151,8 @@ const landing = {
     ],
   },
   closing: {
-    title: 'Empieza con el monto que quieras',
-    body: 'Entra con tu email, escribe un monto y mira el precio antes de decidir.',
+    title: 'Crea tu cuenta',
+    body: 'Con tu email o tu cuenta de Google. Ves el precio de cada pago antes de confirmarlo.',
   },
 };
 
