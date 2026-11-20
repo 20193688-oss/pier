@@ -2,81 +2,156 @@ import {
   Address,
   FeeBumpTransaction,
   Keypair,
+  Networks,
   TransactionBuilder,
   scValToNative,
+  xdr,
   type Transaction as StellarTransaction,
 } from '@stellar/stellar-sdk';
 import { unwrap, type PedospeClient } from '@/client';
 import type { Transaction, TransferMatch } from '@/types';
 
 /**
- * Why the bot must not sign a match's transaction, or null when it is exactly
- * `release(<the bot's account>, <the order's on-chain id>)` on the order's
- * contract (and `MARKET_CONTRACT` when set), for the order's network, from the
- * bot's account, with only source-account authorization and time bounds. The
- * bot decodes what it signs instead of trusting the response: a key that can
- * release can be made to sign anything else.
+ * The networks the bot signs for, with their passphrases pinned HERE (never
+ * taken from an API answer), and the tier each belongs to.
  */
-export function releaseProblem(
-  match: TransferMatch,
-  options: { signer: string; passphrase: string; marketContract?: string | null },
-): string | null {
+export const BOT_NETWORKS: Readonly<Record<string, { passphrase: string; tier: 'live' | 'test' }>> =
+  {
+    mainnet: { passphrase: Networks.PUBLIC, tier: 'live' },
+    testnet: { passphrase: Networks.TESTNET, tier: 'test' },
+    local: { passphrase: Networks.STANDALONE, tier: 'test' },
+  };
+
+/** A release must expire within this many seconds (the API builds them 5 minutes ahead). */
+export const MAX_RELEASE_TTL_SECONDS = 360;
+/** The default cap on a release's total fee (resource fee included), stroops: 0.1 XLM. */
+export const DEFAULT_MAX_FEE_STROOPS = 1_000_000;
+
+export interface ReleaseCheck {
+  /** The bot's own account: the merchant's, or an operator it granted PERM_RELEASE. */
+  signer: string;
+  /** The network id the order names. */
+  network: string;
+  /** The bot's tier, from its API key's prefix. */
+  tier: 'live' | 'test';
+  /** The market contract per network id, from the bot's OWN configuration. */
+  marketContracts: Readonly<Record<string, string>>;
+  /** The largest fee the bot signs, stroops. */
+  maxFeeStroops: number;
+  /** Unix seconds now. */
+  now?: number;
+}
+
+/** The one call the bot signs: `release(signer, id)` on `contract`, as an auth function. */
+function expectedAuthFunction(contract: string, signer: string, id: bigint): string {
+  return xdr.SorobanAuthorizedFunction.sorobanAuthorizedFunctionTypeContractFn(
+    new xdr.InvokeContractArgs({
+      contractAddress: new Address(contract).toScAddress(),
+      functionName: 'release',
+      args: [new Address(signer).toScVal(), xdr.ScVal.scvU64(id)],
+    }),
+  ).toXdr('base64');
+}
+
+/**
+ * Why the bot must not sign a match's transaction, or null when it is exactly
+ * what it expects. Every API answer is untrusted: the network, contract and
+ * passphrase come from the bot's own configuration, and the envelope must be
+ * exactly ONE `release(<the bot's account>, <the order's on-chain id>)` on
+ * that contract, from the bot's account, with no memo, no preconditions but a
+ * near upper time bound, a fee under the cap, and either no auth entries or
+ * one source-account entry for that same call with no sub-invocations (a
+ * sub-invocation could move the bot's tokens).
+ */
+export function releaseProblem(match: TransferMatch, check: ReleaseCheck): string | null {
   const { order, transaction } = match;
-  if (transaction.network !== order.network) {
-    return `the transaction is for ${transaction.network}, the order is on ${order.network}`;
+  const network = BOT_NETWORKS[check.network];
+  if (!network) return `the bot does not sign for the network ${check.network}`;
+  if (network.tier !== check.tier) {
+    return `a ${check.tier} API key never signs on ${check.network}`;
   }
+  if (transaction.network !== check.network || order.network !== check.network) {
+    return `the transaction or the order is not on ${check.network}`;
+  }
+  const contract = check.marketContracts[check.network];
+  if (!contract) return `MARKET_CONTRACT names no contract for ${check.network}`;
+  if (order.onchainId === null || !/^[0-9]+$/.test(order.onchainId)) {
+    return 'the order has no on-chain id yet';
+  }
+  const id = BigInt(order.onchainId);
+
   let parsed: StellarTransaction | FeeBumpTransaction;
   try {
-    parsed = TransactionBuilder.fromXDR(transaction.xdr, options.passphrase);
+    parsed = TransactionBuilder.fromXDR(transaction.xdr, network.passphrase);
   } catch {
-    return 'the transaction is not an envelope for this network';
+    return 'the transaction is not an envelope';
   }
   if (parsed instanceof FeeBumpTransaction) return 'the transaction is a fee-bump';
   const tx = parsed;
-  if (tx.source !== options.signer) {
-    return `the transaction's source is ${tx.source}, not the bot's account ${options.signer}`;
+  if (tx.source !== check.signer) {
+    return `the transaction's source is ${tx.source}, not the bot's account ${check.signer}`;
   }
-  if (!tx.timeBounds || Number(tx.timeBounds.maxTime) === 0) {
-    return 'the transaction has no upper time bound';
+  if (tx.memo.type !== 'none') return 'the transaction carries a memo';
+  const now = check.now ?? Math.floor(Date.now() / 1000);
+  const maxTime = Number(tx.timeBounds?.maxTime ?? 0);
+  if (!maxTime || maxTime > now + MAX_RELEASE_TTL_SECONDS) {
+    return `the transaction must expire within ${MAX_RELEASE_TTL_SECONDS} seconds`;
+  }
+  if (
+    tx.ledgerBounds ||
+    (tx.minAccountSequence !== undefined && tx.minAccountSequence !== null) ||
+    Number(tx.minAccountSequenceAge ?? 0) !== 0 ||
+    Number(tx.minAccountSequenceLedgerGap ?? 0) !== 0 ||
+    (tx.extraSigners ?? []).length > 0
+  ) {
+    return 'the transaction carries preconditions other than its time bounds';
+  }
+  if (Number(tx.fee) > check.maxFeeStroops) {
+    return `the transaction's fee (${tx.fee} stroops) is above the cap (${check.maxFeeStroops})`;
   }
   if (tx.operations.length !== 1) return 'the transaction must have exactly one operation';
   const op = tx.operations[0];
   if (op.type !== 'invokeHostFunction' || op.func.type !== 'hostFunctionTypeInvokeContract') {
     return 'the operation is not a contract call';
   }
-  if (op.source && op.source !== options.signer) return 'the operation acts for another account';
-  if ((op.auth ?? []).some((a) => a.credentials.type !== 'sorobanCredentialsSourceAccount')) {
-    return 'the call carries authorization other than the source account’s';
-  }
+  if (op.source && op.source !== check.signer) return 'the operation acts for another account';
   const call = op.func.invokeContract;
-  const contract = Address.fromScAddress(call.contractAddress).toString();
-  if (contract !== order.contract) {
-    return `the transaction calls ${contract}, not the order's contract ${order.contract}`;
+  const target = Address.fromScAddress(call.contractAddress).toString();
+  if (target !== contract) {
+    return `the transaction calls ${target}, not MARKET_CONTRACT ${contract}`;
   }
-  if (options.marketContract && contract !== options.marketContract) {
-    return `the transaction calls ${contract}, not MARKET_CONTRACT ${options.marketContract}`;
-  }
-  if (order.onchainId === null || !/^[0-9]+$/.test(order.onchainId)) {
-    return 'the order has no on-chain id yet';
-  }
-  const fn = String(call.functionName);
   const args = call.args.map((a) => scValToNative(a) as unknown);
   if (
-    fn !== 'release' ||
+    String(call.functionName) !== 'release' ||
     args.length !== 2 ||
-    args[0] !== options.signer ||
-    args[1] !== BigInt(order.onchainId)
+    args[0] !== check.signer ||
+    args[1] !== id
   ) {
-    return `the call is not release(${options.signer}, ${order.onchainId})`;
+    return `the call is not release(${check.signer}, ${order.onchainId})`;
+  }
+  const auth = op.auth ?? [];
+  if (auth.length > 1) return 'the call carries more than one authorization';
+  if (auth.length === 1) {
+    const [entry] = auth;
+    if (entry.credentials.type !== 'sorobanCredentialsSourceAccount') {
+      return 'the call carries authorization other than the source account’s';
+    }
+    const root = entry.rootInvocation;
+    if (root.subInvocations.length > 0) {
+      return 'the authorization covers sub-invocations';
+    }
+    if (root.function.toXdr('base64') !== expectedAuthFunction(contract, check.signer, id)) {
+      return 'the authorization is for another call';
+    }
   }
   return null;
 }
 
 /** Signs release transactions with the bot's own key and submits them through the API. */
 export interface ReleaseSender {
-  /** The bot's account: the merchant's (the API builds releases for the merchant). */
+  /** The bot's account: the merchant's, or an operator it granted PERM_RELEASE. */
   readonly address: string;
-  /** Signs, submits (`POST /v1/p2p/submit`) and waits for the result. */
+  /** Signs for `passphrase` (the bot's own), submits (`POST /v1/p2p/submit`) and waits. */
   send(
     transaction: Transaction,
     passphrase: string,
@@ -84,8 +159,8 @@ export interface ReleaseSender {
 }
 
 /**
- * A sender for the merchant's Stellar secret: it signs the envelope as built
- * and submits it through `/v1/p2p/submit` (the API's sponsor pays the fee when
+ * A sender for the bot's Stellar secret: it signs the envelope as checked and
+ * submits it through `/v1/p2p/submit` (the API's sponsor pays the fee when
  * gasless is on), then polls `/v1/p2p/submissions/{hash}`. The secret never
  * leaves the process.
  */

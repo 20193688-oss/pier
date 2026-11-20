@@ -12,16 +12,19 @@
  * - the best score is at least `MIN_SCORE` (default 3: amount, name and document),
  * - no other match has the same score (an ambiguous transfer is left to a person),
  * - the order is a purchase (BUY), and
- * - the transaction, decoded, is exactly `release(<the bot's account>, <the
- *   order's on-chain id>)` on the order's contract (and `MARKET_CONTRACT` when
- *   set), for the order's network, from the bot's account, with only
- *   source-account authorization.
+ * - the transaction, decoded with the bot's OWN passphrase for the order's
+ *   network, is exactly one `release(<the bot's account>, <the order's
+ *   on-chain id>)` on the bot's OWN `MARKET_CONTRACT`, from the bot's account,
+ *   with no memo, no preconditions but an upper time bound within 6 minutes, a
+ *   fee under `MAX_FEE_STROOPS`, and at most one source-account authorization
+ *   for that same call with no sub-invocations. A test key never signs on
+ *   mainnet. Every API answer is untrusted.
  *
- * It then signs the envelope with the merchant's Stellar secret
- * (`BOT_SECRET`), submits it through the API (`POST /v1/p2p/submit`: the
- * API's sponsor pays the fee when gasless is on) and waits for the result.
- * The API never holds that key. The network passphrase comes from the public
- * market overview (`GET /v1/market`).
+ * It then signs the envelope with its own Stellar secret (`BOT_SECRET`: best
+ * an operator the merchant granted only PERM_RELEASE with `set_operator`, so
+ * the key cannot withdraw; or the merchant account's own), submits it through
+ * the API (`POST /v1/p2p/submit`: the API's sponsor pays the fee when gasless
+ * is on) and waits for the result. The API never holds that key.
  *
  * Input: one JSON object per line, from the file named by the first argument,
  * or from stdin when there is none (or it is `-`):
@@ -32,10 +35,11 @@
  *
  * - `PEDOSPE_API_URL`  the API origin
  * - `PEDOSPE_API_KEY`  the merchant organization's API key (`pk_live_...` / `pk_test_...`)
- * - `BOT_SECRET`       the merchant account's Stellar secret (S...); not needed with `DRY_RUN`
+ * - `BOT_SECRET`       its Stellar secret (S...): an operator with PERM_RELEASE, or the merchant; not needed with `DRY_RUN`
  * - `MIN_SCORE`        1 to 3 (default 3)
  * - `DRY_RUN`          `true`: decide and log, never sign or send
- * - `MARKET_CONTRACT`  optional: the only contract (C...) the bot will call
+ * - `MARKET_CONTRACT`  required: the market contract (C...), or `network=C...` pairs
+ * - `MAX_FEE_STROOPS`  optional: the largest fee it signs (default 1000000)
  *
  * Run (after `npm run build -w @pedospe/sdk`):
  *
@@ -49,7 +53,12 @@ import { createReadStream } from 'node:fs';
 import { createInterface } from 'node:readline';
 import { chooseMatch, type MatchDecision } from '@/bot/choose-match';
 import { parseTransferLine, readBotConfig } from '@/bot/config';
-import { createReleaseSender, releaseProblem, type ReleaseSender } from '@/bot/release';
+import {
+  BOT_NETWORKS,
+  createReleaseSender,
+  releaseProblem,
+  type ReleaseSender,
+} from '@/bot/release';
 import { createPedospeClient, PedospeError, unwrap, type PedospeClient } from '@/client';
 import type { TransferMatchRequest } from '@/types';
 
@@ -68,9 +77,12 @@ export interface BotContext {
   minScore: number;
   /** Null in a dry run. */
   sender: ReleaseSender | null;
-  marketContract: string | null;
-  /** Network id → passphrase, from the market overview. */
-  passphrases: Record<string, string>;
+  /** The API key's tier: a test key never signs on mainnet, nor a live key on testnet. */
+  tier: 'live' | 'test';
+  /** The market contract per network, from the bot's own configuration (never the API). */
+  marketContracts: Readonly<Record<string, string>>;
+  /** The largest fee the bot signs, stroops. */
+  maxFeeStroops: number;
   /**
    * Orders released in this run. The API sees a release only once it is
    * indexed, so until then a second transfer could match the same order again.
@@ -84,7 +96,10 @@ export async function handleTransfer(
   ctx: BotContext,
 ): Promise<TransferOutcome> {
   const { data } = await unwrap(
-    ctx.client.POST('/v1/p2p/merchant/transfer-matches', { body: transfer }),
+    ctx.client.POST('/v1/p2p/merchant/transfer-matches', {
+      // The releases are built for the bot's own account (the merchant, or its operator).
+      body: ctx.sender ? { ...transfer, signer: ctx.sender.address } : transfer,
+    }),
   );
   const decision = chooseMatch(
     data.filter((m) => !ctx.released.has(m.order.id)),
@@ -100,15 +115,14 @@ export async function handleTransfer(
   }
   const { match } = decision;
   const orderId = match.order.id;
-  const passphrase = ctx.passphrases[match.order.network];
-  const problem = passphrase
-    ? releaseProblem(match, {
-        // A dry run checks the transaction is the merchant's own release.
-        signer: ctx.sender?.address ?? match.order.sellerAddress,
-        passphrase,
-        marketContract: ctx.marketContract,
-      })
-    : `the market does not list the network ${match.order.network}`;
+  const problem = releaseProblem(match, {
+    // A dry run (no key) checks the release is the merchant's own.
+    signer: ctx.sender?.address ?? match.order.sellerAddress,
+    network: match.order.network,
+    tier: ctx.tier,
+    marketContracts: ctx.marketContracts,
+    maxFeeStroops: ctx.maxFeeStroops,
+  });
   if (problem !== null) return { status: 'refused', orderId, problem };
   if (ctx.sender === null) {
     ctx.released.add(orderId);
@@ -119,7 +133,10 @@ export async function handleTransfer(
       description: match.transaction.description,
     };
   }
-  const { hash, status } = await ctx.sender.send(match.transaction, passphrase as string);
+  const { hash, status } = await ctx.sender.send(
+    match.transaction,
+    BOT_NETWORKS[match.order.network].passphrase,
+  );
   if (status !== 'success') return { status: 'reverted', orderId, hash };
   ctx.released.add(orderId);
   return { status: 'released', orderId, hash };
@@ -142,14 +159,13 @@ async function main(): Promise<void> {
     config.dryRun || config.secret === null
       ? null
       : createReleaseSender({ secret: config.secret, client });
-  const tier = config.apiKey.startsWith('pk_live_') ? 'live' : 'test';
-  const market = await unwrap(client.GET('/v1/market', { params: { query: { tier } } }));
   const ctx: BotContext = {
     client,
     minScore: config.minScore,
     sender,
-    marketContract: config.marketContract,
-    passphrases: Object.fromEntries(market.networks.map((n) => [n.id, n.networkPassphrase])),
+    tier: config.tier,
+    marketContracts: config.marketContracts,
+    maxFeeStroops: config.maxFeeStroops,
     released: new Set(),
   };
   const file = process.argv[2] && process.argv[2] !== '-' ? process.argv[2] : null;

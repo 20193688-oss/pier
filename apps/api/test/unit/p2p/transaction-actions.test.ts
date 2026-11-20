@@ -138,6 +138,16 @@ describe('P2P transaction actions', () => {
     expect(buildOrderAction('markPaid', orderCtx(ACCOUNT)).ok).toBe(false);
   });
 
+  it('lets a release operator release as itself, never anyone else', () => {
+    const asBot = buildOrderAction('release', { ...orderCtx(BOT), releaseOperator: true });
+    if (!asBot.ok) throw new Error(asBot.error);
+    expect(call(asBot.value.operation)).toEqual({ fn: 'release', args: [BOT, 7n] });
+    expect(buildOrderAction('release', orderCtx(BOT)).ok).toBe(false);
+    expect(buildOrderAction('markPaid', { ...orderCtx(BOT), releaseOperator: true }).ok).toBe(
+      false,
+    );
+  });
+
   it('follows the contract’s cancel rules', () => {
     expect(buildOrderAction('cancel', orderCtx(BUYER)).ok).toBe(true);
     expect(buildOrderAction('cancel', orderCtx(ACCOUNT)).ok).toBe(false);

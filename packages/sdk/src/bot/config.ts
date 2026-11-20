@@ -1,4 +1,5 @@
 import { DEFAULT_MIN_SCORE, MAX_MATCH_SCORE } from '@/bot/choose-match';
+import { BOT_NETWORKS, DEFAULT_MAX_FEE_STROOPS } from '@/bot/release';
 import type { TransferMatchRequest } from '@/types';
 
 /** The reference bot's settings, read from the environment. */
@@ -13,8 +14,16 @@ export interface BotConfig {
   minScore: number;
   /** `DRY_RUN`: decide and log, never sign or send. */
   dryRun: boolean;
-  /** `MARKET_CONTRACT` (optional): the only contract (C...) the bot will call. */
-  marketContract: string | null;
+  /** The API key's tier (its prefix). */
+  tier: 'live' | 'test';
+  /**
+   * `MARKET_CONTRACT`: the market contract per network, from this configuration
+   * only (`testnet=C...,mainnet=C...`; a bare `C...` is the tier's network:
+   * mainnet for `pk_live_`, testnet for `pk_test_`).
+   */
+  marketContracts: Record<string, string>;
+  /** `MAX_FEE_STROOPS`: the largest fee the bot signs (default 1 000 000 = 0.1 XLM). */
+  maxFeeStroops: number;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -63,9 +72,35 @@ export function readBotConfig(env: Env): BotConfig {
     problems.push(`MIN_SCORE must be an integer from 1 to ${MAX_MATCH_SCORE}.`);
   }
 
-  const marketContract = value(env, 'MARKET_CONTRACT');
-  if (marketContract !== undefined && !CONTRACT.test(marketContract)) {
-    problems.push('MARKET_CONTRACT must be a contract address (C...).');
+  const tier = apiKey?.startsWith('pk_live_') ? 'live' : 'test';
+  const marketContracts: Record<string, string> = {};
+  const contracts = value(env, 'MARKET_CONTRACT');
+  if (contracts === undefined) {
+    problems.push('MARKET_CONTRACT is required: the market contract the bot may call (C...).');
+  } else {
+    for (const part of contracts.split(',').map((p) => p.trim())) {
+      const [first, second] = part.split('=');
+      const network = second === undefined ? (tier === 'live' ? 'mainnet' : 'testnet') : first;
+      const contract = second ?? first;
+      const known = BOT_NETWORKS[network];
+      if (!known || !CONTRACT.test(contract)) {
+        problems.push(
+          'MARKET_CONTRACT must be C... or network=C... pairs (local, testnet, mainnet).',
+        );
+        break;
+      }
+      if (known.tier !== tier) {
+        problems.push(`MARKET_CONTRACT names ${network}, which a ${tier} API key never signs on.`);
+        break;
+      }
+      marketContracts[network] = contract;
+    }
+  }
+
+  const rawFee = value(env, 'MAX_FEE_STROOPS');
+  const maxFeeStroops = rawFee === undefined ? DEFAULT_MAX_FEE_STROOPS : Number(rawFee);
+  if (!Number.isInteger(maxFeeStroops) || maxFeeStroops < 100 || maxFeeStroops > 100_000_000) {
+    problems.push('MAX_FEE_STROOPS must be an integer from 100 to 100000000.');
   }
 
   if (problems.length > 0)
@@ -76,7 +111,9 @@ export function readBotConfig(env: Env): BotConfig {
     secret: secret ?? null,
     minScore,
     dryRun,
-    marketContract: marketContract ?? null,
+    tier,
+    marketContracts,
+    maxFeeStroops,
   };
 }
 

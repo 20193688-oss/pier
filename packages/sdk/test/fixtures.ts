@@ -1,11 +1,14 @@
 import {
   Account,
+  Address,
   Keypair,
+  Memo,
   Networks,
   Operation,
   StrKey,
   TransactionBuilder,
   nativeToScVal,
+  xdr,
 } from '@stellar/stellar-sdk';
 import type { MerchantOrder, TransferMatch } from '@/types';
 
@@ -15,29 +18,84 @@ export const PASSPHRASE = Networks.TESTNET;
 export const MERCHANT = Keypair.random();
 export const BUYER = Keypair.random().publicKey();
 
-/** An unsigned `release(caller, id)` on `contract` from `source`, as the API builds it. */
-export function releaseXdr(
-  onchainId: string,
-  options: { source?: string; caller?: string; contract?: string; fn?: string } = {},
-): string {
+export interface ReleaseOptions {
+  source?: string;
+  caller?: string;
+  contract?: string;
+  fn?: string;
+  fee?: string;
+  timeoutSeconds?: number;
+  memo?: string;
+  minSequence?: string;
+  /** Auth entries: `self` = one source-account entry for the same call; `sub` = with a sub-invocation; `address` = address credentials. */
+  auth?: 'self' | 'sub' | 'address' | 'two';
+  extraOp?: boolean;
+}
+
+/** An unsigned `release(caller, id)` on `contract` from `source`, as the API builds it (or tampered). */
+export function releaseXdr(onchainId: string, options: ReleaseOptions = {}): string {
   const source = options.source ?? MERCHANT.publicKey();
-  return new TransactionBuilder(new Account(source, '41'), {
-    fee: '100',
+  const contract = options.contract ?? MARKET;
+  const args = [
+    nativeToScVal(options.caller ?? source, { type: 'address' }),
+    nativeToScVal(BigInt(onchainId), { type: 'u64' }),
+  ];
+  const fn = options.fn ?? 'release';
+  const invocation = (sub: xdr.SorobanAuthorizedInvocation[] = []) =>
+    new xdr.SorobanAuthorizedInvocation({
+      function: xdr.SorobanAuthorizedFunction.sorobanAuthorizedFunctionTypeContractFn(
+        new xdr.InvokeContractArgs({
+          contractAddress: new Address(contract).toScAddress(),
+          functionName: fn,
+          args,
+        }),
+      ),
+      subInvocations: sub,
+    });
+  const sourceEntry = (sub: xdr.SorobanAuthorizedInvocation[] = []) =>
+    new xdr.SorobanAuthorizationEntry({
+      credentials: xdr.SorobanCredentials.sorobanCredentialsSourceAccount(),
+      rootInvocation: invocation(sub),
+    });
+  const auth =
+    options.auth === 'self'
+      ? [sourceEntry()]
+      : options.auth === 'sub'
+        ? [sourceEntry([invocation()])]
+        : options.auth === 'two'
+          ? [sourceEntry(), sourceEntry()]
+          : options.auth === 'address'
+            ? [
+                new xdr.SorobanAuthorizationEntry({
+                  credentials: xdr.SorobanCredentials.sorobanCredentialsAddress(
+                    new xdr.SorobanAddressCredentials({
+                      address: new Address(source).toScAddress(),
+                      nonce: 1n,
+                      signatureExpirationLedger: 10,
+                      signature: xdr.ScVal.scvVoid(),
+                    }),
+                  ),
+                  rootInvocation: invocation(),
+                }),
+              ]
+            : [];
+  const builder = new TransactionBuilder(new Account(source, '41'), {
+    fee: options.fee ?? '100',
     networkPassphrase: PASSPHRASE,
+    ...(options.minSequence ? { minAccountSequence: options.minSequence } : {}),
   })
+    // A Soroban transaction cannot carry a memo: a memo comes on a classic operation.
     .addOperation(
-      Operation.invokeContractFunction({
-        contract: options.contract ?? MARKET,
-        function: options.fn ?? 'release',
-        args: [
-          nativeToScVal(options.caller ?? source, { type: 'address' }),
-          nativeToScVal(BigInt(onchainId), { type: 'u64' }),
-        ],
-      }),
+      options.memo
+        ? Operation.bumpSequence({ bumpTo: '100' })
+        : Operation.invokeContractFunction({ contract, function: fn, args, auth }),
     )
-    .setTimeout(300)
-    .build()
-    .toXDR();
+    .setTimeout(options.timeoutSeconds ?? 300);
+  if (options.extraOp) {
+    builder.addOperation(Operation.bumpSequence({ bumpTo: '100' }));
+  }
+  if (options.memo) builder.addMemo(Memo.text(options.memo));
+  return builder.build().toXDR();
 }
 
 /** A transfer match as the API answers it, for an order with on-chain id `onchainId`. */

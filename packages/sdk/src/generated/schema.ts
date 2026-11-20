@@ -4035,6 +4035,11 @@ export interface components {
       receivedAt?: string;
       /** @example TRX-88213 */
       reference?: string;
+      /**
+       * @description The account that signs the releases: the merchant account (default), or an operator it granted PERM_RELEASE (`set_operator`), so a bot never needs the merchant’s own key.
+       * @example GAXTHY6ASJEWI3OJGM7UZ2KSMBQD7VHCCH27PAL6ALSSSW7D33B5WMMI
+       */
+      signer?: string;
     };
     /** @description What an account owner may change. */
     UpdateAccountDto: {
