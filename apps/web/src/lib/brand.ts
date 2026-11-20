@@ -4,7 +4,8 @@
    `midpoint-signature` webhook header, the `Midpoint-Organization` request header, storage keys,
    the `@midpoint/*` packages) are not the display name and do not change with it. */
 export const BRAND = {
-  /* The name as people read it in a sentence. The wordmark sets it in lowercase (Logo.tsx). */
+  /* The name as people read it in a sentence. The wordmark sets it in the hero's capitals
+     (Logo.tsx). */
   name: 'Midpoint',
   /* The installed app's short name (home screen label). */
   shortName: 'Midpoint',

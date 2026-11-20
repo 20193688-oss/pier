@@ -1,5 +1,5 @@
 /* Welcome, sign-up and sign-in. The welcome sits on the aura over the whole screen: the mark's
-   glyph drawn large in the ice, then, where the aura turns to night, what the app is for and two
+   slid M drawn large in the ice, then, where the aura turns to night, what the app is for and two
    ways in (create an account, sign in). Each opens a plain page with the form (src/components/
    wallet/SignIn.tsx). The screen stays on the route the person was going to, so after signing in
    they land there (a payment link opens the send screen). */
@@ -30,7 +30,7 @@ function Intro({ onMode }: { onMode: (m: AuthMode) => void }) {
       <div className="tone-light flex items-center justify-between px-5 pt-3 text-ink">
         <span className="inline-flex items-center gap-2">
           <LogoMark size={28} />
-          <b className="text-[1.2rem] font-bold tracking-[-0.04em] lowercase">{BRAND.name}</b>
+          <b className="display text-[1.1rem]">{BRAND.name}</b>
         </span>
         <span className="flex items-center gap-1">
           <LangToggle />

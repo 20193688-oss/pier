@@ -216,8 +216,12 @@ offered to liquidity merchants.
   `.tone-dark` and `.tone-glass` set the palette for part of a page whatever the theme; pill
   buttons (`.btn-white`, `.btn-glass` on the aura);
   action `.tile`s with tracked capitals (`.caps`); wide uppercase `.display` headlines on the aura;
-  an ice highlighter (`.marker`) for the exact amount. The mark is the glyph on an aura tile
-  (`Logo.tsx`, `public/favicon.svg`, `scripts/gen-icons.mjs`).
+  an ice highlighter (`.marker`) for the exact amount.
+- The mark (2026-11-20, chosen by the owner from the options on the logo canvas): the hero's
+  capital M (Archivo's outline at width 116, weight 720, taken from the app's own font file), cut
+  on a slant with its lower part slid right; flat, the M in paper on an ink tile (no gradient).
+  The wordmark is MIDPOINT in the hero's capitals (`.display`). One geometry in `Logo.tsx`
+  (`M_PATH`, the cut, `M_SLIDE`), `public/favicon.svg` and `scripts/gen-icons.mjs`.
 
 ## 7. Security invariants (keep them)
 
