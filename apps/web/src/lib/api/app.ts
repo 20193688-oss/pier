@@ -132,6 +132,7 @@ export function readPayerCharge(raw: unknown): PayerCharge | null {
       isDestination(p.recipient)
         ? {
             token: String(p.token ?? p.tokenSymbol ?? ''),
+            tokenContract: typeof p.tokenContract === 'string' ? p.tokenContract : null,
             amount: String(p.amount),
             expiresAt: iso(p.expiresAt) ?? '',
             recipient: p.recipient,

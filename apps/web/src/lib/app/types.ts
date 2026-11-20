@@ -76,7 +76,14 @@ export interface PayerCharge {
   expiresAt: string | null;
   /* Null when the balance cannot pay it now (no quote, the charge is closed...). `recipient` is
      the charge's receiving account (G or C): what the payment must pay. */
-  payWithBalance: { token: string; amount: string; expiresAt: string; recipient: string } | null;
+  payWithBalance: {
+    token: string;
+    /* The token's SAC contract: the asset the payment must move. */
+    tokenContract: string | null;
+    amount: string;
+    expiresAt: string;
+    recipient: string;
+  } | null;
 }
 
 /** A payment of a charge from the balance: a token transfer to the charge's receiving account

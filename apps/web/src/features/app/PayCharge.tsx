@@ -134,7 +134,9 @@ export default function PayCharge() {
                       return {
                         action: 'payment',
                         to: price.recipient,
-                        token: token.symbol,
+                        // The asset the charge is priced in; one the market does not list is
+                        // refused by the check.
+                        token: price.tokenContract ?? price.token,
                         amountUnits: price.amount,
                         memo: null,
                       };
