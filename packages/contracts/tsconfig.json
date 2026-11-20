@@ -1,23 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "noEmit": true,
     "allowImportingTsExtensions": true,
-    "types": [
-      "node"
-    ],
+    "types": ["node"],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
-    },
-    "module": "ESNext",
-    "moduleResolution": "Bundler"
+      "@/*": ["./src/*"],
+      "@scripts/*": ["./scripts/*"]
+    }
   },
-  "include": [
-    "src",
-    "test",
-    "scripts",
-    "vitest.config.ts"
-  ]
+  "include": ["src", "test", "scripts", "vitest.config.ts"]
 }
