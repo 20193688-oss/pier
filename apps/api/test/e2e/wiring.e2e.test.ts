@@ -1,13 +1,16 @@
-import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
+import { Networks } from '@stellar/stellar-sdk';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { buildOpenApi } from '@/openapi/document';
 import {
   bearer,
   bootApp,
+  HOME_DOMAIN,
+  KEYS,
   organization,
   randomWallet,
   registerWallet,
+  sign,
   signIn,
-  wallet,
   WEB_ORIGIN,
   type Harness,
 } from '@test/e2e/harness';
@@ -22,9 +25,12 @@ type Policy = 'public' | 'session' | 'read' | 'write' | 'admin';
 
 const ROUTES: Record<string, Policy> = {
   'GET /health': 'public',
+  'GET /.well-known/stellar.toml': 'public',
   'GET /v1/market': 'public',
-  'POST /v1/auth/nonce': 'public',
+  'GET /v1/auth/challenge': 'public',
   'POST /v1/auth/verify': 'public',
+  'GET /v1/auth/sep10': 'public',
+  'POST /v1/auth/sep10': 'public',
   'GET /v1/auth/session': 'session',
   'POST /v1/auth/logout': 'session',
   'GET /v1/organizations': 'session',
@@ -46,6 +52,18 @@ const ROUTES: Record<string, Policy> = {
   'POST /v1/app/orders/{id}/paid': 'session',
   'POST /v1/app/orders/{id}/transactions': 'session',
   'POST /v1/app/quotes': 'session',
+  'GET /v1/app/profile': 'session',
+  'PUT /v1/app/profile': 'session',
+  'GET /v1/app/handles/{handle}': 'session',
+  'GET /v1/app/balances': 'session',
+  'POST /v1/app/activate': 'session',
+  'POST /v1/app/transfers': 'session',
+  'GET /v1/app/transfers/{id}': 'session',
+  'GET /v1/app/activity': 'session',
+  'GET /v1/app/charges/{id}': 'session',
+  'POST /v1/app/charges/{id}/payments': 'session',
+  'POST /v1/app/submit': 'session',
+  'GET /v1/app/submissions/{hash}': 'session',
   'GET /v1/p2p-checkout/charges/{id}': 'public',
   'POST /v1/p2p-checkout/charges/{id}/orders': 'public',
   'GET /v1/p2p-checkout/orders/{id}': 'public',
@@ -83,6 +101,8 @@ const ROUTES: Record<string, Policy> = {
   'GET /v1/p2p/payouts/{id}': 'read',
   'POST /v1/p2p/quotes': 'write',
   'POST /v1/p2p/transactions': 'read',
+  'POST /v1/p2p/submit': 'write',
+  'GET /v1/p2p/submissions/{hash}': 'read',
   'GET /v1/webhook-endpoints': 'read',
   'POST /v1/webhook-endpoints': 'write',
   'DELETE /v1/webhook-endpoints/{id}': 'write',
@@ -114,13 +134,9 @@ function send(method: string, path: string, headers: Record<string, string> = {}
 }
 
 beforeAll(async () => {
-  const infra = inject('infra');
-  // A live tier is configured too (it points at the dev node, so it never
-  // verifies), so the tier checks run against a tier that exists.
-  h = await bootApp({
-    P2P_CONTRACTS_LIVE: JSON.stringify({ base: infra.deployment.market }),
-    P2P_RPC_URLS_LIVE: JSON.stringify({ base: infra.rpcUrl }),
-  });
+  // Both tiers have a market configured (testnet and mainnet), on a fake
+  // chain that never verifies it, so the tier checks run against tiers that exist.
+  h = await bootApp();
   org = await organization(h);
   other = await organization(h);
   readOnlyKey = (
@@ -137,10 +153,10 @@ beforeAll(async () => {
     .http()
     .post(`/v1/organizations/${org.id}/members`)
     .set(bearer(org.session))
-    .send({ address: member.address, role: 'member' })
+    .send({ address: member.publicKey(), role: 'member' })
     .expect(201);
   memberSession = await signIn(h, member);
-  adminSession = await signIn(h, wallet('owner'));
+  adminSession = await signIn(h, KEYS.admin);
 });
 
 afterAll(async () => {
@@ -329,11 +345,8 @@ describe('credentials', () => {
     await h.http().get('/v1/auth/session').set('cookie', cookie).expect(200);
   });
 
-  it('spends a SIWE nonce once and refuses another domain', async () => {
-    const res = await h
-      .http()
-      .post('/v1/auth/verify')
-      .send({ message: 'not siwe', signature: '0x00' });
+  it('refuses a transaction that is not a challenge', async () => {
+    const res = await h.http().post('/v1/auth/verify').send({ transaction: 'not xdr' });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('challenge_invalid');
   });
@@ -344,7 +357,7 @@ describe('credentials', () => {
     await h.http().get('/v1/auth/session').set(bearer(session)).expect(401);
   });
 
-  it('refuses the dev tools on orders that are not on the dev chain, and unknown ones', async () => {
+  it('refuses the dev tools on unknown orders', async () => {
     await h.http().post(`/v1/dev/orders/${MISSING}/simulate-transfer`).expect(404);
   });
 });
@@ -366,5 +379,136 @@ describe('error shape', () => {
       .expect(400);
     expect(res.body.error.code).toBe('validation_failed');
     expect(res.body.error.details.length).toBeGreaterThan(1);
+  });
+});
+
+describe('SEP-10', () => {
+  const passphrase = Networks.TESTNET;
+
+  async function challenge(account: string) {
+    const res = await h.http().get(`/v1/auth/challenge?account=${account}`).expect(200);
+    expect(res.body.network_passphrase).toBe(passphrase);
+    return res.body.transaction as string;
+  }
+
+  it('spends a challenge once', async () => {
+    const w = randomWallet();
+    const signed = sign(await challenge(w.publicKey()), passphrase, w);
+    await h.http().post('/v1/auth/verify').send({ transaction: signed }).expect(200);
+    const again = await h.http().post('/v1/auth/verify').send({ transaction: signed }).expect(400);
+    expect(again.body.error.code).toBe('challenge_invalid');
+  });
+
+  it('refuses a challenge signed by another key, without spending it', async () => {
+    const w = randomWallet();
+    const tx = await challenge(w.publicKey());
+    const wrong = await h
+      .http()
+      .post('/v1/auth/verify')
+      .send({ transaction: sign(tx, passphrase, randomWallet()) })
+      .expect(400);
+    expect(wrong.body.error.code).toBe('signature_invalid');
+    await h
+      .http()
+      .post('/v1/auth/verify')
+      .send({ transaction: sign(tx, passphrase, w) })
+      .expect(200);
+  });
+
+  it('refuses a challenge signed for another network', async () => {
+    const w = randomWallet();
+    const tx = await challenge(w.publicKey());
+    const res = await h
+      .http()
+      .post('/v1/auth/verify')
+      .send({ transaction: sign(tx, Networks.PUBLIC, w) });
+    expect(res.status).toBe(400);
+  });
+
+  it('never lets a sign-in challenge register a wallet, nor a registration challenge sign in', async () => {
+    const org = await organization(h);
+    const w = randomWallet();
+    const signInTx = sign(await challenge(w.publicKey()), passphrase, w);
+    const asRegistration = await h
+      .http()
+      .post('/v1/p2p/accounts')
+      .set(bearer(org.testKey))
+      .send({ transaction: signInTx })
+      .expect(400);
+    expect(asRegistration.body.error.code).toBe('challenge_invalid');
+    const reg = await h
+      .http()
+      .post('/v1/p2p/accounts/challenge')
+      .set(bearer(org.testKey))
+      .send({ address: w.publicKey() })
+      .expect(200);
+    const regSigned = sign(reg.body.transaction, passphrase, w);
+    const asSignIn = await h
+      .http()
+      .post('/v1/auth/verify')
+      .send({ transaction: regSigned })
+      .expect(400);
+    expect(asSignIn.body.error.code).toBe('challenge_invalid');
+  });
+
+  it('binds a registration to its organization and tier', async () => {
+    const a = await organization(h);
+    const b = await organization(h);
+    const w = randomWallet();
+    const reg = await h
+      .http()
+      .post('/v1/p2p/accounts/challenge')
+      .set(bearer(a.testKey))
+      .send({ address: w.publicKey() })
+      .expect(200);
+    const signed = sign(reg.body.transaction, passphrase, w);
+    await h
+      .http()
+      .post('/v1/p2p/accounts')
+      .set(bearer(b.testKey))
+      .send({ transaction: signed })
+      .expect(400);
+    await h
+      .http()
+      .post('/v1/p2p/accounts')
+      .set(bearer(a.testKey))
+      .send({ transaction: signed })
+      .expect(201);
+    // Spent: a second registration with the same proof is refused.
+    await h
+      .http()
+      .post('/v1/p2p/accounts')
+      .set(bearer(a.testKey))
+      .send({ transaction: signed })
+      .expect(400);
+  });
+
+  it('serves stellar.toml with the endpoint, the signing key and the network', async () => {
+    const res = await h.http().get('/.well-known/stellar.toml').expect(200);
+    expect(res.text).toContain(`SIGNING_KEY = "${KEYS.sep10.publicKey()}"`);
+    expect(res.text).toContain(`WEB_AUTH_ENDPOINT = "http://${HOME_DOMAIN}/v1/auth/sep10"`);
+    expect(res.text).toContain(`NETWORK_PASSPHRASE = "${passphrase}"`);
+  });
+});
+
+describe('handles', () => {
+  it('claims, refuses a taken or reserved one, and resolves', async () => {
+    const a = await signIn(h, randomWallet());
+    const b = await signIn(h, randomWallet());
+    const handle = `user_${Date.now().toString(36)}`;
+    const mine = await h
+      .http()
+      .put('/v1/app/profile')
+      .set(bearer(a))
+      .send({ handle: `@${handle.toUpperCase()}` })
+      .expect(200);
+    expect(mine.body.handle).toBe(handle);
+    const taken = await h.http().put('/v1/app/profile').set(bearer(b)).send({ handle }).expect(409);
+    expect(taken.body.error.code).toBe('handle_taken');
+    await h.http().put('/v1/app/profile').set(bearer(b)).send({ handle: 'admin' }).expect(409);
+    await h.http().put('/v1/app/profile').set(bearer(b)).send({ handle: 'no' }).expect(400);
+    const found = await h.http().get(`/v1/app/handles/@${handle}`).set(bearer(b)).expect(200);
+    expect(found.body).toEqual({ handle, address: mine.body.address });
+    await h.http().get('/v1/app/handles/nobody_here').set(bearer(b)).expect(404);
   });
 });

@@ -48,6 +48,11 @@ export class RateLimiter implements OnModuleDestroy {
     return Math.max(1, Math.ceil((current.resetAt - now) / 1000));
   }
 
+  /** Forgets every window (tests that sign in many times from one address). */
+  reset(): void {
+    this.windows.clear();
+  }
+
   private sweep(): void {
     const now = Date.now();
     for (const [key, window] of this.windows) if (window.resetAt <= now) this.windows.delete(key);
