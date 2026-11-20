@@ -1,8 +1,9 @@
 /* Orders: the ones this organization's merchant wallets must complete (release a purchase once the
-   money arrived; accept, pay the beneficiary and mark paid on a sale or a payout) and the ones it
-   opened as a client (report a transfer, cancel, dispute, release a payout), each with its
-   running deadline. On-chain actions are signed by the order's own wallet of this organization,
-   after the check in SignFlow; the reconciliation helper finds the orders a bank transfer settles. */
+   money arrived; accept, pay the beneficiary and mark paid on a sale or a payout; pay the shop's
+   QR from a banking app and mark paid on a QR payment) and the ones it opened as a client (report
+   a transfer, cancel, dispute, release a payout), each with its running deadline. On-chain actions
+   are Stellar transactions signed by the order's own wallet of this organization, after the check
+   in SignFlow; the reconciliation helper finds the orders a bank transfer settles. */
 import { useEffect, useMemo, useState } from 'react';
 import { fmt, useI18n } from '@/i18n';
 import {
@@ -23,18 +24,19 @@ import {
   type ClientAction,
   type MerchantAction,
 } from '@/lib/p2p/orders';
-import { explorerTx } from '@/lib/p2p/tx-check';
+import { explorerLink } from '@/lib/stellar/network';
 import { matchConfidence } from '@/lib/p2p/normalize';
 import { checkHolderName } from '@/lib/p2p/rails';
 import { dateTime, money, percent, units } from '@/lib/format';
 import { Field, Notice, SelectField, Spinner } from '@/components/ui/controls';
 import { ConfirmDialog } from '@/components/ui/Dialog';
-import { Address, Empty, StatusPill, useNow } from '@/components/ui/misc';
+import { CopyButton, Empty, Qr, StatusPill, useNow } from '@/components/ui/misc';
 import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/Toast';
 import { accountRows, railName, TokenMark } from '@/components/p2p/parts';
 import { useDash } from '@/features/dashboard/context';
 import {
+  AddressLink,
   Figures,
   LoadState,
   PageHead,
@@ -44,7 +46,13 @@ import {
 } from '@/features/dashboard/ui';
 import { accountStep } from '@/features/dashboard/tx';
 import type { TxStep } from '@/components/wallet/SignFlow';
-import type { P2pAccount, P2pMarket, P2pOrder, P2pTransferMatch } from '@/lib/p2p/types';
+import type {
+  P2pAccount,
+  P2pMarket,
+  P2pOrder,
+  P2pOrderQr,
+  P2pTransferMatch,
+} from '@/lib/p2p/types';
 
 type Tab = 'merchant' | 'client';
 type Signing = {
@@ -111,8 +119,9 @@ export function OrdersView() {
     };
   }, [data]);
 
+  // Stellar addresses are compared exactly (StrKeys have one spelling).
   const accountOf = (address: string | null) =>
-    accounts.find((a) => address && a.address.toLowerCase() === address.toLowerCase()) ?? null;
+    accounts.find((a) => !!address && a.address === address) ?? null;
   const net = (id: string) => market?.networks.find((n) => n.id === id);
 
   /* A merchant's action: its wallet on this order is the seller of a purchase, the buyer of a
@@ -131,7 +140,9 @@ export function OrdersView() {
             })
           : action === 'dispute'
             ? o.disputeBody
-            : undefined,
+            : action === 'mark_paid' && order.kind === 'QR_PAY'
+              ? o.qr.paidBody
+              : undefined,
       order,
       account,
       steps: [
@@ -157,7 +168,7 @@ export function OrdersView() {
     const account = accountOf(order.seller);
     if (!account) return setError(o.noWallet);
     const label = o.actions[action];
-    const onchain = action === 'paid' ? 'markPaid' : action;
+    const onchain = action === 'paid' ? 'mark_paid' : action;
     setSigning({
       title: label,
       intro:
@@ -264,8 +275,9 @@ export function OrdersView() {
                       tab === 'merchant' ? merchantActions(order, now) : clientActions(order, now);
                     const sells = merchantSells(order.kind);
                     const network = net(order.network);
-                    const txLink = explorerTx(
+                    const txLink = explorerLink(
                       network,
+                      'tx',
                       order.txs?.release ?? order.txs?.open ?? null,
                     );
                     return (
@@ -300,6 +312,9 @@ export function OrdersView() {
                             </StatusPill>
                           </div>
                         </div>
+                        {tab === 'merchant' && order.kind === 'QR_PAY' && order.qr?.payload && (
+                          <QrToPay qr={order.qr} />
+                        )}
                         {canWrite && actions.length > 0 && (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {tab === 'merchant'
@@ -307,7 +322,7 @@ export function OrdersView() {
                                   <button
                                     key={a}
                                     type="button"
-                                    className={`btn btn-sm ${a === 'release' || a === 'accept' || a === 'markPaid' ? 'btn-ink' : 'btn-line'}`}
+                                    className={`btn btn-sm ${a === 'release' || a === 'accept' || a === 'mark_paid' ? 'btn-ink' : 'btn-line'}`}
                                     onClick={() => merchantAct(order, a)}
                                   >
                                     {o.actions[a]}
@@ -354,7 +369,7 @@ export function OrdersView() {
                               <div className="flex justify-between gap-3">
                                 <dt className="text-ink-3">{o.fields.buyer}</dt>
                                 <dd>
-                                  <Address value={order.buyer} />
+                                  <AddressLink value={order.buyer} network={network} />
                                 </dd>
                               </div>
                             )}
@@ -362,7 +377,7 @@ export function OrdersView() {
                               <div className="flex justify-between gap-3">
                                 <dt className="text-ink-3">{o.fields.seller}</dt>
                                 <dd>
-                                  <Address value={order.seller} />
+                                  <AddressLink value={order.seller} network={network} />
                                 </dd>
                               </div>
                             )}
@@ -567,9 +582,7 @@ function TransferMatches({
       {matches && matches.length > 0 && (
         <ul className="mt-4 flex flex-col gap-2" role="list">
           {matches.map((x) => {
-            const account = accounts.find(
-              (a) => x.order.seller && a.address.toLowerCase() === x.order.seller.toLowerCase(),
-            );
+            const account = accounts.find((a) => !!x.order.seller && a.address === x.order.seller);
             return (
               <li
                 key={x.order.id}
@@ -611,5 +624,66 @@ function TransferMatches({
         </ul>
       )}
     </details>
+  );
+}
+
+/** A QR payment's QR for its merchant: drawn from the scanned payload, with the shop, the exact
+    amount (the highlighter: the one thing not to get wrong) and the payload to copy, so the
+    merchant pays it from its own banking app and then marks the order paid. The API shows it only
+    to this order's merchant while the order is live. */
+function QrToPay({ qr }: { qr: P2pOrderQr }) {
+  const { t, lang } = useI18n();
+  const q = t.p2p.orders.qr;
+  const standard = (q.standards as Record<string, string>)[qr.standard] ?? qr.standard;
+  return (
+    <section
+      className="mt-3 grid gap-4 rounded-[16px] border border-line bg-paper p-4 sm:grid-cols-[auto_minmax(0,1fr)]"
+      aria-label={q.title}
+    >
+      <div className="justify-self-center rounded-[14px] bg-white p-2">
+        <Qr value={qr.payload} label={fmt(q.image, { name: qr.merchantName ?? '' })} size={184} />
+      </div>
+      <div className="flex min-w-0 flex-col gap-2">
+        <h3 className="text-[1.05rem]">{q.title}</h3>
+        <p className="text-[0.9375rem] text-ink-2">{q.body}</p>
+        <dl className="grid gap-1 text-[0.9375rem]">
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-3">{q.merchant}</dt>
+            <dd className="text-right">
+              {[qr.merchantName, qr.merchantCity].filter(Boolean).join(', ') || '-'}
+            </dd>
+          </div>
+          {qr.amount && (
+            <div className="flex items-baseline justify-between gap-3">
+              <dt className="text-ink-3">{q.amount}</dt>
+              <dd className="figure text-[1.25rem]">
+                <span className="marker">
+                  {qr.currency ? money(lang, qr.amount, qr.currency) : qr.amount}
+                </span>
+              </dd>
+            </div>
+          )}
+          {qr.reference && (
+            <div className="flex justify-between gap-3">
+              <dt className="text-ink-3">{q.reference}</dt>
+              <dd className="num">{qr.reference}</dd>
+            </div>
+          )}
+          <div className="flex justify-between gap-3">
+            <dt className="text-ink-3">{q.standard}</dt>
+            <dd>{standard}</dd>
+          </div>
+        </dl>
+        <div className="flex flex-wrap items-center gap-2">
+          <code
+            className="num min-w-0 flex-1 truncate rounded-md bg-well px-2 py-1 text-[0.75rem]"
+            title={qr.payload}
+          >
+            {qr.payload}
+          </code>
+          <CopyButton value={qr.payload} label={q.copy} />
+        </div>
+      </div>
+    </section>
   );
 }

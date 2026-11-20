@@ -11,7 +11,7 @@ import {
 } from '@/lib/api/endpoints';
 import { errorMessage } from '@/lib/api/messages';
 import { parseDecimal } from '@/lib/p2p/amounts';
-import { fiatDecimals } from '@/lib/p2p/rails';
+import { accountRails, fiatDecimals, isQrRailId } from '@/lib/p2p/rails';
 import { ago, money, rate } from '@/lib/format';
 import { Check, Field, Notice, SelectField, Spinner, Switch } from '@/components/ui/controls';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
@@ -269,7 +269,7 @@ function OfferDialog({
           network: market.networks[0]?.id ?? '',
           token: market.networks[0]?.tokens[0]?.symbol ?? 'USDC',
           currency: market.currencies[0]?.code ?? 'ARS',
-          rails: market.currencies[0]?.rails.slice(0, 1) ?? [],
+          rails: accountRails(market.currencies[0]?.rails ?? []).slice(0, 1),
           price: '',
           priceTtlSeconds: 3600,
           minFiat: '',
@@ -284,6 +284,11 @@ function OfferDialog({
     setForm((x) => ({ ...x, [k]: v }));
   const network = market.networks.find((n) => n.id === form.network);
   const currency = market.currencies.find((c) => c.code === form.currency);
+  // The QR rails (a shop's QR the merchant pays from its banking app) are for merchants that buy
+  // tokens (BUY_TOKEN: QR payments are sales to the merchant); a seller is paid into an account.
+  const railsOf = (side: OfferInput['side'], c = currency) =>
+    side === 'BUY_TOKEN' ? (c?.rails ?? []) : accountRails(c?.rails ?? []);
+  const sideRails = railsOf(form.side);
   const d = fiatDecimals(form.currency);
   const price = parseDecimal(form.price, 8);
   const min = parseDecimal(form.minFiat, d);
@@ -374,7 +379,13 @@ function OfferDialog({
                     key={s}
                     type="button"
                     aria-pressed={form.side === s}
-                    onClick={() => set('side', s)}
+                    onClick={() =>
+                      setForm((x) => ({
+                        ...x,
+                        side: s,
+                        rails: x.rails.filter((r) => railsOf(s).includes(r)),
+                      }))
+                    }
                   >
                     {o.sides[s]}
                   </button>
@@ -409,7 +420,7 @@ function OfferDialog({
                 setForm((x) => ({
                   ...x,
                   currency: e.target.value,
-                  rails: c?.rails.slice(0, 1) ?? [],
+                  rails: railsOf(x.side, c).slice(0, 1),
                 }));
               }}
               options={market.currencies.map((c) => ({ value: c.code, label: c.code }))}
@@ -420,7 +431,7 @@ function OfferDialog({
           <legend className="mb-1 text-[0.875rem] font-semibold text-ink-2">
             {o.head.methods}
           </legend>
-          {(currency?.rails ?? []).map((r) => (
+          {sideRails.map((r) => (
             <Check
               key={r}
               checked={form.rails.includes(r)}
@@ -428,6 +439,7 @@ function OfferDialog({
                 set('rails', on ? [...form.rails, r] : form.rails.filter((x) => x !== r))
               }
               title={railName(t.p2p, r)}
+              desc={isQrRailId(r) ? f.qrRail : undefined}
             />
           ))}
           {touched && errors.rails && <p className="text-[0.8125rem] text-bad">{errors.rails}</p>}

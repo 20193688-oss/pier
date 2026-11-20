@@ -1,49 +1,69 @@
-/* The mock API's starting data, in the API's wire shapes (base units, token addresses, flat
+/* The mock API's starting data, in the API's wire shapes (base units, token contracts, flat
    deadlines), so mock mode exercises the same readers (src/lib/p2p/normalize.ts) as the real API.
-   Every address here is obviously fake; nothing points at a real network. */
 
-export const DEMO_ADDRESS = '0xde3000000000000000000000000000000000a11e';
-export const MATCHER = '0x3a7c4e000000000000000000000000000000beef';
+   Every key here is derived from a fixed, public seed ("pedospe-mock:<name>"): the demo wallets
+   sign real Stellar transactions that only the in-browser mock API ever sees. Nothing points at
+   a funded account on any network. */
+import { Asset, Keypair, StrKey, hash } from '@stellar/stellar-sdk/base';
+import { PASSPHRASES } from '@/lib/stellar/network';
 
-export const NETWORKS = [
-  {
-    id: 'base',
-    name: 'Base',
-    chainId: 8453,
-    contract: '0x5eed00000000000000000000000000000000ba5e',
-    explorer: null,
-    rpcUrl: null,
-    nativeSymbol: 'ETH',
-    tokens: [
-      { symbol: 'USDC', address: '0xc0c0000000000000000000000000000000000001', decimals: 6 },
-      { symbol: 'USDT', address: '0xc0c0000000000000000000000000000000000002', decimals: 6 },
-    ],
-  },
-  {
-    id: 'arbitrum',
-    name: 'Arbitrum One',
-    chainId: 42161,
-    contract: '0x5eed0000000000000000000000000000000a4b17',
-    explorer: null,
-    rpcUrl: null,
-    nativeSymbol: 'ETH',
-    tokens: [
-      { symbol: 'USDC', address: '0xc0c0000000000000000000000000000000000003', decimals: 6 },
-    ],
-  },
-  {
-    id: 'polygon',
-    name: 'Polygon',
-    chainId: 137,
-    contract: '0x5eed000000000000000000000000000000000137',
-    explorer: null,
-    rpcUrl: null,
-    nativeSymbol: 'POL',
-    tokens: [
-      { symbol: 'USDC', address: '0xc0c0000000000000000000000000000000000004', decimals: 6 },
-    ],
-  },
-];
+const seed = (name: string) => hash(new TextEncoder().encode(`pedospe-mock:${name}`));
+
+/** A demo key pair: deterministic, test data only. */
+export const mockKeypair = (name: string) => Keypair.fromRawEd25519Seed(seed(name));
+const account = (name: string) => mockKeypair(name).publicKey();
+const contract = (name: string) => StrKey.encodeContract(seed(name));
+
+/** The people the demo wallet can sign in as. */
+export const PERSONAS = ['user', 'merchant', 'business', 'fresh'] as const;
+export type Persona = (typeof PERSONAS)[number];
+
+export const USER = account('user');
+export const MERCHANT_WALLET = account('merchant');
+export const BUSINESS_WALLET = account('business');
+export const FRESH = account('fresh');
+/** Another app user, with a handle, to send money to. */
+export const FRIEND = account('friend');
+/** The merchant that takes app orders in mock mode (not one of the demo organizations). */
+export const OTHER_MERCHANT = account('other-merchant');
+export const MATCHER = account('matcher');
+export const SPONSOR = account('sponsor');
+export const SEP10_SIGNER = mockKeypair('sep10');
+export const OPS_MEMBER = account('ops');
+export const LERMA_OWNER = account('lerma-owner');
+export const BOT = account('bot');
+
+export const PERSONA_ADDRESS: Record<Persona, string> = {
+  user: USER,
+  merchant: MERCHANT_WALLET,
+  business: BUSINESS_WALLET,
+  fresh: FRESH,
+};
+
+/** The mock market runs on testnet's passphrase with Circle's testnet USDC issuer; the market
+    contract is a made-up id. */
+const PASSPHRASE = PASSPHRASES.testnet;
+const USDC_ISSUER = 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5';
+export const USDC = {
+  symbol: 'USDC',
+  code: 'USDC',
+  issuer: USDC_ISSUER,
+  contract: new Asset('USDC', USDC_ISSUER).contractId(PASSPHRASE),
+  decimals: 7,
+};
+
+export const NETWORK = {
+  id: 'testnet',
+  name: 'Stellar Testnet',
+  networkPassphrase: PASSPHRASE,
+  rpcUrl: 'https://soroban-testnet.stellar.org',
+  horizonUrl: 'https://horizon-testnet.stellar.org',
+  explorerUrl: 'https://stellar.expert/explorer/testnet',
+  contract: contract('market'),
+  tokens: [USDC],
+};
+export const NETWORKS = [NETWORK];
+export const MARKET_CONTRACT = NETWORK.contract;
 
 const field = (key: string, required = true) => ({ key, required });
 
@@ -55,9 +75,16 @@ export const CURRENCIES = [
         id: 'ar_bank_transfer',
         fields: [field('cbu', false), field('alias', false), field('cuit')],
       },
+      { id: 'ar_qr', fields: [] },
     ],
   },
-  { code: 'BRL', rails: [{ id: 'br_pix', fields: [field('keyType'), field('key')] }] },
+  {
+    code: 'BRL',
+    rails: [
+      { id: 'br_pix', fields: [field('keyType'), field('key')] },
+      { id: 'br_pix_qr', fields: [] },
+    ],
+  },
   { code: 'MXN', rails: [{ id: 'mx_spei', fields: [field('clabe')] }] },
   {
     code: 'COP',
@@ -112,6 +139,9 @@ export const RULES = {
   sellAcceptSeconds: 300,
   sellPaymentSeconds: 1800,
   sellSettleSeconds: 21600,
+  qrAcceptSeconds: 120,
+  qrPaymentSeconds: 600,
+  qrSettleSeconds: 3600,
 };
 
 /** `GET /v1/market` as the API answers it (MarketOverviewView). */
@@ -119,7 +149,6 @@ export const MARKET = {
   available: true,
   networks: NETWORKS.map((n) => ({
     ...n,
-    explorerUrl: n.explorer,
     paused: false,
     protocolFeeBps: RULES.protocolFeeBps,
   })),
@@ -141,6 +170,7 @@ export const MARKET = {
     sellSettleWindow: RULES.sellSettleSeconds,
   },
   matcher: MATCHER,
+  sponsor: { enabled: true },
 };
 
 /** The merchants the matcher picks from in mock mode (their public profile only). */
@@ -224,7 +254,11 @@ export const ORGS = [
   },
 ];
 
-/** The merchant organization's registered wallet. */
-export const MERCHANT_WALLET = DEMO_ADDRESS;
-/** The business organization's registered wallet (collections land here, payouts are paid from it). */
-export const BUSINESS_WALLET = '0xb05e000000000000000000000000000000007e11';
+/** The handles that already exist in mock mode. */
+export const HANDLES: Record<string, string> = {
+  lucia: FRIEND,
+  nortecambios: MERCHANT_WALLET,
+  tiendalerma: BUSINESS_WALLET,
+};
+/** Words nobody can claim as a handle. */
+export const RESERVED_HANDLES = ['admin', 'support', 'soporte', 'pedospe', 'app', 'root'];

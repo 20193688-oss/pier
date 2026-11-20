@@ -1,8 +1,12 @@
 /* Liquidity: the organization's registered wallets and what the market contract holds for them.
-   Register a wallet with an EIP-191 signature over the API's single-use challenge; deposit
-   (approve + deposit) and withdraw; authorise pedospe's matcher with a per-order cap; give a bot
-   permission bits or revoke it; pause or resume a merchant. Every on-chain step is built by the
-   API for that wallet and checked against what was typed before the wallet signs (SignFlow). */
+   Register the signed-in wallet with a SEP-10-shaped proof bound to the organization (a challenge
+   transaction that can never be submitted, checked against this app's own SEP-10 domains and its
+   stellar.toml signing key before the wallet signs); deposit (one `deposit` call: the contract pulls the
+   tokens under the wallet's own authorization) and withdraw; authorise the market's matcher with
+   a per-order cap (`set_matcher`); give a bot permission bits or revoke them (`set_operator`);
+   pause or resume a merchant. Every on-chain step is Stellar XDR built by the API for that wallet,
+   checked against what was typed before the wallet signs, and submitted through the API, which
+   pays the network fee (SignFlow). */
 import { useMemo, useState } from 'react';
 import { fmt, useI18n } from '@/i18n';
 import { accounts as accountsApi } from '@/lib/api/endpoints';
@@ -12,16 +16,21 @@ import { fromBaseUnits, gteUnits, parseDecimal, toBaseUnits } from '@/lib/p2p/am
 import { maskToPerms, OPERATOR_PERM_KEYS, permsToMask, type OperatorPerm } from '@/lib/p2p/perms';
 import { units, shortAddress } from '@/lib/format';
 import { useSession } from '@/lib/session';
-import { signText, WalletError } from '@/lib/wallet/actions';
+import { WalletError } from '@/lib/wallet/types';
+import { assertSameTransaction } from '@/lib/wallet/signed';
+import { assertChallenge } from '@/lib/stellar/sep10';
+import { isStellarAddress } from '@pedospe/payment-qr';
+import { STELLAR_DECIMALS } from '@/lib/stellar/network';
 import { Check, Field, Notice, SelectField, Spinner, Switch } from '@/components/ui/controls';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
 import { Address, Empty, Pill } from '@/components/ui/misc';
 import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/Toast';
 import { TokenMark } from '@/components/p2p/parts';
-import { WalletList } from '@/components/wallet/ConnectDialog';
+import { ConnectDialog } from '@/components/wallet/ConnectDialog';
 import { useDash } from '@/features/dashboard/context';
 import {
+  AddressLink,
   Figures,
   LoadState,
   PageHead,
@@ -30,7 +39,6 @@ import {
   useLoad,
 } from '@/features/dashboard/ui';
 import { accountStep } from '@/features/dashboard/tx';
-import type { DiscoveredWallet } from '@/lib/wallet/eip6963';
 import type { P2pAccount, P2pAccountChain, P2pMarket, P2pNetwork } from '@/lib/p2p/types';
 
 type Action =
@@ -66,14 +74,14 @@ export function LiquidityView() {
       for (const c of a.chains ?? []) {
         if (c.matcher) authorised += 1;
         for (const b of c.balances) {
-          if (b.decimals !== 6) continue;
+          if (b.decimals !== STELLAR_DECIMALS) continue;
           free += BigInt(b.freeUnits || '0');
           locked += BigInt(b.lockedUnits || '0');
         }
       }
     return {
-      free: fromBaseUnits(free.toString(), 6),
-      locked: fromBaseUnits(locked.toString(), 6),
+      free: fromBaseUnits(free.toString(), STELLAR_DECIMALS),
+      locked: fromBaseUnits(locked.toString(), STELLAR_DECIMALS),
       authorised,
     };
   }, [load.data]);
@@ -160,7 +168,7 @@ export function LiquidityView() {
                       {a.label || a.merchant?.displayName || shortAddress(a.address)}
                     </p>
                     <p className="mt-1 flex flex-wrap items-center gap-2 text-[0.875rem] text-ink-3">
-                      <Address value={a.address} />
+                      <AddressLink value={a.address} network={market?.networks[0]} />
                       {a.merchant ? (
                         <>
                           <span>{a.merchant.displayName}</span>
@@ -313,9 +321,12 @@ function Chains({
   if (!chains.length)
     return <p className="mt-3 text-[0.9375rem] text-ink-3">{t.dash.liq.noBalance}</p>;
   const nameOf = (id: string) => market?.networks.find((n) => n.id === id)?.name ?? id;
-  /* The matcher's cap is in base units of the network's tokens (the stablecoins share 6). */
+  /* The matcher's cap is in base units of the network's tokens (every Stellar asset has 7). */
   const tokenOf = (id: string) =>
-    market?.networks.find((n) => n.id === id)?.tokens[0] ?? { symbol: 'USDC', decimals: 6 };
+    market?.networks.find((n) => n.id === id)?.tokens[0] ?? {
+      symbol: 'USDC',
+      decimals: STELLAR_DECIMALS,
+    };
   return (
     <div className="mt-4 grid gap-3 md:grid-cols-2">
       {chains.map((c: P2pAccountChain) => (
@@ -369,7 +380,10 @@ function Chains({
                     className="flex flex-wrap items-center justify-between gap-2 text-[0.875rem]"
                   >
                     <span className="flex flex-wrap items-center gap-2">
-                      <Address value={o.address} />
+                      <AddressLink
+                        value={o.address}
+                        network={market?.networks.find((n) => n.id === c.network)}
+                      />
                       <span className="text-ink-3">
                         {maskToPerms(o.perms)
                           .map((p) => l.perms[p].title)
@@ -423,7 +437,7 @@ function ActionDialog({
   const freeUnits = chain?.balances.find((b) => b.symbol === token?.symbol)?.freeUnits ?? '0';
   const [amount, setAmount] = useState(
     action.kind === 'matcher' && chain?.matcher
-      ? fromBaseUnits(chain.matcher.maxPerOrderUnits, 6)
+      ? fromBaseUnits(chain.matcher.maxPerOrderUnits, token?.decimals ?? STELLAR_DECIMALS)
       : '',
   );
   const [autoSettle, setAutoSettle] = useState(chain?.matcher?.autoSettle ?? false);
@@ -432,21 +446,22 @@ function ActionDialog({
   const [touched, setTouched] = useState(false);
   const [ready, setReady] = useState(action.kind === 'revokeBot');
 
-  const decimals = token?.decimals ?? 6;
-  const parsed = parseDecimal(amount, Math.min(decimals, 6));
-  const units6 = parsed !== null ? toBaseUnits(parsed, decimals) : null;
+  const decimals = token?.decimals ?? STELLAR_DECIMALS;
+  const parsed = parseDecimal(amount, decimals);
+  const baseUnits = parsed !== null ? toBaseUnits(parsed, decimals) : null;
   const amountError = (() => {
     if (action.kind === 'bot' || action.kind === 'revokeBot') return null;
     if (!amount.trim()) return action.kind === 'matcher' ? f.enterCap : f.enterAmount;
-    if (units6 === null) return fmt(f.badAmount, { n: Math.min(decimals, 6) });
-    if (action.kind !== 'matcher' && units6 === '0') return f.enterAmount;
-    if (action.kind === 'withdraw' && !gteUnits(freeUnits, units6)) return f.overFree;
+    if (baseUnits === null) return fmt(f.badAmount, { n: decimals });
+    if (action.kind !== 'matcher' && baseUnits === '0') return f.enterAmount;
+    if (action.kind === 'withdraw' && !gteUnits(freeUnits, baseUnits)) return f.overFree;
     return null;
   })();
   const botError = (() => {
     if (action.kind !== 'bot') return null;
-    if (!/^0x[0-9a-fA-F]{40}$/.test(bot.trim())) return f.badBot;
-    if (bot.trim().toLowerCase() === a.address.toLowerCase()) return f.selfBot;
+    // A bot is a Stellar account (G) or a contract (C), written exactly (StrKeys are upper case).
+    if (!isStellarAddress(bot.trim(), ['account', 'contract'])) return f.badBot;
+    if (bot.trim() === a.address) return f.selfBot;
     if (!perms.length) return f.pickPerms;
     return null;
   })();
@@ -469,49 +484,30 @@ function ActionDialog({
         ? [
             accountStep(
               scope,
-              { ...base, action: 'approve', args: { token: token.symbol, amount: units6 } },
-              fmt(d.approveStep, { amount: amt, token: token.symbol }),
-              {
-                action: 'approve',
-                token: token.symbol,
-                spender: network.contract,
-                amountUnits: units6!,
-              },
-            ),
-            accountStep(
-              scope,
-              { ...base, action: 'deposit', args: { token: token.symbol, amount: units6 } },
+              { ...base, action: 'deposit', args: { token: token.symbol, amount: baseUnits } },
               fmt(d.depositStep, { amount: amt, token: token.symbol }),
-              {
-                action: 'deposit',
-                token: token.symbol,
-                amountUnits: units6!,
-              },
+              { action: 'deposit', token: token.symbol, amountUnits: baseUnits! },
             ),
           ]
         : action.kind === 'withdraw'
           ? [
               accountStep(
                 scope,
-                { ...base, action: 'withdraw', args: { token: token.symbol, amount: units6 } },
+                { ...base, action: 'withdraw', args: { token: token.symbol, amount: baseUnits } },
                 fmt(d.withdrawStep, { amount: amt, token: token.symbol }),
-                {
-                  action: 'withdraw',
-                  token: token.symbol,
-                  amountUnits: units6!,
-                },
+                { action: 'withdraw', token: token.symbol, amountUnits: baseUnits! },
               ),
             ]
           : action.kind === 'matcher'
             ? [
                 accountStep(
                   scope,
-                  { ...base, action: 'setMatcher', args: { maxPerOrder: units6, autoSettle } },
+                  { ...base, action: 'set_matcher', args: { maxPerOrder: baseUnits, autoSettle } },
                   fmt(d.matcherStep, { amount: amt, token: token.symbol }),
                   {
-                    action: 'setMatcher',
+                    action: 'set_matcher',
                     matcher: market.matcher,
-                    maxPerOrderUnits: units6!,
+                    maxPerOrderUnits: baseUnits!,
                     autoSettle,
                   },
                 ),
@@ -521,7 +517,7 @@ function ActionDialog({
                   scope,
                   {
                     ...base,
-                    action: 'setOperator',
+                    action: 'set_operator',
                     args: {
                       operator: bot.trim(),
                       permissions: action.kind === 'revokeBot' ? 0 : permsToMask(perms),
@@ -531,7 +527,7 @@ function ActionDialog({
                     address: shortAddress(bot.trim()),
                   }),
                   {
-                    action: 'setOperator',
+                    action: 'set_operator',
                     operator: bot.trim(),
                     perms: action.kind === 'revokeBot' ? 0 : permsToMask(perms),
                   },
@@ -653,7 +649,7 @@ function ActionDialog({
               value={bot}
               spellCheck={false}
               autoComplete="off"
-              placeholder="0x…"
+              placeholder="G…"
               onChange={(e) => setBot(e.target.value)}
               onBlur={() => setTouched(true)}
               error={touched ? botError : null}
@@ -681,51 +677,41 @@ function ActionDialog({
   );
 }
 
-/** Register a wallet: a name and, for a merchant, the name people see; then the wallet's account
-    signs the API's challenge (EIP-191), which proves the organization holds it. */
+/** Register a wallet: a name and, for a merchant, the name people see; then the signed-in wallet
+    proves it holds its account by signing the API's SEP-10-shaped challenge, bound to this
+    organization. The challenge is checked first (src/lib/stellar/sep10.ts): it can never be
+    submitted, names this account, this app's home and web-auth domains, is signed by the key this
+    origin's stellar.toml publishes, and expires within minutes; the wallet must hand back that
+    same transaction, signed. */
 function RegisterDialog({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const { t } = useI18n();
   const r = t.p2p.liquidity.registerForm;
   const d = t.dash.liq;
   const { scope } = useDash();
-  const { wallet: sessionWallet, wallets } = useSession();
+  const { wallet } = useSession();
   const [label, setLabel] = useState('');
   const [merchant, setMerchant] = useState(false);
   const [displayName, setDisplayName] = useState('');
-  const [wallet, setWallet] = useState<DiscoveredWallet | null>(sessionWallet);
-  const [addresses, setAddresses] = useState<string[] | null>(null);
-  const [address, setAddress] = useState('');
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+  const [signingIn, setSigningIn] = useState(false);
   const nameMissing = merchant && displayName.trim().length < 2;
 
-  const connect = async (w: DiscoveredWallet) => {
-    setWallet(w);
-    setError('');
-    try {
-      const list =
-        ((await w.provider.request({ method: 'eth_requestAccounts' })) as string[]) ?? [];
-      setAddresses(list);
-      setAddress(list[0] ?? '');
-    } catch {
-      setError(t.common.wallet.rejected);
-    }
-  };
-
   const register = async () => {
-    if (!wallet || !address || nameMissing) return;
+    if (!wallet || nameMissing) return;
     setError('');
     try {
       setProgress(r.challenge);
-      const ch = await accountsApi.challenge(scope, address);
-      setProgress(
-        fmt(t.common.wallet.signing, { wallet: wallet.info.name || t.common.wallet.unnamed }),
-      );
-      const signature = await signText(wallet.provider, address as `0x${string}`, ch.message);
+      const ch = await accountsApi.challenge(scope, wallet.address);
+      // Pinned to this app's home domain, web_auth_domain and stellar.toml SIGNING_KEY.
+      const domains = await assertChallenge(ch.transaction, ch.networkPassphrase, wallet.address);
+      setProgress(fmt(t.common.wallet.signing, { wallet: wallet.label }));
+      const signed = await wallet.signAuthChallenge(ch.transaction, ch.networkPassphrase, domains);
+      assertSameTransaction(ch.transaction, signed, ch.networkPassphrase);
       setProgress(r.checking);
       await accountsApi.register(scope, {
-        address,
-        signature,
+        address: wallet.address,
+        transaction: signed,
         ...(label.trim() ? { label: label.trim() } : {}),
         ...(merchant ? { displayName: displayName.trim() } : {}),
       });
@@ -733,7 +719,17 @@ function RegisterDialog({ onClose, onDone }: { onClose: () => void; onDone: () =
     } catch (e) {
       setProgress('');
       if (e instanceof WalletError)
-        setError(e.kind === 'rejected' ? t.common.wallet.rejected : t.common.wallet.failed);
+        setError(
+          e.message.startsWith('challenge:')
+            ? t.common.wallet.badChallenge
+            : e.kind === 'rejected'
+              ? t.common.wallet.rejected
+              : e.kind === 'mismatch'
+                ? t.common.wallet.mismatch
+                : e.kind === 'unsupported'
+                  ? t.common.wallet.unsupported
+                  : t.common.wallet.failed,
+        );
       else if (e instanceof ApiError && e.status === 409) setError(d.alreadyRegistered);
       else setError(errorMessage(t.common, e));
     }
@@ -763,37 +759,36 @@ function RegisterDialog({ onClose, onDone }: { onClose: () => void; onDone: () =
         <div className="border-t border-line pt-4">
           <h3 className="text-[1.05rem]">{r.signTitle}</h3>
           <p className="mt-1 mb-3 text-[0.9375rem] text-ink-2">{r.signBody}</p>
-          {!addresses ? (
-            wallets.length ? (
-              <WalletList
-                wallets={wallet ? [wallet, ...wallets.filter((w) => w !== wallet)] : wallets}
-                onPick={(w) => void connect(w)}
-              />
-            ) : (
-              <Notice tone="warn">{t.common.wallet.none}</Notice>
-            )
-          ) : (
+          {wallet ? (
             <div className="flex flex-col gap-3">
-              <SelectField
-                label={d.pickAccount}
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                options={addresses.map((x) => ({ value: x, label: x }))}
-              />
+              <div className="rounded-[14px] bg-well px-4 py-3">
+                <p className="text-[0.8125rem] font-semibold text-ink-3">{d.registering}</p>
+                <Address value={wallet.address} className="mt-1" />
+              </div>
               <button
                 type="button"
                 className="btn btn-ink btn-lg"
-                disabled={!!progress || !address || nameMissing}
+                disabled={!!progress || nameMissing}
                 onClick={() => void register()}
               >
                 {progress ? <Spinner /> : <Icon name="wallet" />}
                 {progress || d.sign}
+              </button>
+              <p className="text-[0.8125rem] text-ink-3">{d.otherWallet}</p>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-3">
+              <Notice tone="warn">{t.common.wallet.reconnect}</Notice>
+              <button type="button" className="btn btn-ink" onClick={() => setSigningIn(true)}>
+                <Icon name="wallet" />
+                {t.common.wallet.connect}
               </button>
             </div>
           )}
         </div>
         {error && <Notice tone="error">{error}</Notice>}
       </div>
+      {signingIn && <ConnectDialog onClose={() => setSigningIn(false)} />}
     </Dialog>
   );
 }

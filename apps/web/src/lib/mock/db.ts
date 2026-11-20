@@ -1,24 +1,49 @@
-/* The mock API's state: what a real API and chain would hold, in this tab's memory, saved to
-   sessionStorage so a reload (or a dev hot reload) keeps the session and every order. Orders move
-   on their own as time passes (a merchant accepting, paying, releasing), the way the indexer
-   would move them from on-chain events. */
+/* The mock API's state: what a real API and the Stellar network would hold, in this tab's memory,
+   saved to sessionStorage so a reload (or a dev hot reload) keeps the session and every order.
+   Orders move on their own as time passes (a merchant accepting, paying, releasing), the way the
+   indexer would move them from contract events; `chain` holds the accounts, trustlines and
+   balances that submitted transactions change (src/lib/mock/chain.ts). */
 import { orderRef } from '@/lib/p2p/order-ref';
 import {
+  BOT,
   BUSINESS_WALLET,
-  DEMO_ADDRESS,
-  RULES,
-  MERCHANTS,
+  FRIEND,
+  HANDLES,
+  LERMA_OWNER,
   MERCHANT_WALLET,
+  MERCHANTS,
   NETWORKS,
+  OPS_MEMBER,
   ORGS,
+  OTHER_MERCHANT,
+  RULES,
+  USER,
 } from '@/lib/mock/fixtures';
+import { DEMO_QRS } from '@/lib/mock/qr';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type Wire = Record<string, any>;
 
+/** An account on the mock network: whether it exists, its sequence, XLM, and its trustlines
+    (null: none) with their balance, all in base units. */
+export interface ChainAccount {
+  exists: boolean;
+  seq: string;
+  xlm: string;
+  trust: Record<string, string | null>;
+}
+
 export interface MockState {
   v: number;
   session: { address: string } | null;
+  chain: {
+    accounts: Record<string, ChainAccount>;
+    submissions: Record<string, Wire>;
+  };
+  handles: Record<string, string>;
+  transfers: Wire[];
+  chargePayments: Record<string, Wire>;
+  challenges10: Record<string, Wire>;
   orgs: Wire[];
   members: Record<string, Wire[]>;
   orders: Wire[];
@@ -36,7 +61,7 @@ export interface MockState {
   nextOnchainId: number;
 }
 
-const VERSION = 5;
+const VERSION = 6;
 const STORAGE_KEY = 'pedospe.mock';
 
 export const now = () => Date.now();
@@ -46,21 +71,21 @@ export const rid = (prefix: string, n = 12) => {
   return `${prefix}_${[...bytes].map((b) => (b % 36).toString(36)).join('')}`;
 };
 export const hash32 = () =>
-  `0x${[...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+  [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('');
 export const refOf = (id: string) => orderRef(id)!;
-export const units = (decimal: number, decimals = 6) =>
+export const units = (decimal: number, decimals = 7) =>
   BigInt(Math.round(decimal * 10 ** decimals)).toString();
 
 const MIN = 60_000;
 
 function token(network: string, symbol = 'USDC') {
-  const n = NETWORKS.find((x) => x.id === network)!;
-  return n.tokens.find((t) => t.symbol === symbol)!;
+  const n = NETWORKS.find((x) => x.id === network) ?? NETWORKS[0];
+  return n.tokens.find((t) => t.symbol === symbol) ?? n.tokens[0];
 }
 
 /** One order in the API's wire shape, with the mock's private fields (`_...`). */
 export function makeOrder(o: {
-  kind: 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';
+  kind: 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT' | 'QR_PAY';
   status: string;
   owner: string; // 'app' or an organization id: who created it
   merchantOrg?: string | null; // the organization whose merchant took it
@@ -78,18 +103,18 @@ export function makeOrder(o: {
   auto?: boolean;
 }): Wire {
   const created = now() - (o.createdAgoMin ?? 0) * MIN;
-  const network = o.network ?? 'base';
+  const network = o.network ?? NETWORKS[0].id;
   const t = token(network, o.symbol);
   const tokens = Math.floor((o.fiat / o.price) * 100) / 100;
   const id = crypto.randomUUID();
-  const bonded = o.kind === 'SELL' || o.kind === 'PAYOUT';
+  const bonded = o.kind === 'SELL' || o.kind === 'PAYOUT' || o.kind === 'QR_PAY';
   return {
     id,
     ref: refOf(id),
     kind: o.kind,
     status: o.status,
     network,
-    token: t.address,
+    token: t.contract,
     tokenSymbol: t.symbol,
     tokenDecimals: t.decimals,
     tokenAmount: units(tokens, t.decimals),
@@ -135,14 +160,14 @@ function seed(): MockState {
       org_nortecambios: [
         {
           id: 'mem_norte_owner',
-          address: DEMO_ADDRESS,
+          address: MERCHANT_WALLET,
           role: 'owner',
           label: null,
           addedAt: '2026-09-02T13:00:00.000Z',
         },
         {
           id: 'mem_norte_ops',
-          address: '0x0a5e000000000000000000000000000000000a11',
+          address: OPS_MEMBER,
           role: 'admin',
           label: 'Operaciones',
           addedAt: '2026-09-10T18:00:00.000Z',
@@ -151,14 +176,21 @@ function seed(): MockState {
       org_tiendalerma: [
         {
           id: 'mem_lerma_owner',
-          address: '0x7e11a00000000000000000000000000000000001',
+          address: LERMA_OWNER,
           role: 'owner',
           label: 'Dueña',
           addedAt: '2026-10-11T15:30:00.000Z',
         },
         {
           id: 'mem_lerma_demo',
-          address: DEMO_ADDRESS,
+          address: MERCHANT_WALLET,
+          role: 'admin',
+          label: null,
+          addedAt: '2026-10-12T09:00:00.000Z',
+        },
+        {
+          id: 'mem_lerma_business',
+          address: BUSINESS_WALLET,
           role: 'admin',
           label: null,
           addedAt: '2026-10-12T09:00:00.000Z',
@@ -186,39 +218,18 @@ function seed(): MockState {
         },
         networks: [
           {
-            network: 'base',
+            network: 'testnet',
             balances: [
               {
-                token: token('base').address,
+                token: token('testnet').contract,
                 symbol: 'USDC',
-                decimals: 6,
+                decimals: 7,
                 freeUnits: units(12450.5),
                 lockedUnits: units(233.45),
               },
-              {
-                token: token('base', 'USDT').address,
-                symbol: 'USDT',
-                decimals: 6,
-                freeUnits: units(800),
-                lockedUnits: '0',
-              },
             ],
             matcher: { maxPerOrder: units(2000), autoSettle: false },
-            operators: { '0xb07000000000000000000000000000000000b075': 6 },
-          },
-          {
-            network: 'arbitrum',
-            balances: [
-              {
-                token: token('arbitrum').address,
-                symbol: 'USDC',
-                decimals: 6,
-                freeUnits: units(3100),
-                lockedUnits: '0',
-              },
-            ],
-            matcher: { maxPerOrder: '0', autoSettle: false },
-            operators: {},
+            operators: { [BOT]: 6 },
           },
         ],
       },
@@ -231,12 +242,12 @@ function seed(): MockState {
         createdAt: '2026-10-11T16:00:00.000Z',
         networks: [
           {
-            network: 'base',
+            network: 'testnet',
             balances: [
               {
-                token: token('base').address,
+                token: token('testnet').contract,
                 symbol: 'USDC',
-                decimals: 6,
+                decimals: 7,
                 freeUnits: units(5000),
                 lockedUnits: units(410.2),
               },
@@ -298,8 +309,8 @@ function seed(): MockState {
         _org: 'org_nortecambios',
         accountId: 'acc_norte_treasury',
         side: 'SELL_TOKEN',
-        network: 'base',
-        token: token('base').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         currency: 'ARS',
         rails: ['ar_bank_transfer'],
@@ -316,8 +327,8 @@ function seed(): MockState {
         _org: 'org_nortecambios',
         accountId: 'acc_norte_treasury',
         side: 'BUY_TOKEN',
-        network: 'base',
-        token: token('base').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         currency: 'ARS',
         rails: ['ar_bank_transfer'],
@@ -334,8 +345,8 @@ function seed(): MockState {
         _org: 'org_nortecambios',
         accountId: 'acc_norte_treasury',
         side: 'SELL_TOKEN',
-        network: 'base',
-        token: token('base').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         currency: 'BRL',
         rails: ['br_pix'],
@@ -352,8 +363,8 @@ function seed(): MockState {
         _org: 'org_nortecambios',
         accountId: 'acc_norte_treasury',
         side: 'SELL_TOKEN',
-        network: 'arbitrum',
-        token: token('arbitrum').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         currency: 'MXN',
         rails: ['mx_spei'],
@@ -370,8 +381,8 @@ function seed(): MockState {
         _org: 'org_nortecambios',
         accountId: 'acc_norte_treasury',
         side: 'BUY_TOKEN',
-        network: 'base',
-        token: token('base').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         currency: 'BRL',
         rails: ['br_pix'],
@@ -390,8 +401,8 @@ function seed(): MockState {
         _org: 'org_tiendalerma',
         currency: 'ARS',
         fiatAmount: '25000.00',
-        network: 'base',
-        token: token('base').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         recipientAddress: BUSINESS_WALLET,
         description: 'Pedido #1042: dos frascos de dulce de cayote',
@@ -408,8 +419,8 @@ function seed(): MockState {
         _org: 'org_tiendalerma',
         currency: 'ARS',
         fiatAmount: '12000.00',
-        network: 'base',
-        token: token('base').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         recipientAddress: BUSINESS_WALLET,
         description: 'Cuota mensual del club de lectura',
@@ -426,8 +437,8 @@ function seed(): MockState {
         _org: 'org_tiendalerma',
         currency: 'ARS',
         fiatAmount: '48500.00',
-        network: 'base',
-        token: token('base').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         recipientAddress: BUSINESS_WALLET,
         description: 'Pedido #1039',
@@ -444,8 +455,8 @@ function seed(): MockState {
         _org: 'org_tiendalerma',
         currency: 'BRL',
         fiatAmount: '320.00',
-        network: 'base',
-        token: token('base').address,
+        network: 'testnet',
+        token: token('testnet').contract,
         tokenSymbol: 'USDC',
         recipientAddress: BUSINESS_WALLET,
         description: 'Pedido #1031',
@@ -570,6 +581,20 @@ function seed(): MockState {
     ],
     payerTokens: {},
     nextOnchainId: 4100,
+    chain: {
+      accounts: {
+        [USER]: { exists: true, seq: '100', xlm: '0', trust: { USDC: units(248.35) } },
+        [FRIEND]: { exists: true, seq: '100', xlm: '0', trust: { USDC: units(40) } },
+        [MERCHANT_WALLET]: { exists: true, seq: '100', xlm: units(5), trust: { USDC: units(3100) } },
+        [BUSINESS_WALLET]: { exists: true, seq: '100', xlm: '0', trust: { USDC: units(900) } },
+        [OTHER_MERCHANT]: { exists: true, seq: '100', xlm: '0', trust: { USDC: units(50000) } },
+      },
+      submissions: {},
+    },
+    handles: { ...HANDLES },
+    transfers: [],
+    chargePayments: {},
+    challenges10: {},
   };
 
   // The merchant's orders to work on, and its history.
@@ -585,7 +610,7 @@ function seed(): MockState {
     s.orders.push(order);
     return order;
   };
-  const user = '0x11ce00000000000000000000000000000000f0e1';
+  const user = FRIEND;
   const arsAccount = {
     rail: 'ar_bank_transfer',
     holderName: 'Norte Cambios SRL',
@@ -745,7 +770,7 @@ function seed(): MockState {
       currency: 'ARS',
       rail: 'ar_bank_transfer',
       price: 1452,
-      buyer: '0x9e77000000000000000000000000000000000c4a',
+      buyer: OTHER_MERCHANT,
       seller: BUSINESS_WALLET,
       createdAgoMin: 90,
       extra: {
@@ -771,8 +796,8 @@ function seed(): MockState {
   s.payouts.push({
     id: batchId,
     _org: 'org_tiendalerma',
-    network: 'base',
-    token: token('base').address,
+    network: 'testnet',
+    token: token('testnet').contract,
     tokenSymbol: 'USDC',
     accountId: 'acc_lerma_collect',
     _orderIds: items.map((o) => o.id),
@@ -788,6 +813,92 @@ function seed(): MockState {
       },
     ],
     createdAt: iso(t - 90 * MIN),
+  });
+
+  // A QR payment the merchant is serving: it pays the café's QR from its banking app.
+  const qrOrder = makeOrder({
+    kind: 'QR_PAY',
+    status: 'awaiting_payment',
+    owner: 'app',
+    merchantOrg: 'org_nortecambios',
+    auto: false,
+    fiat: 18200,
+    currency: 'ARS',
+    rail: 'ar_qr',
+    price: 1452,
+    buyer: MERCHANT_WALLET,
+    seller: FRIEND,
+    createdAgoMin: 2,
+    extra: {
+      paymentDeadline: iso(t + 8 * MIN),
+      _qr: DEMO_QRS.kiosk,
+      _qrAmount: '18200.00',
+      txHashes: { open: hash32(), accept: hash32() },
+    },
+  });
+  qrOrder.onchainId = String(s.nextOnchainId++);
+  s.orders.push(qrOrder);
+
+  // The app user's history: money in and out, a purchase and a sale.
+  const transfer = (o: {
+    from: string;
+    to: string;
+    amount: number;
+    note: string | null;
+    agoMin: number;
+    fromHandle?: string | null;
+    toHandle?: string | null;
+  }) => {
+    const at = iso(t - o.agoMin * MIN);
+    s.transfers.push({
+      id: crypto.randomUUID(),
+      network: NETWORKS[0].id,
+      token: 'USDC',
+      amount: units(o.amount),
+      from: o.from,
+      fromHandle: o.fromHandle ?? null,
+      to: o.to,
+      toHandle: o.toHandle ?? null,
+      note: o.note,
+      status: 'COMPLETED',
+      hash: hash32(),
+      createdAt: at,
+      completedAt: at,
+    });
+  };
+  transfer({ from: FRIEND, to: USER, amount: 35, note: 'Asado del sábado', agoMin: 50, fromHandle: 'lucia' });
+  transfer({ from: USER, to: FRIEND, amount: 12.5, note: 'Café', agoMin: 26 * 60, toHandle: 'lucia' });
+  // A payment from outside the app: no handle.
+  transfer({ from: OTHER_MERCHANT, to: USER, amount: 100, note: null, agoMin: 3 * 24 * 60 });
+  const app = (o: Omit<Parameters<typeof makeOrder>[0], 'owner' | 'merchantOrg'>) => {
+    const order = makeOrder({ owner: 'app', merchantOrg: 'org_other', auto: false, ...o });
+    order.onchainId = String(s.nextOnchainId++);
+    order.txHashes = { open: hash32(), release: hash32() };
+    s.orders.push(order);
+    return order;
+  };
+  app({
+    kind: 'BUY',
+    status: 'completed',
+    fiat: 150000,
+    currency: 'ARS',
+    rail: 'ar_bank_transfer',
+    price: 1488.5,
+    buyer: USER,
+    seller: OTHER_MERCHANT,
+    createdAgoMin: 2 * 24 * 60,
+    extra: { payer: { name: 'Sofía Ruiz', document: '27345678906' } },
+  });
+  app({
+    kind: 'SELL',
+    status: 'completed',
+    fiat: 29040,
+    currency: 'ARS',
+    rail: 'ar_bank_transfer',
+    price: 1452,
+    buyer: OTHER_MERCHANT,
+    seller: USER,
+    createdAgoMin: 5 * 24 * 60,
   });
   return s;
 }
@@ -847,6 +958,7 @@ export function tick(o: Wire): Wire {
   if (o.status === 'awaiting_acceptance' && o.acceptDeadline && Date.parse(o.acceptDeadline) < t) {
     o.status = 'expired';
     touch();
+    refundSeller(o);
     return o;
   }
   if (!o._auto) return o;
@@ -868,12 +980,16 @@ export function tick(o: Wire): Wire {
     }
     return o;
   }
-  // A sale or a payout: the merchant accepts, pays the beneficiary and marks it paid.
+  // A sale, a QR payment or a payout: the merchant accepts, pays the beneficiary (or the shop's
+  // QR) and marks it paid.
+  const qr = o.kind === 'QR_PAY';
   if (o.status === 'awaiting_acceptance' && T.opened && t - T.opened > 4000) {
     o.status = 'awaiting_payment';
     // Time-based, not read-based: the merchant accepted four seconds after the order opened.
     T.accepted = Math.min(t, T.opened + 4000);
-    o.paymentDeadline = at(T.accepted + w.sellPaymentSeconds * 1000);
+    o.paymentDeadline = at(
+      T.accepted + (qr ? RULES.qrPaymentSeconds : w.sellPaymentSeconds) * 1000,
+    );
     o.txHashes = { ...o.txHashes, accept: hash32() };
     touch();
   }
@@ -881,15 +997,46 @@ export function tick(o: Wire): Wire {
     o.status = 'paid';
     T.paid = t;
     o.paidReference = `TRF-${Math.floor(10000 + Math.random() * 89999)}`;
-    o.settleDeadline = o.kind === 'SELL' ? at(t + w.settleSeconds * 1000) : null;
+    o.settleDeadline =
+      o.kind === 'SELL'
+        ? at(t + w.settleSeconds * 1000)
+        : qr
+          ? at(t + RULES.qrSettleSeconds * 1000)
+          : null;
     o.txHashes = { ...o.txHashes, paid: hash32() };
     touch();
   }
   return o;
 }
 
-/** A completed order's side effects: its charge is paid. */
+/** A token balance on the mock network, moved by `delta` base units (a missing trustline takes
+    nothing). */
+export function credit(address: string, symbol: string, delta: bigint) {
+  const a = db().chain.accounts[address];
+  if (!a?.exists) return false;
+  const cur = a.trust[symbol];
+  if (cur === null || cur === undefined) return false;
+  const next = BigInt(cur) + delta;
+  if (next < 0n) return false;
+  a.trust[symbol] = next.toString();
+  return true;
+}
+
+/** A sale that ends without a release: its tokens go back to the seller. */
+export function refundSeller(o: Wire) {
+  if (o._refunded || !o._locked) return;
+  o._refunded = true;
+  credit(o.sellerAddress, o.tokenSymbol, BigInt(o.tokenAmount));
+}
+
+/** A completed order's side effects: the buyer receives the tokens (less the protocol fee), and
+    its charge is paid. */
 export function onCompleted(o: Wire) {
+  if (!o._credited) {
+    o._credited = true;
+    const fee = (BigInt(o.tokenAmount) * BigInt(o.feeBps ?? 0)) / 10000n;
+    credit(o.buyerAddress, o.tokenSymbol, BigInt(o.tokenAmount) - fee);
+  }
   if (o.chargeId) {
     const c = db().charges.find((x) => x.id === o.chargeId);
     if (c) {
@@ -902,4 +1049,4 @@ export function onCompleted(o: Wire) {
   }
 }
 
-export { DEMO_ADDRESS };
+export { USER };

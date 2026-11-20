@@ -7,7 +7,8 @@ import docs from '@/i18n/messages/en/docs';
 import charge from '@/i18n/messages/en/charge';
 import dash from '@/i18n/messages/en/dash';
 import admin from '@/i18n/messages/en/admin';
+import app from '@/i18n/messages/en/app';
 
-const en = { common, p2p, landing, trade, docs, charge, dash, admin };
+const en = { common, p2p, landing, trade, docs, charge, dash, admin, app };
 
 export default en;

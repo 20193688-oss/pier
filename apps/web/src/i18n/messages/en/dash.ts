@@ -2,10 +2,10 @@
 import type es from '@/i18n/messages/es/dash';
 
 const dash: typeof es = {
-  metaTitle: 'Dashboard | pedospe',
+  metaTitle: 'Dashboard | {brand}',
   signIn: {
     title: 'Sign in to the dashboard with your wallet',
-    body: 'The dashboard is for merchants and businesses: liquidity, offers, orders, charges, payouts and the API. You sign in by signing a message with your wallet; there is no password.',
+    body: 'The dashboard is for merchants and businesses: liquidity, offers, orders, charges, payouts and the API. You sign in with your Stellar wallet (email, Google or an extension); there is no password.',
     cta: 'Connect wallet',
     back: 'Back to the site',
   },
@@ -105,7 +105,7 @@ const dash: typeof es = {
     ownersOnly: 'Only owners and admins create and revoke keys.',
   },
   liq: {
-    lede: "Your organization's wallets: their balance in the market contract, the limit pedospe may open orders with on it, and the bots you authorised. You sign every move yourself, in your wallet.",
+    lede: "Your organization's wallets: their balance in the market contract, the limit {brand} may open orders with on it, and the bots you authorised. You sign every move yourself, in your wallet.",
     empty: 'You have not registered a wallet yet.',
     emptyBody:
       'Register one to deposit liquidity, publish offers as a merchant or receive charges.',
@@ -115,9 +115,8 @@ const dash: typeof es = {
     noBalance: 'No balance in the market yet.',
     noMatcher: 'This environment has no published order matcher.',
     depositStep: 'Deposit {amount} {token}',
-    approveStep: 'Allow the market to take {amount} {token}',
     withdrawStep: 'Withdraw {amount} {token} to this wallet',
-    matcherStep: 'Authorise pedospe up to {amount} {token} per order',
+    matcherStep: 'Authorise {brand} up to {amount} {token} per order',
     botStep: 'Give the bot {address} its permissions',
     revokeStep: 'Take every permission from the bot {address}',
     pause: 'Pause orders',
@@ -126,8 +125,10 @@ const dash: typeof es = {
     resumed: 'The merchant takes orders',
     sent: 'Done. The balance updates in a few seconds.',
     registered: 'Wallet registered',
-    alreadyRegistered: 'That account is already registered. Pick another one in your wallet.',
-    pickAccount: 'Pick the account you want to register',
+    alreadyRegistered: 'That wallet is already registered.',
+    registering: 'The wallet you signed in with is registered',
+    otherWallet: 'To register another wallet, sign out and sign in with it.',
+    explorer: 'View on the explorer',
     sign: 'Sign and register',
   },
 };

@@ -1,7 +1,8 @@
-/* The home page. The hero's second half is the thing pedospe is about: an order slip with the
-   exact amount to transfer marked like a receipt someone highlighted, the account to pay, and the
-   clock. Then how a purchase works (a real sequence, so numbered), why nobody keeps the funds,
-   merchants, businesses and the API, and the questions people ask first. */
+/* The home page. The hero's second half is the thing the product is about: an order slip with
+   the exact amount to transfer marked like a receipt someone highlighted, the account to pay, and
+   the clock. Then how a purchase works (a real sequence, so numbered), the payments app (/app),
+   why nobody keeps the funds, merchants, businesses and the API, and the questions people ask
+   first. The market runs on Stellar. */
 import { Link } from 'react-router';
 import { useDocumentMeta, useI18n } from '@/i18n';
 import { Icon, type IconName } from '@/components/ui/Icon';
@@ -69,6 +70,7 @@ function OrderSlip() {
 }
 
 const TRUST_ICONS: IconName[] = ['lock', 'clock', 'users', 'list'];
+const APP_ICONS: IconName[] = ['send', 'qr', 'bank', 'link'];
 
 export default function LandingPage() {
   const { t } = useI18n();
@@ -87,10 +89,10 @@ export default function LandingPage() {
           <p className="max-w-[34rem] text-[1.125rem] text-ink-2">{l.hero.body}</p>
           <div className="flex flex-wrap gap-3">
             <Link to="/app" className="btn btn-ink btn-lg">
-              {l.hero.buy}
+              {l.hero.open}
             </Link>
-            <Link to="/app?side=sell" className="btn btn-line btn-lg">
-              {l.hero.sell}
+            <Link to="/dashboard" className="btn btn-line btn-lg">
+              {l.hero.merchant}
             </Link>
           </div>
           <p className="max-w-[34rem] text-[0.9375rem] text-ink-3">{l.hero.rails}</p>
@@ -121,6 +123,38 @@ export default function LandingPage() {
           <p className="mt-10 max-w-[44rem] rounded-[16px] bg-well px-5 py-4 text-ink-2">
             {l.how.sell}
           </p>
+        </div>
+      </section>
+
+      <section aria-labelledby="app-h" className="mx-auto max-w-6xl px-4 pt-16 md:pt-24">
+        <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-start">
+          <div className="flex flex-col gap-5">
+            <h2 id="app-h" className="text-[1.9rem] sm:text-[2.3rem]">
+              {l.app.title}
+            </h2>
+            <p className="max-w-[34rem] text-[1.0625rem] text-ink-2">{l.app.body}</p>
+            <div>
+              <Link to="/app" className="btn btn-ink btn-lg">
+                {l.app.cta}
+              </Link>
+            </div>
+          </div>
+          <ul className="grid gap-4 sm:grid-cols-2" role="list">
+            {l.app.points.map((p, i) => (
+              <li key={p.title} className="sheet flex gap-3 p-4">
+                <span
+                  className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-well text-ink"
+                  aria-hidden="true"
+                >
+                  <Icon name={APP_ICONS[i] ?? 'send'} />
+                </span>
+                <div>
+                  <h3 className="text-[1.0625rem]">{p.title}</h3>
+                  <p className="mt-1 text-[0.9375rem] text-ink-2">{p.body}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
@@ -212,13 +246,13 @@ export default function LandingPage() {
               {l.business.codeLabel}
             </figcaption>
             <pre className="overflow-x-auto text-[0.8125rem] leading-relaxed">
-              <code>{`curl "$PEDOSPE_API_URL/v1/charges" \\
+              <code>{`curl "$PEDOSPE_API_URL/v1/p2p/charges" \\
   -H "Authorization: Bearer $PEDOSPE_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "currency": "ARS",
     "fiatAmount": "25000.00",
-    "network": "base",
+    "network": "testnet",
     "token": "USDC",
     "recipient": "acc_...",
     "description": "Pedido #1042"
@@ -260,7 +294,7 @@ export default function LandingPage() {
             <p className="mt-2 text-ink-2">{l.closing.body}</p>
           </div>
           <Link to="/app" className="btn btn-ink btn-lg">
-            {l.hero.buy}
+            {l.hero.open}
           </Link>
         </div>
       </section>

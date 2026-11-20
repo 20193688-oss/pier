@@ -2,9 +2,10 @@
 
    A purchase: the slip with the exact amount marked, the merchant's account with copy buttons,
    the clock, "I transferred"; then the merchant releases the USDC to the wallet.
-   A sale: the two transactions the wallet signs to lock the USDC in the order, a merchant accepts
-   and pays into the seller's account, the seller releases once the money is there (or the settle
-   window does). Every on-chain step is the person's own wallet's, checked first (SignFlow). */
+   A sale: the one transaction the wallet signs to lock the USDC in the order (`open_with_deposit`),
+   a merchant accepts and pays into the seller's account, the seller releases once the money is
+   there (or the settle window does). Every on-chain step is the person's own wallet's, checked
+   first (SignFlow), and the API pays its network fee. */
 import { useEffect, useState } from 'react';
 import { fmt, useI18n } from '@/i18n';
 import { trade as tradeApi } from '@/lib/api/endpoints';
@@ -20,8 +21,10 @@ import {
 } from '@/lib/p2p/orders';
 import { bpsOf, toBaseUnits, fromBaseUnits } from '@/lib/p2p/amounts';
 import { decimalsFrom, decimalsOf } from '@/lib/p2p/normalize';
-import { explorerTx } from '@/lib/p2p/tx-check';
+import { explorerLink } from '@/lib/stellar/network';
 import { saveSteps, savedQuoteTerms, savedSteps } from '@/lib/p2p/steps';
+import { QR_PAY_WINDOWS } from '@/lib/p2p/qr-pay';
+import { appSubmitter } from '@/lib/api/app';
 import { saleTerms } from '@/lib/p2p/tx-verify';
 import { amountOnly, money, plainAmount, units } from '@/lib/format';
 import { ConfirmDialog } from '@/components/ui/Dialog';
@@ -68,7 +71,7 @@ export function OrderPanel({
         .then((raw) => {
           if (!alive) return;
           const x = { ...raw };
-          if (x.kind === 'SELL' && x.status === 'pending' && !x.transactions?.length)
+          if (x.kind !== 'BUY' && x.status === 'pending' && !x.transactions?.length)
             x.transactions = savedSteps(x.id);
           if (x.status !== 'pending') saveSteps(x.id, undefined);
           setOrder(x);
@@ -130,7 +133,7 @@ export function OrderPanel({
   const net = fromBaseUnits(netUnits, decimals);
   const statusWord = (p.status as Record<string, string>)[order.status] ?? order.status;
   const shownTx = order.txs?.release ?? order.txs?.open ?? null;
-  const txLink = explorerTx(network, shownTx);
+  const txLink = explorerLink(network, 'tx', shownTx);
   const me = session?.address ?? '';
 
   const act = async (action: 'paid' | 'cancel' | 'dispute') => {
@@ -169,32 +172,28 @@ export function OrderPanel({
     token: order.token,
     accepted: savedQuoteTerms(order.id),
     order: { amountUnits: tokenUnits, buyer: order.buyer },
-    market,
+    bondBps: market.sellBondBps,
+    windows:
+      order.kind === 'QR_PAY'
+        ? QR_PAY_WINDOWS
+        : {
+            acceptSeconds: market.windows.acceptSeconds,
+            paymentSeconds: market.windows.sellPaymentSeconds,
+            settleSeconds: market.windows.settleSeconds,
+          },
   });
   const unverifiable = !buy && order.status === 'pending' && sale.problem !== null;
   const saleSteps: TxStep[] = (() => {
-    const list = order.transactions ?? [];
-    const approve = list.find((x) => x.action === 'approve' || x.description === 'approve');
-    const open = list.find((x) => x !== approve);
-    if (!approve || !open || !network || !sale.terms) return [];
+    const open = (order.transactions ?? [])[0];
+    if (!open || !network || !sale.terms) return [];
     return [
       {
-        label: fmt(o.stepApprove, {
+        label: fmt(o.stepOpen, {
           amount: amountOnly(lang, order.tokenAmount),
           token: order.token,
         }),
-        build: async () => approve,
-        expect: {
-          action: 'approve',
-          token: order.token,
-          spender: network.contract,
-          amountUnits: sale.terms.amountUnits,
-        },
-      },
-      {
-        label: o.stepOpen,
         build: async () => open,
-        expect: { action: 'openWithDeposit', ...sale.terms },
+        expect: { action: 'open_with_deposit', ...sale.terms },
       },
     ];
   })();
@@ -376,6 +375,8 @@ export function OrderPanel({
             <SignFlow
               network={network}
               signer={me}
+              via={appSubmitter}
+              sponsored={market.sponsor.enabled}
               steps={saleSteps}
               onDone={() => {
                 setSigned(true);
@@ -391,10 +392,10 @@ export function OrderPanel({
             <p className="mt-1 text-ink-2">{o.paidBody}</p>
           </div>
         )}
-        {/* The local development chain only: play the merchant's bot so a purchase can be
+        {/* The local development network only: play the merchant's bot so a purchase can be
             clicked through without a bank. */}
         {buy &&
-          network?.chainId === 31337 &&
+          network?.id === 'local' &&
           (order.status === 'awaiting_payment' || order.status === 'paid') && (
             <button
               type="button"
@@ -443,6 +444,8 @@ export function OrderPanel({
             <SignFlow
               network={network}
               signer={me}
+              via={appSubmitter}
+              sponsored={market.sponsor.enabled}
               startLabel={fmt(o.release, { token: order.token })}
               steps={[
                 builtStep(
@@ -540,6 +543,8 @@ export function OrderPanel({
           <SignFlow
             network={network}
             signer={me}
+            via={appSubmitter}
+            sponsored={market.sponsor.enabled}
             startLabel={confirm === 'cancel' ? o.cancel : o.dispute}
             steps={[builtStep(confirm, confirm === 'cancel' ? o.cancel : o.dispute)]}
             onDone={() => {

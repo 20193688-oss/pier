@@ -1,7 +1,9 @@
 /* The hosted charge page (/c/{chargeId}): someone pays a business's request with a bank
    transfer, with no wallet and no account. Who pays (name, document, email) and how, then the
    merchant's account and the exact amount with the clock, "I transferred", and the status until
-   the merchant confirms. The payer's order is kept for this tab (its token reads only that
+   the merchant confirms. Someone with dollars in the payments app can pay it from their balance
+   there instead (/app/charge/{chargeId}). The QR rails are never offered here: they pay a shop's
+   QR, not a merchant's account. The payer's order is kept for this tab (its token reads only that
    order), so a reload resumes it. Everything the page shows was checked first
    (src/lib/p2p/checkout.ts). */
 import { useCallback, useEffect, useState } from 'react';
@@ -11,7 +13,7 @@ import { checkout } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
 import { errorMessage, isNotFound } from '@/lib/api/messages';
 import { savedOrder, saveOrder, type CheckoutCharge, type CheckoutOrder } from '@/lib/p2p/checkout';
-import { checkEmail, checkHolderName, checkPayerDocument } from '@/lib/p2p/rails';
+import { accountRails, checkEmail, checkHolderName, checkPayerDocument } from '@/lib/p2p/rails';
 import { countdown, isTerminal, msLeft, pollDelay } from '@/lib/p2p/orders';
 import { dateTime, money, plainAmount } from '@/lib/format';
 import { Logo } from '@/components/ui/Logo';
@@ -120,13 +122,28 @@ export default function ChargePage() {
                 </Notice>
               </div>
             ) : (
-              <PayerForm
-                charge={charge}
-                onOpened={(s) => {
-                  saveOrder(chargeId, s);
-                  setSession(s);
-                }}
-              />
+              <>
+                <div className="mx-5 mt-2 flex flex-wrap items-center justify-between gap-3 rounded-[16px] bg-well p-4 sm:mx-7">
+                  <div className="min-w-0">
+                    <p className="font-semibold">{c.app.title}</p>
+                    <p className="text-[0.875rem] text-ink-3">{c.app.body}</p>
+                  </div>
+                  <Link
+                    to={`/app/charge/${encodeURIComponent(charge.id)}`}
+                    className="btn btn-line btn-sm"
+                  >
+                    <Icon name="wallet" size={16} />
+                    {c.app.cta}
+                  </Link>
+                </div>
+                <PayerForm
+                  charge={charge}
+                  onOpened={(s) => {
+                    saveOrder(chargeId, s);
+                    setSession(s);
+                  }}
+                />
+              </>
             )}
           </article>
         )}
@@ -149,11 +166,12 @@ function PayerForm({
   const { t } = useI18n();
   const c = t.charge;
   const p = t.p2p;
+  const rails = accountRails(charge.rails);
   const [form, setForm] = useState({
     name: '',
     document: '',
     email: '',
-    rail: charge.rails[0] ?? '',
+    rail: rails[0] ?? '',
   });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -188,7 +206,7 @@ function PayerForm({
     }
   };
 
-  if (!charge.rails.length)
+  if (!rails.length)
     return (
       <div className="px-5 pt-2 pb-6 sm:px-7">
         <Notice tone="warn">{c.payer.noRails}</Notice>
@@ -244,8 +262,8 @@ function PayerForm({
         label={c.payer.method}
         value={form.rail}
         onChange={(e) => setForm({ ...form, rail: e.target.value })}
-        disabled={charge.rails.length < 2}
-        options={charge.rails.map((r) => ({ value: r, label: railName(p, r) }))}
+        disabled={rails.length < 2}
+        options={rails.map((r) => ({ value: r, label: railName(p, r) }))}
       />
       <button type="submit" className="btn btn-ink btn-lg mt-1 w-full" disabled={busy}>
         {busy && <Spinner />}

@@ -55,7 +55,7 @@ export default function DocsApp() {
   const page = findDocPage(params['*'] ?? '');
   const [open, setOpen] = useState(false);
   const words = page ? d.pages[page.key] : null;
-  useDocumentMeta(words ? `${words.title} | pedospe` : d.metaTitle, words?.description);
+  useDocumentMeta(words ? `${words.title} | ${t.common.brand}` : d.metaTitle, words?.description);
 
   // A link to a heading lands on it; a new page starts at its top.
   useEffect(() => {

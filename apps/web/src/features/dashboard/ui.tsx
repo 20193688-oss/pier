@@ -12,9 +12,14 @@ import {
 import { useI18n } from '@/i18n';
 import { Notice, Skeleton } from '@/components/ui/controls';
 import { Dialog } from '@/components/ui/Dialog';
+import { Icon } from '@/components/ui/Icon';
+import { Address } from '@/components/ui/misc';
+import { addressKind, explorerLink } from '@/lib/stellar/network';
 import { SignFlow, type TxStep } from '@/components/wallet/SignFlow';
 import { errorMessage, isUnauthorized } from '@/lib/api/messages';
 import { useSession } from '@/lib/session';
+import { useDash } from '@/features/dashboard/context';
+import { orgSubmitter } from '@/features/dashboard/tx';
 import type { P2pNetwork } from '@/lib/p2p/types';
 
 export function PageHead({
@@ -137,7 +142,8 @@ export function ReadOnly() {
 }
 
 /** A dialog that signs one or more transactions from `signer` (one of the organization's
-    registered wallets) after the check in SignFlow. */
+    registered wallets) after the check in SignFlow, and submits them through the organization's
+    submit route (the API pays the network fee when the market sponsors it). */
 export function SignDialog({
   title,
   intro,
@@ -155,10 +161,18 @@ export function SignDialog({
   onDone: () => void;
   onClose: () => void;
 }) {
+  const { scope, market } = useDash();
   return (
     <Dialog title={title} onClose={onClose}>
       {intro && <div className="mb-4 text-ink-2">{intro}</div>}
-      <SignFlow network={network} signer={signer} steps={steps} onDone={onDone} />
+      <SignFlow
+        network={network}
+        signer={signer}
+        steps={steps}
+        via={orgSubmitter(scope)}
+        sponsored={market?.sponsor.enabled ?? false}
+        onDone={onDone}
+      />
     </Dialog>
   );
 }
@@ -170,5 +184,35 @@ export function Row({ k, children }: { k: string; children: ReactNode }) {
       <dt className="text-ink-3">{k}</dt>
       <dd className="min-w-0 text-right">{children}</dd>
     </div>
+  );
+}
+
+/** A Stellar address, shortened, with a link to its page on the network's explorer when the
+    market names one. */
+export function AddressLink({
+  value,
+  network,
+}: {
+  value: string;
+  network?: Pick<P2pNetwork, 'explorerUrl'> | null;
+}) {
+  const { t } = useI18n();
+  const href = explorerLink(network, addressKind(value), value);
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Address value={value} />
+      {href && (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={t.dash.liq.explorer}
+          title={t.dash.liq.explorer}
+          className="text-ink-3 hover:text-ink"
+        >
+          <Icon name="external" size={14} />
+        </a>
+      )}
+    </span>
   );
 }

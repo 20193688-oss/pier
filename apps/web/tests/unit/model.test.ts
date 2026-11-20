@@ -144,7 +144,7 @@ test('who may act on an order, as the contract allows', () => {
   );
   assert.deepEqual(
     merchantActions({ kind: 'PAYOUT', status: 'awaiting_payment', deadlines: d() }, now),
-    ['markPaid', 'cancel'],
+    ['mark_paid', 'cancel'],
   );
   assert.deepEqual(
     merchantActions({ kind: 'SELL', status: 'paid', deadlines: d({ settleBy: later }) }, now),
@@ -269,5 +269,30 @@ test('the template parses with every row valid', () => {
   assert.deepEqual(
     parsed.rows.map((r) => r.errors),
     [{}, {}, {}],
+  );
+});
+
+test('a payout file never pays a QR rail: it has no account to pay', () => {
+  const r = parsePayoutCsv(
+    'currency,amount,rail,holderName,document\nARS,1000,ar_qr,Ana,20329642330',
+  );
+  assert.equal(r.rows[0].errors.rail, 'rail');
+});
+
+test("a QR payment is the user's own sale: the client only follows it", () => {
+  const now = Date.parse('2026-11-19T12:00:00Z');
+  const d = { acceptBy: null, payBy: null, settleBy: null };
+  assert.deepEqual(clientActions({ kind: 'QR_PAY', status: 'paid', deadlines: d }, now), []);
+  assert.deepEqual(
+    merchantActions(
+      {
+        kind: 'QR_PAY',
+        status: 'awaiting_payment',
+        deadlines: { ...d, payBy: '2026-11-19T12:10:00Z' },
+      },
+      now,
+    ),
+    ['mark_paid', 'cancel'],
+    'the merchant pays the QR, then marks it paid',
   );
 });

@@ -15,7 +15,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/Toast';
 import { useDash } from '@/features/dashboard/context';
 import { LoadState, PageHead, useLoad } from '@/features/dashboard/ui';
-import { grantableRoles, isEvmAddress } from '@/features/dashboard/views/admin-model';
+import { grantableRoles, isMemberAddress } from '@/features/dashboard/views/admin-model';
 
 export function TeamView() {
   const { t, lang } = useI18n();
@@ -85,8 +85,7 @@ export function TeamView() {
         {(members) => (
           <ul className="flex flex-col gap-3" role="list" aria-label={m.title}>
             {members.map((member) => {
-              const me =
-                !!session && member.address.toLowerCase() === session.address.toLowerCase();
+              const me = !!session && member.address === session.address;
               // A member's role can be changed only to one this member may grant (and an owner only by an owner).
               const editable = canWrite && grantable.includes(member.role);
               return (
@@ -192,11 +191,11 @@ function AddMember({
   const [touched, setTouched] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const addressError = touched && !isEvmAddress(address) ? m.addressError : null;
+  const addressError = touched && !isMemberAddress(address) ? m.addressError : null;
 
   const submit = async () => {
     setTouched(true);
-    if (!isEvmAddress(address) || !grantable.includes(role)) return;
+    if (!isMemberAddress(address) || !grantable.includes(role)) return;
     setBusy(true);
     setError('');
     try {

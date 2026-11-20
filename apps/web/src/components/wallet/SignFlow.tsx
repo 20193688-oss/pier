@@ -1,120 +1,135 @@
-/* Signing one or more transactions in the person's own wallet. Each step's transaction is built
-   by the API (or comes with the order), then checked against what the screen promised (the
-   target, the chain, and the decoded call: tx-verify.ts) before the wallet is asked; a step that
-   fails the check is never sent. Steps already sent are never sent again on a retry, so a sale
-   never locks its tokens twice. */
+/* Signing one or more transactions with the signed-in wallet. Each step's transaction is built by
+   the API (or comes with the order), checked against what the screen promised (the decoded XDR:
+   src/lib/p2p/tx-verify.ts), signed, handed back to the API to submit (it pays the network fee),
+   and followed until the network settles it. A step that fails the check is never signed. Steps
+   already settled are never sent again on a retry, so a sale never locks its tokens twice. */
 import { useRef, useState } from 'react';
-import { fmt, useT } from '@/i18n';
+import { fmt, useT, type Messages } from '@/i18n';
 import { Notice, Spinner } from '@/components/ui/controls';
 import { Icon } from '@/components/ui/Icon';
-import { WalletList, walletName } from '@/components/wallet/ConnectDialog';
+import { ConnectDialog } from '@/components/wallet/ConnectDialog';
 import { useSession } from '@/lib/session';
-import {
-  ensureChain,
-  sendTransaction,
-  waitForTransaction,
-  WalletError,
-} from '@/lib/wallet/actions';
-import { evmChainOf } from '@/lib/p2p/tx-check';
 import { shortAddress } from '@/lib/format';
 import { ApiError } from '@/lib/api/client';
-import type { DiscoveredWallet } from '@/lib/wallet/eip6963';
+import { WalletError } from '@/lib/wallet/types';
 import type { P2pNetwork, P2pTransaction } from '@/lib/p2p/types';
 import type { TxExpectation } from '@/lib/p2p/tx-verify';
+import type { Submitter } from '@/lib/wallet/sign';
 
 export interface TxStep {
   label: string;
   build: () => Promise<P2pTransaction>;
-  expect: TxExpectation;
+  /* Null: no trusted expectation, so the step is refused. */
+  expect: TxExpectation | null;
+  /* An expectation that can only be known once `build` ran (a sale's ref comes from the order
+     `build` opened); it wins over `expect`. */
+  expectFor?: () => TxExpectation | null;
 }
 
-class Refused extends Error {}
+/** A signing failure in the reader's words. */
+export function signError(common: Messages['common'], e: unknown): string {
+  const s = common.sign;
+  if (e instanceof Error && e.name === 'Refused') return s.mismatch;
+  if (e instanceof Error && e.name === 'SubmitFailed') {
+    const code = (e as Error & { contractError?: string | null }).contractError;
+    return code ? fmt(s.revertedCode, { code }) : s.reverted;
+  }
+  if (e instanceof WalletError)
+    return e.kind === 'rejected'
+      ? common.wallet.rejected
+      : e.kind === 'pending'
+        ? common.wallet.pending
+        : e.kind === 'unsupported'
+          ? common.wallet.unsupported
+          : e.kind === 'mismatch'
+            ? common.wallet.mismatch
+            : common.wallet.failed;
+  if (e instanceof ApiError)
+    return e.status === 0
+      ? common.errors.network
+      : e.status === 429
+        ? common.errors.limited
+        : e.code === 'bad_response'
+          ? common.errors.badResponse
+          : common.errors.generic;
+  return common.wallet.failed;
+}
 
 export function SignFlow({
   network,
   signer,
   steps,
+  via,
   onDone,
   startLabel,
   onError,
+  sponsored = true,
 }: {
   network: P2pNetwork;
   /* The address that must sign (the order's seller, the registered wallet...). */
   signer: string;
   steps: TxStep[];
+  /* Where signed envelopes go: the app's or the organization's submit route. */
+  via: Submitter;
   onDone: (hashes: string[]) => void;
   startLabel?: string;
   onError?: (e: unknown) => void;
+  /* Whether the API pays the network fee (the market's `sponsor.enabled`). */
+  sponsored?: boolean;
 }) {
   const t = useT();
   const s = t.common.sign;
-  const { wallet: sessionWallet, wallets } = useSession();
-  const [picked, setPicked] = useState<DiscoveredWallet | null>(null);
-  const [choosing, setChoosing] = useState(false);
+  const { wallet } = useSession();
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState('');
   const [error, setError] = useState('');
+  const [pending, setPending] = useState(false);
+  const [signingIn, setSigningIn] = useState(false);
   const sent = useRef<string[]>([]);
   const [doneCount, setDoneCount] = useState(0);
-  const wallet = picked ?? sessionWallet;
+  const wrongWallet = !!wallet && wallet.address !== signer;
 
-  const run = async (w: DiscoveredWallet) => {
+  const run = async () => {
+    if (!wallet || wrongWallet) return;
     setBusy(true);
     setError('');
-    const name = walletName(w, t.common.wallet.unnamed);
+    setPending(false);
     try {
-      const { verifyTransaction } = await import('@/lib/p2p/tx-verify');
-      const accounts = (await w.provider.request({ method: 'eth_requestAccounts' })) as string[];
-      const from = accounts.find((a) => a.toLowerCase() === signer.toLowerCase());
-      if (!from) throw new Refused(fmt(s.wrongAccount, { address: shortAddress(signer) }));
+      const { signAndSubmit } = await import('@/lib/wallet/sign');
       for (let i = sent.current.length; i < steps.length; i++) {
         const step = steps[i];
         setProgress(s.preparing);
         const tx = await step.build();
-        setProgress(s.checking);
-        if (verifyTransaction(tx, network, step.expect)) throw new Refused(s.mismatch);
-        setProgress(fmt(s.switching, { network: network.name }));
-        await ensureChain(w.provider, network.chainId, evmChainOf(network));
-        setProgress(fmt(s.confirm, { wallet: name }));
-        const hash = await sendTransaction(w.provider, from as `0x${string}`, tx);
-        sent.current.push(hash);
-        setProgress(s.mining);
-        await waitForTransaction(w.provider, hash);
+        const r = await signAndSubmit({
+          wallet,
+          network,
+          tx,
+          expect: step.expectFor ? step.expectFor() : step.expect,
+          via,
+          onStep: (st) =>
+            setProgress(
+              st === 'checking'
+                ? s.checking
+                : st === 'signing'
+                  ? fmt(s.signing, { wallet: wallet.label })
+                  : st === 'submitting'
+                    ? s.submitting
+                    : s.waiting,
+            ),
+        });
+        if (r.status === 'PENDING') setPending(true);
+        sent.current.push(r.hash);
         setDoneCount(sent.current.length);
       }
       setProgress('');
       onDone([...sent.current]);
     } catch (e) {
       setProgress('');
-      if (e instanceof Refused) setError(e.message);
-      else if (e instanceof WalletError)
-        setError(
-          e.kind === 'rejected'
-            ? t.common.wallet.rejected
-            : e.kind === 'chain'
-              ? fmt(s.chain, { network: network.name })
-              : e.kind === 'reverted'
-                ? s.reverted
-                : t.common.wallet.failed,
-        );
-      else if (e instanceof ApiError) {
-        setError(
-          e.status === 0
-            ? t.common.errors.network
-            : e.status === 429
-              ? t.common.errors.limited
-              : t.common.errors.generic,
-        );
-        onError?.(e);
-      } else setError(t.common.wallet.failed);
+      setError(signError(t.common, e));
+      if (e instanceof ApiError) onError?.(e);
     } finally {
       setBusy(false);
     }
-  };
-
-  const start = () => {
-    if (wallet) void run(wallet);
-    else setChoosing(true);
   };
 
   return (
@@ -142,28 +157,22 @@ export function SignFlow({
           })}
         </ol>
       )}
-      {choosing && !busy && !wallet ? (
-        <div>
-          <p className="mb-2 text-[0.875rem] font-semibold text-ink-3">{t.common.wallet.pick}</p>
-          {wallets.length ? (
-            <WalletList
-              wallets={wallets}
-              onPick={(w) => {
-                setPicked(w);
-                setChoosing(false);
-                void run(w);
-              }}
-            />
-          ) : (
-            <Notice tone="warn">{t.common.wallet.none}</Notice>
-          )}
-        </div>
+      {!wallet ? (
+        <>
+          <Notice tone="warn">{t.common.wallet.reconnect}</Notice>
+          <button type="button" className="btn btn-ink btn-lg w-full" onClick={() => setSigningIn(true)}>
+            <Icon name="wallet" />
+            {t.common.wallet.connect}
+          </button>
+        </>
+      ) : wrongWallet ? (
+        <Notice tone="warn">{fmt(s.wrongAccount, { address: shortAddress(signer) })}</Notice>
       ) : (
         <button
           type="button"
           className="btn btn-ink btn-lg w-full"
           disabled={busy || doneCount === steps.length}
-          onClick={start}
+          onClick={() => void run()}
         >
           {busy ? <Spinner /> : <Icon name="wallet" />}
           {busy ? progress : error ? s.retry : (startLabel ?? s.start)}
@@ -171,8 +180,11 @@ export function SignFlow({
       )}
       <p className="text-[0.8125rem] text-ink-3">
         {fmt(s.signer, { address: shortAddress(signer) })}. {s.nonCustodial}
+        {sponsored ? ` ${s.gasless}` : ''}
       </p>
+      {pending && <Notice>{s.stillPending}</Notice>}
       {error && <Notice tone="error">{error}</Notice>}
+      {signingIn && <ConnectDialog onClose={() => setSigningIn(false)} />}
     </div>
   );
 }

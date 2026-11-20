@@ -21,6 +21,7 @@ export function MockBanner() {
         type="button"
         className="underline underline-offset-2"
         onClick={async () => {
+          if (!(import.meta.env.DEV || import.meta.env.VITE_MOCK === '1')) return;
           const { resetMock } = await import('@/lib/mock');
           resetMock();
           location.reload();

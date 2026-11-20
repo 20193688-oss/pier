@@ -1,7 +1,7 @@
 /* The hosted charge page (/c/{id}): who pays, then the account and the exact amount, then the
    status. Ported from the earlier payer page's copy. */
 const charge = {
-  metaTitle: 'Solicitud de pago | pedospe',
+  metaTitle: 'Solicitud de pago | {brand}',
   metaDescription: 'Paga esta solicitud con una transferencia bancaria.',
   eyebrow: 'Solicitud de pago',
   toPay: 'A pagar',
@@ -61,7 +61,12 @@ const charge = {
   },
   startAgain: 'Empezar de nuevo',
   poweredBy:
-    'Pago protegido por pedospe: el dinero llega al comerciante y el comerciante libera el pago en un contrato inteligente.',
+    'Pago protegido por {brand}: el dinero llega al comerciante y el comerciante libera el pago en un contrato inteligente de la red Stellar.',
+  app: {
+    title: '¿Tienes dólares en {brand}?',
+    body: 'Paga con tu saldo desde la app, sin transferencia bancaria.',
+    cta: 'Pagar con mi saldo',
+  },
 };
 
 export default charge;

@@ -2,10 +2,10 @@
    document (apps/api/openapi.json).
 
    Who calls what:
-   - Wallet session (SIWE, HttpOnly cookie): the buy/sell app's user on `/v1/app/*` (their own
-     quotes and orders, and the transactions of their own sales), and dashboard members on
-     `/v1/organizations/*` and, with the organization and tier headers below, `/v1/p2p/*` and
-     `/v1/webhook-endpoints`.
+   - Wallet session (SEP-10, HttpOnly cookie): the payments app's user on `/v1/app/*` (their own
+     profile, balances, transfers, quotes and orders, and the transactions they sign), and
+     dashboard members on `/v1/organizations/*` and, with the organization and tier headers below,
+     `/v1/p2p/*` and `/v1/webhook-endpoints`.
    - No credentials: the market overview, sign-in, and the hosted charge page's
      `/v1/p2p-checkout/*` (a payer token for its own order). */
 
@@ -19,8 +19,8 @@ export const TIER_HEADER = 'Pedospe-Tier';
 export const PAYER_TOKEN_HEADER = 'X-Payer-Token';
 
 export const ROUTES = {
-  // Sign-in with Ethereum (EIP-4361)
-  authNonce: '/v1/auth/nonce',
+  // Sign-in with a Stellar wallet (SEP-10)
+  authChallenge: '/v1/auth/challenge',
   authVerify: '/v1/auth/verify',
   authSession: '/v1/auth/session',
   authLogout: '/v1/auth/logout',
@@ -42,14 +42,25 @@ export const ROUTES = {
   // The market overview (public; `?tier=live|test`)
   market: '/v1/market',
 
-  // The public buy/sell app (the signed-in wallet's own orders)
+  // The payments app (the signed-in wallet acting for itself)
+  appProfile: '/v1/app/profile',
+  appHandle: (handle: string) => `/v1/app/handles/${enc(handle)}`,
+  appBalances: '/v1/app/balances',
+  appActivate: '/v1/app/activate',
+  appTransfers: '/v1/app/transfers',
+  appTransfer: (id: string) => `/v1/app/transfers/${enc(id)}`,
+  appActivity: '/v1/app/activity',
+  appCharge: (id: string) => `/v1/app/charges/${enc(id)}`,
+  appChargePayments: (id: string) => `/v1/app/charges/${enc(id)}/payments`,
+  appSubmit: '/v1/app/submit',
+  appSubmission: (hash: string) => `/v1/app/submissions/${enc(hash)}`,
   appQuotes: '/v1/app/quotes',
   appOrders: '/v1/app/orders',
   appOrder: (id: string) => `/v1/app/orders/${enc(id)}`,
   appOrderAction: (id: string, action: 'paid' | 'cancel' | 'dispute') =>
     `/v1/app/orders/${enc(id)}/${action}`,
   appOrderTransactions: (id: string) => `/v1/app/orders/${enc(id)}/transactions`,
-  // Development only (chain 31337): the merchant bot's part of a purchase, simulated.
+  // Development only (the local network): the merchant bot's part of a purchase, simulated.
   devSimulateTransfer: (id: string) => `/v1/dev/orders/${enc(id)}/simulate-transfer`,
 
   // The dashboard's market (organization and tier headers)
@@ -69,6 +80,8 @@ export const ROUTES = {
   merchantOrder: (id: string) => `/v1/p2p/merchant/orders/${enc(id)}`,
   transferMatches: '/v1/p2p/merchant/transfer-matches',
   transactions: '/v1/p2p/transactions',
+  submit: '/v1/p2p/submit',
+  submission: (hash: string) => `/v1/p2p/submissions/${enc(hash)}`,
   charges: '/v1/p2p/charges',
   charge: (id: string) => `/v1/p2p/charges/${enc(id)}`,
   payouts: '/v1/p2p/payouts',

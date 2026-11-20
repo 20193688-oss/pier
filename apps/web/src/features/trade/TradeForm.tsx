@@ -2,7 +2,8 @@
    currency, the token and network, the payment method, and one price that follows the form a
    moment after the last keystroke. One button says what is missing. Then who pays (a purchase)
    or the account the money goes to (a sale), then the order opens. */
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { isQrRail } from '@/lib/p2p/qr-pay';
 import { fmt, useI18n } from '@/i18n';
 import { trade as tradeApi, type BuyOrderInput, type SellOrderInput } from '@/lib/api/endpoints';
 import { errorMessage, isUnauthorized } from '@/lib/api/messages';
@@ -48,11 +49,17 @@ type QuoteState = {
 export function TradeForm({
   market,
   initialSide,
+  fixedSide,
+  initialToken,
   onConnect,
   onOpened,
 }: {
   market: P2pMarket;
   initialSide: P2pSide;
+  /* The payments app's add-money and withdraw screens: one side, no tabs. */
+  fixedSide?: P2pSide;
+  /* The token to start with (the app's own); the first listed otherwise. */
+  initialToken?: string;
   onConnect: () => void;
   onOpened: (o: P2pOrder, accepted: AcceptedQuote) => void;
 }) {
@@ -60,15 +67,16 @@ export function TradeForm({
   const a = t.trade;
   const p = t.p2p;
   const { session, expire } = useSession();
-  const [side, setSide] = useState<P2pSide>(initialSide);
+  const [side, setSide] = useState<P2pSide>(fixedSide ?? initialSide);
   const [currency, setCurrency] = useState(
     () => (market.currencies.find((c) => c.code === 'ARS') ?? market.currencies[0])?.code ?? '',
   );
-  const [pick, setPick] = useState(() =>
-    market.networks[0]
-      ? { network: market.networks[0].id, token: market.networks[0].tokens[0].symbol }
-      : null,
-  );
+  const [pick, setPick] = useState(() => {
+    const n = market.networks[0];
+    if (!n) return null;
+    const t = n.tokens.find((x) => x.symbol === initialToken) ?? n.tokens[0];
+    return { network: n.id, token: t.symbol };
+  });
   const [rail, setRail] = useState('');
   const [amount, setAmount] = useState('');
   const [picker, setPicker] = useState<null | 'currency' | 'token'>(null);
@@ -86,7 +94,12 @@ export function TradeForm({
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [account, setAccount] = useState<AccountDraft>(emptyAccount(''));
 
-  const cur = market.currencies.find((c) => c.code === currency) ?? null;
+  const found = market.currencies.find((c) => c.code === currency) ?? null;
+  // The QR rails are for QR payments only: a purchase or a sale goes through a bank rail.
+  const cur = useMemo(
+    () => (found ? { ...found, rails: found.rails.filter((r) => !isQrRail(r)) } : null),
+    [found],
+  );
   useEffect(() => {
     if (cur && !cur.rails.includes(rail)) setRail(cur.rails[0] ?? '');
   }, [cur, rail]);
@@ -426,6 +439,7 @@ export function TradeForm({
       <h2 id="trade-widget-h" className="sr-only">
         {a.title}
       </h2>
+      {!fixedSide && (
       <div className="seg" role="tablist" aria-label={a.tabs.label} onKeyDown={tabKey}>
         {(['BUY', 'SELL'] as const).map((s) => (
           <button
@@ -442,11 +456,12 @@ export function TradeForm({
           </button>
         ))}
       </div>
+      )}
       <div
         id="trade-panel"
-        role="tabpanel"
-        aria-labelledby={`trade-tab-${side}`}
-        className="mt-4 flex flex-col gap-2"
+        role={fixedSide ? undefined : 'tabpanel'}
+        aria-labelledby={fixedSide ? undefined : `trade-tab-${side}`}
+        className={`${fixedSide ? '' : 'mt-4'} flex flex-col gap-2`}
       >
         <div className="rounded-[18px] bg-well p-4">
           <label htmlFor="trade-amount" className="text-[0.875rem] font-semibold text-ink-3">

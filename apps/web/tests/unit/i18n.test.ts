@@ -4,7 +4,8 @@
    missing key a compile error; this also catches empty strings and placeholder drift. */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { CATALOGS, LANGS, initialLang } from '@/i18n';
+import { CATALOGS, LANGS, RAW_CATALOGS, initialLang } from '@/i18n';
+import { BRAND, withBrand } from '@/lib/brand';
 
 type Tree = unknown;
 
@@ -63,4 +64,18 @@ test('the starting language: the address, then the saved choice, then Spanish', 
   assert.equal(initialLang('?lang=en'), 'en');
   assert.equal(initialLang('?lang=fr'), 'es');
   assert.equal(initialLang(''), 'es');
+});
+
+test('the product name is written once: catalogs say {brand}', () => {
+  for (const lang of LANGS) {
+    for (const [k, v] of leaves(RAW_CATALOGS[lang])) {
+      // Technical names that are part of the API contract are not the brand.
+      const text = v.replace(/pedospe-signature|\/pedospe\//g, '');
+      assert.ok(!/pedospe/i.test(text), `${lang}:${k} writes the product name`);
+    }
+    for (const [k, v] of leaves(CATALOGS[lang]))
+      assert.ok(!v.includes('{brand}'), `${lang}:${k} still has {brand}`);
+  }
+  assert.equal(CATALOGS.es.common.brand, BRAND.name);
+  assert.deepEqual(withBrand({ a: ['{brand} app'], b: 1 }, 'nuevo'), { a: ['nuevo app'], b: 1 });
 });

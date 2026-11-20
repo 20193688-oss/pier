@@ -2,14 +2,14 @@
 import type es from '@/i18n/messages/es/landing';
 
 const landing: typeof es = {
-  metaTitle: 'pedospe: buy and sell USDC by bank transfer',
+  metaTitle: '{brand}: USDC by bank transfer, and payments in dollars',
   metaDescription:
-    'Type an amount, transfer from your bank and receive USDC in your wallet. Funds stay locked in a contract until the payment is confirmed.',
+    'Type an amount, transfer from your bank and receive USDC in your Stellar wallet. Send, receive and pay by QR from the app. Funds stay locked in a contract until the payment is confirmed.',
   hero: {
     title: 'USDC by bank transfer, person to person',
-    body: 'Type how much you want to buy, transfer from your bank to the account we show you, and the USDC arrives in your wallet. Meanwhile it stays locked in a smart contract, in nobody’s hands.',
-    buy: 'Buy USDC',
-    sell: 'Sell USDC',
+    body: 'Type how much you want to buy, transfer from your bank to the account we show you, and the USDC arrives in your wallet on the Stellar network. Meanwhile it stays locked in a smart contract, in nobody’s hands.',
+    open: 'Open the app',
+    merchant: 'I am a merchant',
     rails:
       'Bank transfer, CVU or alias in Argentina, PIX in Brazil, SPEI in Mexico, and banks in Colombia, Peru and Chile.',
   },
@@ -40,17 +40,40 @@ const landing: typeof es = {
       },
       {
         title: 'Receive the USDC',
-        body: 'The merchant sees your transfer and releases the order. The contract sends the USDC to your wallet, on the network you picked.',
+        body: 'The merchant sees your transfer and releases the order. The contract sends the USDC to your Stellar wallet, with no network fee for you.',
       },
     ],
     sell: 'Selling is the same in reverse: you lock your USDC in the order, the merchant transfers to your account, and you release the USDC once you see the money.',
+  },
+  app: {
+    title: 'A payments app in dollars',
+    body: 'Install it on your phone from the browser. Your USDC balance lives in your wallet on the Stellar network, and {brand} pays the network fees.',
+    points: [
+      {
+        title: 'Send and receive',
+        body: 'To an @handle, a Stellar address or with a link. It arrives in seconds.',
+      },
+      {
+        title: 'Pay by QR',
+        body: 'Scan a shop’s QR in Argentina or a PIX in Brazil: a market merchant pays it for you in pesos or reais.',
+      },
+      {
+        title: 'Add money and withdraw',
+        body: 'Buy USDC with a transfer from your bank and sell it when you need local money.',
+      },
+      {
+        title: 'Pay charges',
+        body: 'Pay a business’s charge link from your balance, with no transfer.',
+      },
+    ],
+    cta: 'Open the app',
   },
   trust: {
     title: 'Nobody keeps your funds',
     items: [
       {
         title: 'Locked in a contract',
-        body: 'Every order locks the USDC in a public smart contract. pedospe holds no key that can move it anywhere else.',
+        body: 'Every order locks the USDC in a public smart contract. {brand} holds no key that can move it anywhere else.',
       },
       {
         title: 'Deadlines refund',
@@ -98,12 +121,16 @@ const landing: typeof es = {
     title: 'Questions',
     items: [
       {
-        q: 'Does pedospe hold my funds?',
-        a: 'No. The USDC is in your wallet or locked in each order’s contract. pedospe holds no key that can move it anywhere else.',
+        q: 'Does {brand} hold my funds?',
+        a: 'No. The USDC is in your wallet or locked in each order’s contract. {brand} holds no key that can move it anywhere else.',
       },
       {
         q: 'Do I need an account?',
-        a: 'No. You connect your wallet and sign a message that proves it is yours. That signature moves no funds and costs nothing.',
+        a: 'No password needed: you sign in with your email or Google account and your Stellar wallet is created on the spot. If you already have a Stellar wallet, you can use it in the dashboard.',
+      },
+      {
+        q: 'Which network does it run on?',
+        a: 'Stellar. {brand} pays the network fees: you do not need any XLM.',
       },
       {
         q: 'What if I transfer and the merchant does not release?',
@@ -125,7 +152,7 @@ const landing: typeof es = {
   },
   closing: {
     title: 'Start with any amount',
-    body: 'Connect your wallet, type an amount and see the price before you decide.',
+    body: 'Sign in with your email, type an amount and see the price before you decide.',
   },
 };
 

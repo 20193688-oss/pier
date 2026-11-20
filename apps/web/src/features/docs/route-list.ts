@@ -8,13 +8,17 @@ export type RouteKey = keyof typeof ROUTES;
 export type RouteGroupKey =
   'auth' | 'orgs' | 'keys' | 'app' | 'market' | 'merchant' | 'collections' | 'checkout';
 
-type Entry = [method: 'GET' | 'POST' | 'PATCH' | 'DELETE', key: RouteKey, ...args: string[]];
+type Entry = [
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
+  key: RouteKey,
+  ...args: string[],
+];
 
 const GROUPS: [RouteGroupKey, Entry[]][] = [
   [
     'auth',
     [
-      ['POST', 'authNonce'],
+      ['GET', 'authChallenge'],
       ['POST', 'authVerify'],
       ['GET', 'authSession'],
       ['POST', 'authLogout'],
@@ -48,6 +52,18 @@ const GROUPS: [RouteGroupKey, Entry[]][] = [
   [
     'app',
     [
+      ['GET', 'appProfile'],
+      ['PUT', 'appProfile'],
+      ['GET', 'appHandle', '{handle}'],
+      ['GET', 'appBalances'],
+      ['POST', 'appActivate'],
+      ['POST', 'appTransfers'],
+      ['GET', 'appTransfer', '{id}'],
+      ['GET', 'appActivity'],
+      ['GET', 'appCharge', '{id}'],
+      ['POST', 'appChargePayments', '{id}'],
+      ['POST', 'appSubmit'],
+      ['GET', 'appSubmission', '{hash}'],
       ['POST', 'appQuotes'],
       ['GET', 'appOrders'],
       ['POST', 'appOrders'],
@@ -85,6 +101,8 @@ const GROUPS: [RouteGroupKey, Entry[]][] = [
       ['POST', 'orderAction', '{id}', 'cancel'],
       ['POST', 'orderAction', '{id}', 'dispute'],
       ['POST', 'transactions'],
+      ['POST', 'submit'],
+      ['GET', 'submission', '{hash}'],
     ],
   ],
   [
