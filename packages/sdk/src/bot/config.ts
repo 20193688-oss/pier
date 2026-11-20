@@ -7,22 +7,20 @@ export interface BotConfig {
   apiUrl: string;
   /** `PEDOSPE_API_KEY`: the merchant organization's API key (`p2p:read` and `p2p:write`). */
   apiKey: string;
-  /** `BOT_PRIVATE_KEY`: the key that signs releases (absent in a dry run). */
-  privateKey: `0x${string}` | null;
-  /** `RPC_URL`: a node on the chain the releases go to (absent in a dry run). */
-  rpcUrl: string | null;
+  /** `BOT_SECRET`: the merchant account's Stellar secret (S...), absent in a dry run. */
+  secret: string | null;
   /** `MIN_SCORE`: the lowest score that releases (1 to 3, default 3). */
   minScore: number;
   /** `DRY_RUN`: decide and log, never sign or send. */
   dryRun: boolean;
-  /** `MARKET_CONTRACT` (optional): the only contract the bot will call. */
-  marketContract: `0x${string}` | null;
+  /** `MARKET_CONTRACT` (optional): the only contract (C...) the bot will call. */
+  marketContract: string | null;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
 
-const PRIVATE_KEY = /^0x[0-9a-fA-F]{64}$/;
-const ADDRESS = /^0x[0-9a-fA-F]{40}$/;
+const SECRET = /^S[A-Z2-7]{55}$/;
+const CONTRACT = /^C[A-Z2-7]{55}$/;
 
 function value(env: Env, name: string): string | undefined {
   const raw = env[name]?.trim();
@@ -52,18 +50,11 @@ export function readBotConfig(env: Env): BotConfig {
     problems.push('PEDOSPE_API_KEY must be an API key (pk_live_... or pk_test_...).');
   }
 
-  const privateKey = value(env, 'BOT_PRIVATE_KEY');
-  if (privateKey !== undefined && !PRIVATE_KEY.test(privateKey)) {
-    problems.push('BOT_PRIVATE_KEY must be a 0x-prefixed 32-byte hex key.');
-  } else if (privateKey === undefined && !dryRun) {
-    problems.push('BOT_PRIVATE_KEY is required unless DRY_RUN is set.');
-  }
-
-  const rpcUrl = value(env, 'RPC_URL');
-  if (rpcUrl !== undefined && !URL.canParse(rpcUrl)) {
-    problems.push('RPC_URL must be an absolute URL.');
-  } else if (rpcUrl === undefined && !dryRun) {
-    problems.push('RPC_URL is required unless DRY_RUN is set.');
+  const secret = value(env, 'BOT_SECRET');
+  if (secret !== undefined && !SECRET.test(secret)) {
+    problems.push('BOT_SECRET must be a Stellar secret seed (S...).');
+  } else if (secret === undefined && !dryRun) {
+    problems.push('BOT_SECRET is required unless DRY_RUN is set.');
   }
 
   const rawMinScore = value(env, 'MIN_SCORE');
@@ -73,8 +64,8 @@ export function readBotConfig(env: Env): BotConfig {
   }
 
   const marketContract = value(env, 'MARKET_CONTRACT');
-  if (marketContract !== undefined && !ADDRESS.test(marketContract)) {
-    problems.push('MARKET_CONTRACT must be a 0x-prefixed 20-byte address.');
+  if (marketContract !== undefined && !CONTRACT.test(marketContract)) {
+    problems.push('MARKET_CONTRACT must be a contract address (C...).');
   }
 
   if (problems.length > 0)
@@ -82,11 +73,10 @@ export function readBotConfig(env: Env): BotConfig {
   return {
     apiUrl: apiUrl as string,
     apiKey: apiKey as string,
-    privateKey: (privateKey as `0x${string}` | undefined) ?? null,
-    rpcUrl: rpcUrl ?? null,
+    secret: secret ?? null,
     minScore,
     dryRun,
-    marketContract: (marketContract as `0x${string}` | undefined) ?? null,
+    marketContract: marketContract ?? null,
   };
 }
 

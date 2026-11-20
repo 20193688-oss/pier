@@ -33,18 +33,18 @@
     "openapi-fetch": "0.17.0"
   },
   "peerDependencies": {
-    "viem": "^2.58.1"
+    "@stellar/stellar-sdk": "^17.4.0"
   },
   "peerDependenciesMeta": {
-    "viem": {
+    "@stellar/stellar-sdk": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@stellar/stellar-sdk": "17.4.0",
     "@types/node": "26.6.6",
     "openapi-typescript": "7.13.0",
     "tsc-alias": "1.9.10",
-    "viem": "2.58.1",
     "vitest": "5.1.1"
   }
 }

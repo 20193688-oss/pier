@@ -21,8 +21,10 @@ export type Quote = Schemas['QuoteView'];
 export type TransferMatch = Schemas['TransferMatchView'];
 /** An incoming bank transfer as the merchant's bank notified it. */
 export type TransferMatchRequest = Schemas['TransferMatchesDto'];
-/** An unsigned EVM transaction (`chainId`, `to`, `data`, `value`) for a wallet or a bot to sign. */
-export type Transaction = Schemas['TransactionView'];
+/** An unsigned, prepared Stellar transaction (`network`, `action`, `xdr`, `hash`, `expiresAt`) to sign. */
+export type Transaction = Schemas['P2pTransaction'];
+/** A signed transaction the API submitted (`POST /v1/p2p/submit`), and where it stands. */
+export type Submission = Schemas['Submission'];
 /** The public market overview: networks, tokens, currencies, rails and windows. */
 export type MarketOverview = Schemas['MarketOverviewView'];
 export type Charge = Schemas['ChargeView'];

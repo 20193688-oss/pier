@@ -16,10 +16,11 @@ Requires Node.js 24.9 or later (ESM only).
 ```sh
 npm install @pedospe/sdk
 # only to run the reference bot, which signs transactions:
-npm install viem
+npm install @stellar/stellar-sdk
 ```
 
-`viem` is an optional peer dependency: the client and the webhook helpers do not need it.
+`@stellar/stellar-sdk` (17.x) is an optional peer dependency: the client and the webhook helpers
+do not need it.
 
 ## Client
 
@@ -34,12 +35,12 @@ const pedospe = createPedospeClient({
 // Public: networks, tokens, currencies and rails.
 const market = await unwrap(pedospe.GET('/v1/market'));
 
-// A quote: 125050 ARS of USDC on Base, paid by bank transfer.
+// A quote: 125050 ARS of USDC on Stellar testnet, paid by bank transfer.
 const quote = await unwrap(
   pedospe.POST('/v1/p2p/quotes', {
     body: {
       side: 'BUY',
-      network: 'base',
+      network: 'testnet',
       token: 'USDC',
       currency: 'ARS',
       rail: 'ar_bank_transfer',
@@ -71,7 +72,7 @@ try {
   `Pedospe-Organization` and `Pedospe-Tier` headers. An API key already carries its organization
   and tier, so the client refuses those options next to one.
 - `fetch` replaces `globalThis.fetch` (tests, proxies, retries).
-- Friendly type names (`Order`, `MerchantOrder`, `Quote`, `TransferMatch`, `Transaction`,
+- Friendly type names (`Order`, `MerchantOrder`, `Quote`, `TransferMatch`, `Transaction`, `Submission`,
   `MarketOverview`, `WebhookEnvelope`, `ErrorCode`, ...) are exported next to the raw generated
   `paths`, `components` and `operations`.
 
@@ -145,31 +146,34 @@ name matches and +1 when the document matches, with its unsigned `release` trans
 | The single best match is not a purchase (e.g. CHARGE)  | skip (`not_a_purchase`)         |
 | One BUY order has the best score, at least `MIN_SCORE` | release it                      |
 
-Before signing, the bot checks that the transaction is exactly `release(<the order's on-chain id>)`
-on the order's contract (and on `MARKET_CONTRACT` when set) and chain, with no value; anything else
-is refused. It signs with its own key through `RPC_URL`, refuses when the node's `eth_chainId` is
-not the transaction's `chainId`, waits for the receipt, and never releases the same order twice in
-one run. Every outcome is one JSON line on stdout; keys and the RPC URL are never logged. The exit
-code is 1 when any transfer failed or was refused.
+Before signing, the bot decodes the transaction (stellar-sdk, the network passphrase from
+`GET /v1/market`) and checks that it is exactly `release(<the bot's account>, <the order's on-chain
+id>)` on the order's contract (and on `MARKET_CONTRACT` when set), for the order's network, from the
+bot's account, with one operation, time bounds and only source-account authorization; anything else
+is refused. It signs the envelope with the merchant account's secret (`BOT_SECRET`) and submits it
+through the API (`POST /v1/p2p/submit`: the API's sponsor pays the network fee when gasless is on),
+waits for the result (`GET /v1/p2p/submissions/{hash}`), and never releases the same order twice in
+one run. Every outcome is one JSON line on stdout; keys are never logged. The exit code is 1 when any
+transfer failed or was refused.
 
-**The key.** Do not give the bot the merchant's main wallet key. Create a separate key and allow it
-to release only: from the merchant's wallet, call `P2PMarket.setOperator(<bot address>, 2)`
-(`PERM_RELEASE`). That key cannot withdraw the merchant's balance.
+**The key.** The transfer-match route builds each release for the merchant account (it is the
+order's seller), so the bot holds that account's secret: run it where that secret is safe. A
+dedicated release-only key (an operator with `PERM_RELEASE` through `set_operator`) cannot be used
+by this bot yet, because the route does not build releases for an operator.
 
-| Variable          | Meaning                                                          |
-| ----------------- | ---------------------------------------------------------------- |
-| `PEDOSPE_API_URL` | The API origin                                                   |
-| `PEDOSPE_API_KEY` | The merchant organization's API key (`p2p:read` and `p2p:write`) |
-| `BOT_PRIVATE_KEY` | The bot's signing key (`0x` + 64 hex); not needed with `DRY_RUN` |
-| `RPC_URL`         | A node on the orders' chain; not needed with `DRY_RUN`           |
-| `MIN_SCORE`       | Lowest score that releases, 1 to 3 (default 3)                   |
-| `DRY_RUN`         | `true`: decide and log, never sign or send                       |
-| `MARKET_CONTRACT` | Optional: the only contract address the bot will call            |
+| Variable          | Meaning                                                                   |
+| ----------------- | ------------------------------------------------------------------------- |
+| `PEDOSPE_API_URL` | The API origin                                                            |
+| `PEDOSPE_API_KEY` | The merchant organization's API key (`p2p:read` and `p2p:write`)          |
+| `BOT_SECRET`      | The merchant account's Stellar secret (`S...`); not needed with `DRY_RUN` |
+| `MIN_SCORE`       | Lowest score that releases, 1 to 3 (default 3)                            |
+| `DRY_RUN`         | `true`: decide and log, never sign or send                                |
+| `MARKET_CONTRACT` | Optional: the only contract (`C...`) the bot will call                    |
 
 ```sh
 # In this repository
 npm run build -w @pedospe/sdk
-DRY_RUN=true PEDOSPE_API_URL=http://localhost:3000 PEDOSPE_API_KEY=pk_test_... \
+DRY_RUN=true PEDOSPE_API_URL=http://localhost:4100 PEDOSPE_API_KEY=pk_test_... \
   npm run bot -w @pedospe/sdk -- transfers.jsonl
 
 # Following a live feed
