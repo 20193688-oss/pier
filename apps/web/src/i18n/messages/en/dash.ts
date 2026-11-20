@@ -2,7 +2,7 @@
 import type es from '@/i18n/messages/es/dash';
 
 const dash: typeof es = {
-  metaTitle: 'Dashboard | pedospe',
+  metaTitle: 'Dashboard | {brand}',
   signIn: {
     title: 'Sign in to the dashboard with your wallet',
     body: 'The dashboard is for merchants and businesses: liquidity, offers, orders, charges, payouts and the API. You sign in by signing a message with your wallet; there is no password.',
@@ -105,7 +105,7 @@ const dash: typeof es = {
     ownersOnly: 'Only owners and admins create and revoke keys.',
   },
   liq: {
-    lede: "Your organization's wallets: their balance in the market contract, the limit pedospe may open orders with on it, and the bots you authorised. You sign every move yourself, in your wallet.",
+    lede: "Your organization's wallets: their balance in the market contract, the limit {brand} may open orders with on it, and the bots you authorised. You sign every move yourself, in your wallet.",
     empty: 'You have not registered a wallet yet.',
     emptyBody:
       'Register one to deposit liquidity, publish offers as a merchant or receive charges.',
@@ -117,7 +117,7 @@ const dash: typeof es = {
     depositStep: 'Deposit {amount} {token}',
     approveStep: 'Allow the market to take {amount} {token}',
     withdrawStep: 'Withdraw {amount} {token} to this wallet',
-    matcherStep: 'Authorise pedospe up to {amount} {token} per order',
+    matcherStep: 'Authorise {brand} up to {amount} {token} per order',
     botStep: 'Give the bot {address} its permissions',
     revokeStep: 'Take every permission from the bot {address}',
     pause: 'Pause orders',

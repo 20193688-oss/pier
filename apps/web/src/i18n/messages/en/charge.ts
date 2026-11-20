@@ -2,7 +2,7 @@
 import type es from '@/i18n/messages/es/charge';
 
 const charge: typeof es = {
-  metaTitle: 'Payment request | pedospe',
+  metaTitle: 'Payment request | {brand}',
   metaDescription: 'Pay this request with a bank transfer.',
   eyebrow: 'Payment request',
   toPay: 'To pay',
@@ -61,7 +61,7 @@ const charge: typeof es = {
   },
   startAgain: 'Start again',
   poweredBy:
-    'Payment protected by pedospe: the money goes to the merchant, who releases the payment in a smart contract.',
+    'Payment protected by {brand}: the money goes to the merchant, who releases the payment in a smart contract.',
 };
 
 export default charge;

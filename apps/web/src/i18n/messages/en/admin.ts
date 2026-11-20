@@ -50,10 +50,10 @@ const admin: typeof es = {
     fileLabel: 'Payouts CSV file',
     noValid: 'No row is ready to send. Fix the file and pick it again.',
     needWallet:
-      'Register a wallet in Liquidity first and authorise pedospe with a per-order limit: payouts come out of its balance.',
+      'Register a wallet in Liquidity first and authorise {brand} with a per-order limit: payouts come out of its balance.',
   },
   webhooks: {
-    lede: 'pedospe tells your server when an order changes, a charge is paid or a batch ends. Every notice is signed so you can check it comes from pedospe.',
+    lede: '{brand} tells your server when an order changes, a charge is paid or a batch ends. Every notice is signed so you can check it comes from {brand}.',
     create: 'Add endpoint',
     createTitle: 'New webhook endpoint',
     url: 'Endpoint URL',

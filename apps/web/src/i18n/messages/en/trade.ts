@@ -2,7 +2,7 @@
 import type es from '@/i18n/messages/es/trade';
 
 const trade: typeof es = {
-  metaTitle: 'Buy and sell USDC | pedospe',
+  metaTitle: 'Buy and sell USDC | {brand}',
   metaDescription:
     'Pay with a bank transfer and receive USDC in your wallet, or sell it and receive local money in your account.',
   title: 'Buy and sell USDC',
@@ -47,7 +47,7 @@ const trade: typeof es = {
   marketError: 'We could not load the market. Try again in a moment.',
   facts: {
     walletTitle: 'Your wallet, your funds',
-    walletBody: 'USDC arrives in the wallet you connect. pedospe never holds it.',
+    walletBody: 'USDC arrives in the wallet you connect. {brand} never holds it.',
     lockedTitle: 'Locked until the payment is confirmed',
     lockedBody:
       'The USDC stays in a smart contract. If the payment never arrives, the deadline returns it.',

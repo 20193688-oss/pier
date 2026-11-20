@@ -1,7 +1,7 @@
 /* The buy/sell app (/app): the form, who pays or where the money goes, the order and the wallet's
    orders. Ported from the earlier P2P app's copy. */
 const trade = {
-  metaTitle: 'Comprar y vender USDC | pedospe',
+  metaTitle: 'Comprar y vender USDC | {brand}',
   metaDescription:
     'Paga con una transferencia bancaria y recibe USDC en tu wallet, o véndelo y recibe moneda local en tu cuenta.',
   title: 'Comprar y vender USDC',
@@ -47,7 +47,7 @@ const trade = {
   marketError: 'No pudimos cargar el mercado. Prueba de nuevo en un momento.',
   facts: {
     walletTitle: 'Tu wallet, tus fondos',
-    walletBody: 'Los USDC llegan a la wallet que conectas. pedospe nunca los retiene.',
+    walletBody: 'Los USDC llegan a la wallet que conectas. {brand} nunca los retiene.',
     lockedTitle: 'Bloqueados hasta que se confirma el pago',
     lockedBody:
       'Los USDC quedan en un contrato inteligente. Si el pago no llega, el plazo los devuelve.',

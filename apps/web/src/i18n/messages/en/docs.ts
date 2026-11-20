@@ -2,7 +2,7 @@
 import type es from '@/i18n/messages/es/docs';
 
 const docs: typeof es = {
-  metaTitle: 'Docs | pedospe',
+  metaTitle: 'Docs | {brand}',
   title: 'Docs',
   navLabel: 'Docs sections',
   sections: 'Sections',
@@ -20,19 +20,19 @@ const docs: typeof es = {
   pages: {
     overview: {
       nav: 'Concepts',
-      title: 'How pedospe works',
+      title: 'How {brand} works',
       description:
         'A person-to-person market to buy and sell stablecoins with local money. The market picks the merchant, a contract locks the tokens and every party signs with its own wallet.',
       body: [
-        'pedospe lets people buy and sell stablecoins for local money: USDC, and USDT where the network has it, against a bank transfer, a PIX or a SPEI. The person types an amount and the market picks the merchant. There is no ads board to browse and no counterparty to choose.',
-        'The tokens of every order are locked in the market’s smart contract until the seller releases them or a deadline returns them. Nobody can move them anywhere else, pedospe included.',
+        '{brand} lets people buy and sell stablecoins for local money: USDC, and USDT where the network has it, against a bank transfer, a PIX or a SPEI. The person types an amount and the market picks the merchant. There is no ads board to browse and no counterparty to choose.',
+        'The tokens of every order are locked in the market’s smart contract until the seller releases them or a deadline returns them. Nobody can move them anywhere else, {brand} included.',
         '## Who takes part',
         '| Role | Who | What it does |',
         '| --- | --- | --- |',
         '| Client | Your integration | Opens orders for its users: purchases, sales, charges and payouts. |',
         '| Merchant | A liquidity provider | Holds tokens in the contract, publishes offers, receives or sends the local money and releases or accepts orders. |',
-        '| Matcher | pedospe | Picks the merchant for each order and opens purchases and payouts on the merchant’s balance, up to the per-order cap the merchant set. |',
-        '| Arbiter | pedospe operations | Resolves disputes from an external multisig wallet. |',
+        '| Matcher | {brand} | Picks the merchant for each order and opens purchases and payouts on the merchant’s balance, up to the per-order cap the merchant set. |',
+        '| Arbiter | {brand} operations | Resolves disputes from an external multisig wallet. |',
         'One organization can be a client, a merchant or both. Its members sign in to the dashboard with their wallet (Sign-In with Ethereum), and its servers use API keys. Every registered wallet signs its own transactions.',
         '## Networks and tokens',
         'The market runs on the EVM networks where its contract is deployed. `GET /v1/market` lists them with each contract address and its tokens, the currencies and the payment methods with their fields, the protocol fee, the bond, the time windows and the matcher’s address. Read it when your integration starts instead of hard-coding networks.',
@@ -83,7 +83,7 @@ const docs: typeof es = {
         'Every quote shows both fees and the net amount before anyone signs.',
         '## Access',
         'API keys need the `p2p:read` scope to read and `p2p:write` to register wallets, publish offers and open orders, charges and payouts. Create them in the dashboard, under **API keys**; each is shown once.',
-        'pedospe’s own buy and sell app runs on this same API with the same rules: each person signs in with their wallet and sees and acts only on that wallet’s orders.',
+        '{brand}’s own buy and sell app runs on this same API with the same rules: each person signs in with their wallet and sees and acts only on that wallet’s orders.',
         '## Next steps',
         '- [Merchant quick start](/docs/quickstart-merchant): register a wallet, add liquidity, publish offers and handle orders.',
         '- [Bot quick start](/docs/quickstart-bot): release orders only once the transfer arrives.',
@@ -115,7 +115,7 @@ const docs: typeof es = {
         '`network` is one of the ids `GET /v1/market` lists, and `token` a symbol or an address listed there. `withdraw` takes the same arguments and returns free tokens to your wallet at any time.',
         '`GET /v1/p2p/accounts/{id}` reads the contract live: for each network and token, the free balance and the amount locked in live orders, the matcher terms you set and the bots you authorised.',
         '## 4. Authorise the matcher with a per-order cap',
-        'pedospe’s matcher opens purchases on your balance. You decide the most one order may lock, in base units:',
+        '{brand}’s matcher opens purchases on your balance. You decide the most one order may lock, in base units:',
         '@@code setMatcher',
         'A cap of `"0"` revokes the authorisation. The matcher can only lock your tokens into orders up to that cap: it cannot withdraw them or send them anywhere else.',
         '!> Keep automatic settlement off. It lets an order you sold be released after the settle window if you do not dispute it in time. A liquidity merchant never needs it, and the API refuses it for a wallet with active sell offers.',
@@ -189,9 +189,9 @@ const docs: typeof es = {
       description:
         'Create API keys, and let your users buy and sell stablecoins with local money without leaving your app.',
       body: [
-        'Your server talks to the pedospe API with a key; your user’s wallet signs only what it sends. The market picks the merchant, the contract locks the tokens and you decide how it all looks in your app.',
+        'Your server talks to the {brand} API with a key; your user’s wallet signs only what it sends. The market picks the merchant, the contract locks the tokens and you decide how it all looks in your app.',
         '## API keys',
-        'Create keys in the dashboard, under **API keys**: a name, the tier and the scopes. The key is shown once; pedospe stores only its hash.',
+        'Create keys in the dashboard, under **API keys**: a name, the tier and the scopes. The key is shown once; {brand} stores only its hash.',
         '- `pk_test_...` trades on test networks. Use it while you build.',
         '- `pk_live_...` trades on mainnets, with real money.',
         '@@code apiKey',
@@ -206,10 +206,10 @@ const docs: typeof es = {
         '## Sell',
         'The token amount of a sale is in base units: `"25000000"` is 25 USDC.',
         '@@code sell',
-        'The order answers `transactions`: an `approve` and an `openWithDeposit`, unsigned. Your user’s wallet sends both, in that order. Before you ask for the signature, check they call the market contract of that network with the order’s amount; the pedospe app decodes every transaction with the contract’s ABI and refuses one that does not match.',
+        'The order answers `transactions`: an `approve` and an `openWithDeposit`, unsigned. Your user’s wallet sends both, in that order. Before you ask for the signature, check they call the market contract of that network with the order’s amount; the {brand} app decodes every transaction with the contract’s ABI and refuses one that does not match.',
         'The merchant accepts, transfers the money to the `beneficiary` account and marks the order paid. Your user releases with a `release` transaction from `POST /v1/p2p/transactions`, with their address as `from`. If nobody disputes the order, anyone can release it once the settle window has passed; your user may dispute only before, with a `dispute` transaction.',
         '`GET /v1/p2p/orders` lists the orders you opened. Their webhooks reach your endpoints with `role: "client"`.',
-        '## The pedospe app',
+        '## The {brand} app',
         'The public buy and sell app runs on this same API. Each person signs in with their wallet (Sign-In with Ethereum, a single-use nonce) and gets a session in a cookie the browser cannot read: no API key ever reaches the browser.',
       ],
     },
@@ -328,7 +328,7 @@ const docs: typeof es = {
         '- Refuse a signature older than five minutes, so a captured delivery cannot be replayed later.',
         '- If the secret leaks, delete the endpoint and create a new one: the old secret stops working.',
         '## Retries',
-        'An event is stored in the same transaction as the change that causes it, so it is never lost. When your endpoint does not answer with a 2xx code, pedospe retries with exponential backoff. The dashboard shows every delivery with its response code and attempts, and can send a test event.',
+        'An event is stored in the same transaction as the change that causes it, so it is never lost. When your endpoint does not answer with a 2xx code, {brand} retries with exponential backoff. The dashboard shows every delivery with its response code and attempts, and can send a test event.',
       ],
     },
     security: {
@@ -337,7 +337,7 @@ const docs: typeof es = {
       description:
         'Who holds which key, what each one can do and the limits that protect merchants, clients and their users.',
       body: [
-        'pedospe is non-custodial. The server never holds a key that can move a merchant’s, a client’s or a user’s tokens. Every on-chain action is a transaction the API builds unsigned and the person’s own wallet signs.',
+        '{brand} is non-custodial. The server never holds a key that can move a merchant’s, a client’s or a user’s tokens. Every on-chain action is a transaction the API builds unsigned and the person’s own wallet signs.',
         '## Keys and roles',
         '| Role | Where the key lives | What it can do |',
         '| --- | --- | --- |',

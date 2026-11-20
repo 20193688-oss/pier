@@ -140,7 +140,7 @@ const p2p: typeof es = {
       locked: 'Locked in orders',
       inOrders: 'Released as each order ends',
       matcher: 'Networks authorised',
-      matcherSub: 'pedospe can open orders there',
+      matcherSub: '{brand} can open orders there',
     },
     readOnly: 'You have read-only access to liquidity in this organization.',
     search: 'Search by name, address or merchant…',
@@ -162,7 +162,7 @@ const p2p: typeof es = {
     },
     deposit: 'Deposit',
     withdraw: 'Withdraw',
-    authorise: 'Authorise pedospe',
+    authorise: 'Authorise {brand}',
     changeCap: 'Change the per-order limit',
     remove: 'Remove wallet',
     removeTitle: 'Remove this wallet?',
@@ -174,7 +174,7 @@ const p2p: typeof es = {
     saveFailed: "Couldn't save the changes.",
     save: 'Save changes',
     merchantStatus: 'Orders',
-    suspended: 'pedospe suspended this merchant. Contact support.',
+    suspended: '{brand} suspended this merchant. Contact support.',
     lockedValue: '{amount} locked',
     stats: {
       completed: 'Completed orders',
@@ -219,7 +219,7 @@ const p2p: typeof es = {
       label: 'Name',
       labelPlaceholder: 'Treasury',
       merchant: 'Use it as a merchant',
-      merchantHint: 'It publishes offers and takes the orders pedospe matches to them.',
+      merchantHint: 'It publishes offers and takes the orders {brand} matches to them.',
       displayName: 'Merchant name',
       displayNameHint: 'Buyers and sellers see this name.',
       signTitle: 'Sign a message with the wallet',
@@ -247,13 +247,13 @@ const p2p: typeof es = {
       cap: 'Per-order limit',
       capHint: 'Zero revokes the authorisation.',
       revoked: 'Revoked',
-      matcher: "pedospe's matcher",
+      matcher: "{brand}'s matcher",
       depositTitle: 'Two signatures',
       depositBody:
         'The wallet first allows the market contract to take this exact amount, then deposits it. Only this wallet can withdraw it.',
       matcherTitle: 'What this allows',
       matcherBody:
-        'pedospe can lock up to this amount per order from the free balance on this network, for the orders it matches to this wallet. It cannot send the funds anywhere else.',
+        '{brand} can lock up to this amount per order from the free balance on this network, for the orders it matches to this wallet. It cannot send the funds anywhere else.',
       autoSettle: 'Release on its own after the settle window',
       autoSettleHint:
         'For payouts: an order the merchant marked paid is released unless you dispute it in time.',
@@ -399,7 +399,7 @@ const p2p: typeof es = {
       filled: 'Filled in 30 days',
       filledSub: 'As merchant',
       disputed: 'In review',
-      disputedSub: 'pedospe decides',
+      disputedSub: '{brand} decides',
     },
     readOnly: 'You have read-only access to orders in this organization.',
     tabs: { merchant: 'To fill', client: 'Yours' },
@@ -442,7 +442,7 @@ const p2p: typeof es = {
       },
       dispute: {
         title: 'Open a dispute?',
-        body: "pedospe reviews the order and decides who receives the locked tokens. Keep the transfer's receipt at hand.",
+        body: "{brand} reviews the order and decides who receives the locked tokens. Keep the transfer's receipt at hand.",
       },
     },
     fields: {
@@ -481,9 +481,9 @@ const p2p: typeof es = {
     releaseTitle: 'A release cannot be undone',
     releaseBody:
       'The buyer receives the tokens, less the fees. Release only once the money is in the account.',
-    disputeTitle: 'pedospe reviews it',
+    disputeTitle: '{brand} reviews it',
     disputeBody:
-      "The locked tokens stay locked until pedospe decides. Keep the transfer's receipt at hand.",
+      "The locked tokens stay locked until {brand} decides. Keep the transfer's receipt at hand.",
   },
   charges: {
     title: 'Charges',
@@ -616,9 +616,9 @@ const p2p: typeof es = {
       stepFrom: 'Paid from',
       stepFile: 'File',
       free: 'Free balance',
-      authoriseTitle: 'Authorise pedospe on this network',
+      authoriseTitle: 'Authorise {brand} on this network',
       authoriseBody:
-        "Payouts are opened on this wallet's free balance. Authorise pedospe with a per-order limit in liquidity first.",
+        "Payouts are opened on this wallet's free balance. Authorise {brand} with a per-order limit in liquidity first.",
       howTitle: 'How each payout is paid',
       howBody:
         'A merchant buys the tokens, pays the beneficiary in local money and marks it paid. You release it once it is.',
@@ -676,7 +676,7 @@ const p2p: typeof es = {
       P2P_ORDER_CANCELLED: 'An order is cancelled.',
       P2P_ORDER_EXPIRED: 'An order runs past its deadline.',
       P2P_ORDER_DISPUTED: 'A dispute is opened.',
-      P2P_ORDER_RESOLVED: 'pedospe resolves a dispute.',
+      P2P_ORDER_RESOLVED: '{brand} resolves a dispute.',
       P2P_ORDER_FAILED: 'An order could not be opened.',
       P2P_CHARGE_SUCCEEDED: 'A charge is paid.',
       P2P_PAYOUT_BATCH_COMPLETED: 'Every payout of a batch is over.',
@@ -720,7 +720,7 @@ const p2p: typeof es = {
     liquidity: {
       title: 'Your liquidity',
       manage: 'Manage liquidity',
-      authorised: 'pedospe authorised',
+      authorised: '{brand} authorised',
       walletsOne: 'On 1 wallet',
       wallets: 'On {n} wallets',
     },

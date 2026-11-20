@@ -2,7 +2,7 @@
 import type es from '@/i18n/messages/es/common';
 
 const common: typeof es = {
-  brand: 'pedospe',
+  brand: '{brand}',
   tagline: 'USDC by bank transfer, person to person',
   skip: 'Skip to content',
   nav: {
@@ -14,7 +14,7 @@ const common: typeof es = {
     dashboard: 'Dashboard',
     menu: 'Open the menu',
     closeMenu: 'Close the menu',
-    home: 'pedospe, home',
+    home: '{brand}, home',
   },
   theme: {
     label: 'Theme',
@@ -28,7 +28,7 @@ const common: typeof es = {
     product: 'Product',
     developers: 'Developers',
     about:
-      'pedospe is a person-to-person market: USDC stays locked in a smart contract until whoever receives the money confirms the payment. pedospe never holds your funds.',
+      '{brand} is a person-to-person market: USDC stays locked in a smart contract until whoever receives the money confirms the payment. {brand} never holds your funds.',
     apiReference: 'API reference',
     security: 'Security model',
     quickstart: 'Quick start',
@@ -73,7 +73,7 @@ const common: typeof es = {
     expired: 'Your session ended. Connect your wallet again.',
     rejected: 'You cancelled in the wallet. Nothing was sent.',
     failed: 'The wallet could not complete the request. Try again.',
-    statement: 'Sign in to pedospe with this wallet. This signature moves no funds.',
+    statement: 'Sign in to {brand} with this wallet. This signature moves no funds.',
     demo: 'Demo mode: only the test wallet is available.',
   },
   sign: {
@@ -94,10 +94,10 @@ const common: typeof es = {
     mismatch: 'The transaction does not match what you asked for. Nothing was sent.',
     reverted: 'The network rejected the transaction. Nothing moved.',
     chain: 'Your wallet did not switch to {network}. Switch it and try again.',
-    nonCustodial: 'You sign, in your own wallet. pedospe never holds your keys.',
+    nonCustodial: 'You sign, in your own wallet. {brand} never holds your keys.',
   },
   errors: {
-    network: 'We could not reach pedospe. Check your connection and try again.',
+    network: 'We could not reach {brand}. Check your connection and try again.',
     limited: 'Too many requests. Wait a minute and try again.',
     generic: 'Something failed on our side. Try again in a moment.',
     unavailable: 'This is not available right now.',

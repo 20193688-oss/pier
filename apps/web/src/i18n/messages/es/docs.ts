@@ -3,7 +3,7 @@
    '- ' a list item, '| ' a table row, '> ' a note, '@@code name' a code sample). en/docs.ts has
    the same blocks in the same order. */
 const docs = {
-  metaTitle: 'Documentación | pedospe',
+  metaTitle: 'Documentación | {brand}',
   title: 'Documentación',
   navLabel: 'Secciones de la documentación',
   sections: 'Secciones',
@@ -21,19 +21,19 @@ const docs = {
   pages: {
     overview: {
       nav: 'Conceptos',
-      title: 'Cómo funciona pedospe',
+      title: 'Cómo funciona {brand}',
       description:
         'Un mercado entre personas para comprar y vender stablecoins con moneda local. El mercado elige al comerciante, un contrato bloquea los tokens y cada parte firma con su propia wallet.',
       body: [
-        'pedospe permite que las personas compren y vendan stablecoins con moneda local: USDC, y USDT donde la red lo tiene, contra una transferencia bancaria, un PIX o un SPEI. La persona escribe un monto y el mercado elige al comerciante. No hay libro de anuncios que recorrer ni contraparte que elegir.',
-        'Los tokens de cada orden quedan bloqueados en el contrato inteligente del mercado hasta que el vendedor los libera o un plazo los devuelve. Nadie puede moverlos a otro lugar, ni siquiera pedospe.',
+        '{brand} permite que las personas compren y vendan stablecoins con moneda local: USDC, y USDT donde la red lo tiene, contra una transferencia bancaria, un PIX o un SPEI. La persona escribe un monto y el mercado elige al comerciante. No hay libro de anuncios que recorrer ni contraparte que elegir.',
+        'Los tokens de cada orden quedan bloqueados en el contrato inteligente del mercado hasta que el vendedor los libera o un plazo los devuelve. Nadie puede moverlos a otro lugar, ni siquiera {brand}.',
         '## Quién participa',
         '| Rol | Quién | Qué hace |',
         '| --- | --- | --- |',
         '| Cliente | Tu integración | Abre órdenes para sus usuarios: compras, ventas, cobros y pagos a terceros. |',
         '| Comerciante | Un proveedor de liquidez | Tiene tokens en el contrato, publica ofertas, recibe o envía la moneda local y libera o acepta órdenes. |',
-        '| Matcher | pedospe | Elige al comerciante de cada orden y abre compras y pagos a terceros sobre el saldo del comerciante, hasta el tope por orden que el comerciante fijó. |',
-        '| Árbitro | Operaciones de pedospe | Resuelve disputas desde una billetera multifirma externa. |',
+        '| Matcher | {brand} | Elige al comerciante de cada orden y abre compras y pagos a terceros sobre el saldo del comerciante, hasta el tope por orden que el comerciante fijó. |',
+        '| Árbitro | Operaciones de {brand} | Resuelve disputas desde una billetera multifirma externa. |',
         'Una organización puede ser cliente, comerciante o ambas cosas. Sus miembros entran al panel con su wallet (Sign-In with Ethereum), y sus servidores usan claves de API. Cada billetera registrada firma sus propias transacciones.',
         '## Redes y tokens',
         'El mercado funciona en las redes EVM donde su contrato está desplegado. `GET /v1/market` las lista con la dirección del contrato y los tokens de cada una, las monedas y los medios de pago con sus campos, la comisión del protocolo, la garantía, los plazos y la dirección del matcher. Léelo cuando tu integración arranca, en lugar de fijar las redes en el código.',
@@ -84,7 +84,7 @@ const docs = {
         'Cada cotización muestra ambas comisiones y el monto neto antes de que alguien firme.',
         '## Acceso',
         'Las claves de API necesitan el permiso `p2p:read` para leer y `p2p:write` para registrar billeteras, publicar ofertas y abrir órdenes, cobros y pagos a terceros. Se crean en el panel, en **Claves de API**, y se muestran una sola vez.',
-        'La app de compra y venta de pedospe funciona sobre esta misma API y con las mismas reglas: cada persona inicia sesión con su wallet y solo ve y opera las órdenes de esa wallet.',
+        'La app de compra y venta de {brand} funciona sobre esta misma API y con las mismas reglas: cada persona inicia sesión con su wallet y solo ve y opera las órdenes de esa wallet.',
         '## Próximos pasos',
         '- [Inicio rápido para comerciantes](/docs/quickstart-merchant): registra una billetera, agrega liquidez, publica ofertas y gestiona órdenes.',
         '- [Inicio rápido para bots](/docs/quickstart-bot): libera órdenes solo cuando llega la transferencia.',
@@ -116,7 +116,7 @@ const docs = {
         '`network` es uno de los identificadores que lista `GET /v1/market`, y `token` un símbolo o una dirección que figura ahí. `withdraw` recibe los mismos argumentos y devuelve tokens libres a tu billetera en cualquier momento.',
         '`GET /v1/p2p/accounts/{id}` lee el contrato en vivo: para cada red y token, el saldo libre y el bloqueado en órdenes en curso, las condiciones del matcher que fijaste y los bots que autorizaste.',
         '## 4. Autoriza al matcher con un tope por orden',
-        'El matcher de pedospe abre compras sobre tu saldo. Tú decides cuánto puede bloquear una orden como máximo, en unidades base:',
+        'El matcher de {brand} abre compras sobre tu saldo. Tú decides cuánto puede bloquear una orden como máximo, en unidades base:',
         '@@code setMatcher',
         'Un tope de `"0"` revoca la autorización. El matcher solo puede bloquear tus tokens en órdenes hasta ese tope: no puede retirarlos ni enviarlos a ningún otro lado.',
         '!> Mantén la liquidación automática desactivada. Permite que una orden que vendiste se libere pasada la ventana de liquidación si no la disputas a tiempo. Un comerciante de liquidez nunca la necesita, y la API la rechaza para una billetera con ofertas de venta activas.',
@@ -190,9 +190,9 @@ const docs = {
       description:
         'Crea claves de API, y deja que tus usuarios compren y vendan stablecoins con moneda local sin salir de tu app.',
       body: [
-        'Tu servidor habla con la API de pedospe con una clave; la wallet de tu usuario firma solo lo que envía. El mercado elige al comerciante, el contrato bloquea los tokens y tú decides cómo se ve todo en tu app.',
+        'Tu servidor habla con la API de {brand} con una clave; la wallet de tu usuario firma solo lo que envía. El mercado elige al comerciante, el contrato bloquea los tokens y tú decides cómo se ve todo en tu app.',
         '## Claves de API',
-        'Crea las claves en el panel, en **Claves de API**: un nombre, el entorno y los permisos. La clave se muestra una sola vez; pedospe guarda solo su hash.',
+        'Crea las claves en el panel, en **Claves de API**: un nombre, el entorno y los permisos. La clave se muestra una sola vez; {brand} guarda solo su hash.',
         '- `pk_test_...` opera en redes de prueba. Úsala para desarrollar.',
         '- `pk_live_...` opera en mainnet, con dinero real.',
         '@@code apiKey',
@@ -207,10 +207,10 @@ const docs = {
         '## Vender',
         'El monto en tokens de una venta va en unidades base: `"25000000"` son 25 USDC.',
         '@@code sell',
-        'La orden responde `transactions`: un `approve` y un `openWithDeposit`, sin firmar. La wallet de tu usuario envía ambas, en ese orden. Antes de pedir la firma, verifica que llamen al contrato del mercado de esa red con el monto de la orden; la app de pedospe decodifica cada transacción con el ABI del contrato y rechaza la que no coincide.',
+        'La orden responde `transactions`: un `approve` y un `openWithDeposit`, sin firmar. La wallet de tu usuario envía ambas, en ese orden. Antes de pedir la firma, verifica que llamen al contrato del mercado de esa red con el monto de la orden; la app de {brand} decodifica cada transacción con el ABI del contrato y rechaza la que no coincide.',
         'El comerciante acepta, transfiere el dinero a la cuenta `beneficiary` y marca la orden como pagada. Tu usuario libera con una transacción `release` de `POST /v1/p2p/transactions`, con su dirección como `from`. Si nadie disputa la orden, cualquiera puede liberarla pasada la ventana de liquidación; tu usuario puede disputarla solo antes, con una transacción `dispute`.',
         '`GET /v1/p2p/orders` lista las órdenes que abriste. Sus webhooks llegan a tus endpoints con `role: "client"`.',
-        '## La app de pedospe',
+        '## La app de {brand}',
         'La app pública de compra y venta usa esta misma API. Cada persona inicia sesión con su wallet (Sign-In with Ethereum, un nonce de un solo uso) y recibe una sesión en una cookie que el navegador no puede leer: ninguna clave de API llega al navegador.',
       ],
     },
@@ -329,7 +329,7 @@ const docs = {
         '- Rechaza una firma de más de cinco minutos: así una entrega capturada no se puede reenviar después.',
         '- Si el secreto se filtra, elimina el endpoint y crea uno nuevo: el secreto anterior deja de valer.',
         '## Reintentos',
-        'Un evento se guarda en la misma transacción que el cambio que lo origina, así que nunca se pierde. Si tu endpoint no responde con un código 2xx, pedospe reintenta con espera exponencial. El panel muestra cada entrega con su código de respuesta y sus intentos, y puede enviar un evento de prueba.',
+        'Un evento se guarda en la misma transacción que el cambio que lo origina, así que nunca se pierde. Si tu endpoint no responde con un código 2xx, {brand} reintenta con espera exponencial. El panel muestra cada entrega con su código de respuesta y sus intentos, y puede enviar un evento de prueba.',
       ],
     },
     security: {
@@ -338,7 +338,7 @@ const docs = {
       description:
         'Quién tiene cada clave, qué puede hacer cada una y los límites que protegen a comerciantes, clientes y sus usuarios.',
       body: [
-        'pedospe no es custodio. El servidor nunca tiene una clave capaz de mover los tokens de un comerciante, de un cliente o de un usuario. Cada acción en la red es una transacción que la API arma sin firmar y que firma la propia wallet de la persona.',
+        '{brand} no es custodio. El servidor nunca tiene una clave capaz de mover los tokens de un comerciante, de un cliente o de un usuario. Cada acción en la red es una transacción que la API arma sin firmar y que firma la propia wallet de la persona.',
         '## Claves y roles',
         '| Rol | Dónde está la clave | Qué puede hacer |',
         '| --- | --- | --- |',

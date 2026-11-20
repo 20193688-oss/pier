@@ -151,7 +151,7 @@ const p2p = {
       locked: 'Bloqueado en órdenes',
       inOrders: 'Se libera al terminar cada orden',
       matcher: 'Redes autorizadas',
-      matcherSub: 'pedospe puede abrir órdenes ahí',
+      matcherSub: '{brand} puede abrir órdenes ahí',
     },
     readOnly: 'Tienes acceso de solo lectura a la liquidez en esta organización.',
     search: 'Busca por nombre, dirección o comerciante…',
@@ -173,7 +173,7 @@ const p2p = {
     },
     deposit: 'Depositar',
     withdraw: 'Retirar',
-    authorise: 'Autorizar a pedospe',
+    authorise: 'Autorizar a {brand}',
     changeCap: 'Cambiar el límite por orden',
     remove: 'Quitar billetera',
     removeTitle: '¿Quitar esta billetera?',
@@ -185,7 +185,7 @@ const p2p = {
     saveFailed: 'No se pudieron guardar los cambios.',
     save: 'Guardar cambios',
     merchantStatus: 'Órdenes',
-    suspended: 'pedospe suspendió a este comerciante. Contacta a soporte.',
+    suspended: '{brand} suspendió a este comerciante. Contacta a soporte.',
     lockedValue: '{amount} bloqueados',
     stats: {
       completed: 'Órdenes completadas',
@@ -230,7 +230,7 @@ const p2p = {
       label: 'Nombre',
       labelPlaceholder: 'Tesorería',
       merchant: 'Usarla como comerciante',
-      merchantHint: 'Publica ofertas y toma las órdenes que pedospe le asigna.',
+      merchantHint: 'Publica ofertas y toma las órdenes que {brand} le asigna.',
       displayName: 'Nombre del comerciante',
       displayNameHint: 'Los compradores y vendedores ven este nombre.',
       signTitle: 'Firma un mensaje con la billetera',
@@ -258,13 +258,13 @@ const p2p = {
       cap: 'Límite por orden',
       capHint: 'Cero revoca la autorización.',
       revoked: 'Autorización revocada',
-      matcher: 'Asignador de órdenes de pedospe',
+      matcher: 'Asignador de órdenes de {brand}',
       depositTitle: 'Dos firmas',
       depositBody:
         'Primero la billetera permite que el contrato del mercado tome este monto exacto y después lo deposita. Solo esta billetera puede retirarlo.',
       matcherTitle: 'Qué permite esto',
       matcherBody:
-        'pedospe puede bloquear hasta este monto por orden del saldo disponible en esta red, para las órdenes que asigna a esta billetera. No puede enviar los fondos a ningún otro destino.',
+        '{brand} puede bloquear hasta este monto por orden del saldo disponible en esta red, para las órdenes que asigna a esta billetera. No puede enviar los fondos a ningún otro destino.',
       autoSettle: 'Liberar automáticamente al terminar la ventana de liquidación',
       autoSettleHint:
         'Para pagos a terceros: una orden que el comerciante marcó como pagada se libera salvo que la disputes a tiempo.',
@@ -412,7 +412,7 @@ const p2p = {
       filled: 'Completadas en 30 días',
       filledSub: 'Como comerciante',
       disputed: 'En revisión',
-      disputedSub: 'Decide pedospe',
+      disputedSub: 'Decide {brand}',
     },
     readOnly: 'Tienes acceso de solo lectura a las órdenes en esta organización.',
     tabs: { merchant: 'Por completar', client: 'Tuyas' },
@@ -455,7 +455,7 @@ const p2p = {
       },
       dispute: {
         title: '¿Abrir una disputa?',
-        body: 'pedospe revisa la orden y decide quién recibe los tokens bloqueados. Ten a mano el comprobante de la transferencia.',
+        body: '{brand} revisa la orden y decide quién recibe los tokens bloqueados. Ten a mano el comprobante de la transferencia.',
       },
     },
     fields: {
@@ -494,9 +494,9 @@ const p2p = {
     releaseTitle: 'Una liberación no se puede deshacer',
     releaseBody:
       'El comprador recibe los tokens, menos las comisiones. Libera solo cuando el dinero esté en la cuenta.',
-    disputeTitle: 'pedospe la revisa',
+    disputeTitle: '{brand} la revisa',
     disputeBody:
-      'Los tokens bloqueados siguen bloqueados hasta que pedospe decida. Ten a mano el comprobante de la transferencia.',
+      'Los tokens bloqueados siguen bloqueados hasta que {brand} decida. Ten a mano el comprobante de la transferencia.',
   },
   charges: {
     title: 'Cobros',
@@ -629,9 +629,9 @@ const p2p = {
       stepFrom: 'Pagado desde',
       stepFile: 'Archivo',
       free: 'Saldo disponible',
-      authoriseTitle: 'Autoriza a pedospe en esta red',
+      authoriseTitle: 'Autoriza a {brand} en esta red',
       authoriseBody:
-        'Los pagos a terceros se abren sobre el saldo disponible de esta billetera. Primero autoriza a pedospe con un límite por orden en Liquidez.',
+        'Los pagos a terceros se abren sobre el saldo disponible de esta billetera. Primero autoriza a {brand} con un límite por orden en Liquidez.',
       howTitle: 'Cómo se completa cada pago a terceros',
       howBody:
         'Un comerciante compra los tokens, paga al beneficiario en moneda local y lo marca como pagado. Después tú lo liberas.',
@@ -689,7 +689,7 @@ const p2p = {
       P2P_ORDER_CANCELLED: 'Se cancela una orden.',
       P2P_ORDER_EXPIRED: 'Una orden supera su plazo.',
       P2P_ORDER_DISPUTED: 'Se abre una disputa.',
-      P2P_ORDER_RESOLVED: 'pedospe resuelve una disputa.',
+      P2P_ORDER_RESOLVED: '{brand} resuelve una disputa.',
       P2P_ORDER_FAILED: 'No se pudo abrir una orden.',
       P2P_CHARGE_SUCCEEDED: 'Se paga un cobro.',
       P2P_PAYOUT_BATCH_COMPLETED: 'Terminan todos los pagos a terceros de un lote.',
@@ -733,7 +733,7 @@ const p2p = {
     liquidity: {
       title: 'Tu liquidez',
       manage: 'Gestionar liquidez',
-      authorised: 'pedospe autorizado',
+      authorised: '{brand} autorizado',
       walletsOne: 'En 1 billetera',
       wallets: 'En {n} billeteras',
     },

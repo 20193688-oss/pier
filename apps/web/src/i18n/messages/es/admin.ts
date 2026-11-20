@@ -51,10 +51,10 @@ const admin = {
     fileLabel: 'Archivo CSV de pagos a terceros',
     noValid: 'Ninguna fila está lista para enviar. Corrige el archivo y vuelve a elegirlo.',
     needWallet:
-      'Registra primero una billetera en Liquidez y autoriza a pedospe con un límite por orden: los pagos a terceros salen de su saldo.',
+      'Registra primero una billetera en Liquidez y autoriza a {brand} con un límite por orden: los pagos a terceros salen de su saldo.',
   },
   webhooks: {
-    lede: 'pedospe avisa a tu servidor cuando cambia una orden, se paga un cobro o termina un lote. Cada aviso va firmado para que compruebes que viene de pedospe.',
+    lede: '{brand} avisa a tu servidor cuando cambia una orden, se paga un cobro o termina un lote. Cada aviso va firmado para que compruebes que viene de {brand}.',
     create: 'Agregar endpoint',
     createTitle: 'Nuevo endpoint de webhook',
     url: 'URL del endpoint',

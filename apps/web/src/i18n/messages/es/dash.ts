@@ -2,7 +2,7 @@
    and the API keys view. The market views' words are in p2p.ts; webhooks and the team in
    admin.ts. */
 const dash = {
-  metaTitle: 'Panel | pedospe',
+  metaTitle: 'Panel | {brand}',
   signIn: {
     title: 'Entra al panel con tu wallet',
     body: 'El panel es para comerciantes y empresas: liquidez, ofertas, órdenes, cobros, pagos a terceros y la API. Entras firmando un mensaje con tu wallet; no hay contraseña.',
@@ -105,7 +105,7 @@ const dash = {
     ownersOnly: 'Solo dueños y administradores crean y revocan claves.',
   },
   liq: {
-    lede: 'Las billeteras de tu organización: su saldo en el contrato del mercado, el límite con el que pedospe puede abrir órdenes sobre él y los bots que autorizaste. Cada movimiento lo firmas tú, en tu wallet.',
+    lede: 'Las billeteras de tu organización: su saldo en el contrato del mercado, el límite con el que {brand} puede abrir órdenes sobre él y los bots que autorizaste. Cada movimiento lo firmas tú, en tu wallet.',
     empty: 'Todavía no registraste ninguna billetera.',
     emptyBody:
       'Registra una para depositar liquidez, publicar ofertas como comerciante o recibir cobros.',
@@ -117,7 +117,7 @@ const dash = {
     depositStep: 'Depositar {amount} {token}',
     approveStep: 'Permitir que el mercado tome {amount} {token}',
     withdrawStep: 'Retirar {amount} {token} a esta billetera',
-    matcherStep: 'Autorizar a pedospe hasta {amount} {token} por orden',
+    matcherStep: 'Autorizar a {brand} hasta {amount} {token} por orden',
     botStep: 'Dar permisos al bot {address}',
     revokeStep: 'Quitarle todos los permisos al bot {address}',
     pause: 'Pausar órdenes',

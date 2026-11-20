@@ -1,7 +1,7 @@
 /* Words every screen shares: the site's frame, actions, the wallet, errors, time. Spanish is the
    source catalog; en/common.ts mirrors it key for key. */
 const common = {
-  brand: 'pedospe',
+  brand: '{brand}',
   tagline: 'USDC por transferencia, de persona a persona',
   skip: 'Saltar al contenido',
   nav: {
@@ -13,7 +13,7 @@ const common = {
     dashboard: 'Panel',
     menu: 'Abrir el menú',
     closeMenu: 'Cerrar el menú',
-    home: 'pedospe, inicio',
+    home: '{brand}, inicio',
   },
   theme: {
     label: 'Tema',
@@ -27,7 +27,7 @@ const common = {
     product: 'Producto',
     developers: 'Desarrolladores',
     about:
-      'pedospe es un mercado entre personas: los USDC quedan bloqueados en un contrato inteligente hasta que quien recibe el dinero confirma el pago. pedospe nunca tiene tus fondos.',
+      '{brand} es un mercado entre personas: los USDC quedan bloqueados en un contrato inteligente hasta que quien recibe el dinero confirma el pago. {brand} nunca tiene tus fondos.',
     apiReference: 'Referencia de la API',
     security: 'Modelo de seguridad',
     quickstart: 'Inicio rápido',
@@ -72,7 +72,7 @@ const common = {
     expired: 'Tu sesión terminó. Conecta tu wallet de nuevo.',
     rejected: 'Cancelaste en la wallet. No se envió nada.',
     failed: 'La wallet no pudo completar el pedido. Prueba de nuevo.',
-    statement: 'Ingresar a pedospe con esta wallet. Esta firma no mueve fondos.',
+    statement: 'Ingresar a {brand} con esta wallet. Esta firma no mueve fondos.',
     demo: 'Modo demo: solo la wallet de prueba está disponible.',
   },
   sign: {
@@ -93,10 +93,10 @@ const common = {
     mismatch: 'La transacción no coincide con lo que pediste. No se envió nada.',
     reverted: 'La red rechazó la transacción. No se movió nada.',
     chain: 'Tu wallet no cambió a {network}. Cámbiala y prueba otra vez.',
-    nonCustodial: 'Firmas tú, en tu wallet. pedospe nunca tiene tus claves.',
+    nonCustodial: 'Firmas tú, en tu wallet. {brand} nunca tiene tus claves.',
   },
   errors: {
-    network: 'No pudimos conectar con pedospe. Revisa tu conexión y prueba de nuevo.',
+    network: 'No pudimos conectar con {brand}. Revisa tu conexión y prueba de nuevo.',
     limited: 'Demasiados pedidos. Espera un minuto y prueba de nuevo.',
     generic: 'Algo falló de nuestro lado. Prueba de nuevo en un momento.',
     unavailable: 'Esto no está disponible por ahora.',

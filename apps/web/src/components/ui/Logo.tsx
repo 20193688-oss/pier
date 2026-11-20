@@ -1,6 +1,8 @@
-/* The pedospe mark: one bowl shared by a "p" (its stem down-left) and a "d" (its stem up-right),
+/* The product's mark: one bowl shared by a "p" (its stem down-left) and a "d" (its stem up-right),
    two people meeting at one point, with the locked order as the marker-yellow dot in the middle.
-   "pe dos pe" is P2P said in Spanish. The wordmark is set in lowercase, wide. */
+   "pe dos pe" is P2P said in Spanish. The wordmark is the product's name (src/lib/brand.ts), set in
+   lowercase, wide. */
+import { BRAND } from '@/lib/brand';
 
 export function LogoMark({ size = 28, className = '' }: { size?: number; className?: string }) {
   return (
@@ -35,7 +37,7 @@ export function Logo({ size = 28, label }: { size?: number; label?: string }) {
         className="text-[1.3rem] leading-none font-[780] tracking-[-0.03em] text-ink"
         style={{ fontStretch: '125%' }}
       >
-        pedospe
+        {BRAND.name}
       </span>
     </span>
   );

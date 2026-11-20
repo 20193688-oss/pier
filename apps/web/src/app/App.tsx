@@ -41,7 +41,7 @@ function Site({ children }: { children?: ReactNode }) {
 
 function NotFound() {
   const t = useT();
-  useDocumentMeta(`${t.common.notFound.title} · pedospe`);
+  useDocumentMeta(`${t.common.notFound.title} · ${t.common.brand}`);
   return (
     <div className="mx-auto flex max-w-xl flex-col items-start gap-4 px-4 py-24">
       <h1 className="text-[2rem]">{t.common.notFound.title}</h1>

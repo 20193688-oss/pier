@@ -2,7 +2,7 @@
 import type es from '@/i18n/messages/es/landing';
 
 const landing: typeof es = {
-  metaTitle: 'pedospe: buy and sell USDC by bank transfer',
+  metaTitle: '{brand}: buy and sell USDC by bank transfer',
   metaDescription:
     'Type an amount, transfer from your bank and receive USDC in your wallet. Funds stay locked in a contract until the payment is confirmed.',
   hero: {
@@ -50,7 +50,7 @@ const landing: typeof es = {
     items: [
       {
         title: 'Locked in a contract',
-        body: 'Every order locks the USDC in a public smart contract. pedospe holds no key that can move it anywhere else.',
+        body: 'Every order locks the USDC in a public smart contract. {brand} holds no key that can move it anywhere else.',
       },
       {
         title: 'Deadlines refund',
@@ -98,8 +98,8 @@ const landing: typeof es = {
     title: 'Questions',
     items: [
       {
-        q: 'Does pedospe hold my funds?',
-        a: 'No. The USDC is in your wallet or locked in each order’s contract. pedospe holds no key that can move it anywhere else.',
+        q: 'Does {brand} hold my funds?',
+        a: 'No. The USDC is in your wallet or locked in each order’s contract. {brand} holds no key that can move it anywhere else.',
       },
       {
         q: 'Do I need an account?',

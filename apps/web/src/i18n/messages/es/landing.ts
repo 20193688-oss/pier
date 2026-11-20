@@ -1,6 +1,6 @@
 /* The public home page. */
 const landing = {
-  metaTitle: 'pedospe: compra y vende USDC con transferencia bancaria',
+  metaTitle: '{brand}: compra y vende USDC con transferencia bancaria',
   metaDescription:
     'Escribe un monto, transfiere desde tu banco y recibe USDC en tu wallet. Los fondos quedan bloqueados en un contrato hasta que el pago se confirma.',
   hero: {
@@ -47,7 +47,7 @@ const landing = {
     items: [
       {
         title: 'Bloqueados en un contrato',
-        body: 'Cada orden bloquea los USDC en un contrato inteligente público. pedospe no tiene ninguna clave que pueda moverlos a otro lado.',
+        body: 'Cada orden bloquea los USDC en un contrato inteligente público. {brand} no tiene ninguna clave que pueda moverlos a otro lado.',
       },
       {
         title: 'Los plazos devuelven',
@@ -98,8 +98,8 @@ const landing = {
     title: 'Preguntas frecuentes',
     items: [
       {
-        q: '¿pedospe guarda mis fondos?',
-        a: 'No. Los USDC están en tu wallet o bloqueados en el contrato de cada orden. pedospe no tiene ninguna clave que pueda moverlos a otro destino.',
+        q: '¿{brand} guarda mis fondos?',
+        a: 'No. Los USDC están en tu wallet o bloqueados en el contrato de cada orden. {brand} no tiene ninguna clave que pueda moverlos a otro destino.',
       },
       {
         q: '¿Necesito crear una cuenta?',
