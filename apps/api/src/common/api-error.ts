@@ -26,6 +26,14 @@ export const ErrorCode = {
   AccountTaken: 'account_taken',
   ChargeClosed: 'charge_closed',
   LastOwner: 'last_owner',
+  AccountMissing: 'account_missing',
+  RestoreRequired: 'restore_required',
+  HandleTaken: 'handle_taken',
+  RecipientCannotReceive: 'recipient_cannot_receive',
+  InsufficientBalance: 'insufficient_balance',
+  QrInvalid: 'qr_invalid',
+  SubmissionRefused: 'submission_refused',
+  BudgetExhausted: 'sponsor_budget_exhausted',
 } as const;
 export type ErrorCode = (typeof ErrorCode)[keyof typeof ErrorCode];
 

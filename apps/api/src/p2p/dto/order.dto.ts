@@ -14,7 +14,7 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { PageQueryDto } from '@/common/pagination';
-import { EVM_ADDRESS_PATTERN } from '@/p2p/dto/account.dto';
+import { ACCOUNT_ADDRESS_RE } from '@/common/stellar';
 import {
   P2P_CURRENCY_CODES,
   P2P_MAX_INTEGRATOR_FEE_BPS,
@@ -38,13 +38,13 @@ export class CreateQuoteDto {
   @IsIn(['BUY', 'SELL'])
   side!: 'BUY' | 'SELL';
 
-  @ApiProperty({ enum: NETWORK_IDS, example: 'base' })
+  @ApiProperty({ enum: NETWORK_IDS, example: 'testnet' })
   @IsIn(NETWORK_IDS)
   network!: string;
 
   @ApiProperty({
     example: 'USDC',
-    description: 'By contract address or symbol.',
+    description: 'By symbol, Stellar Asset Contract (C...) or CODE:ISSUER.',
   })
   @IsString()
   token!: string;
@@ -173,11 +173,11 @@ export class CreateOrderDto {
   kind?: 'BUY' | 'SELL';
 
   @ApiPropertyOptional({
-    example: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
+    example: 'GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ',
     description: 'BUY: the wallet that receives the tokens.',
   })
   @IsOptional()
-  @Matches(EVM_ADDRESS_PATTERN, { message: 'recipient must be an EVM address' })
+  @Matches(ACCOUNT_ADDRESS_RE, { message: 'recipient must be a Stellar account address (G...)' })
   recipient?: string;
 
   @ApiPropertyOptional({
@@ -190,12 +190,12 @@ export class CreateOrderDto {
   payer?: PayerDto;
 
   @ApiPropertyOptional({
-    example: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
+    example: 'GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ',
     description:
       'SELL: the wallet that holds the tokens and signs the two transactions. Refunds go back to it.',
   })
   @IsOptional()
-  @Matches(EVM_ADDRESS_PATTERN, { message: 'seller must be an EVM address' })
+  @Matches(ACCOUNT_ADDRESS_RE, { message: 'seller must be a Stellar account address (G...)' })
   seller?: string;
 
   @ApiPropertyOptional({
@@ -237,10 +237,10 @@ export class QueryOrdersDto extends PageQueryDto {
   kind?: string;
 
   @ApiPropertyOptional({
-    example: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
-    description: 'Only orders where this wallet is the buyer or the seller (any case).',
+    example: 'GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ',
+    description: 'Only orders where this account is the buyer or the seller.',
   })
   @IsOptional()
-  @Matches(EVM_ADDRESS_PATTERN, { message: 'address must be an EVM address' })
+  @Matches(ACCOUNT_ADDRESS_RE, { message: 'address must be a Stellar account address (G...)' })
   address?: string;
 }

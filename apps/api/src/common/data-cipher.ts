@@ -9,6 +9,7 @@ export type SealedField =
   | 'payment-method.holder'
   | 'order.payer'
   | 'order.beneficiary'
+  | 'order.qr'
   | 'webhook-endpoint.secret';
 
 const VERSION = 'v1';

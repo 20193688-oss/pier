@@ -1,5 +1,6 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 import { MerchantStatsView } from '@/p2p/entities/account.entity';
+import { QrSummaryView } from '@/p2p/entities/order.entity';
 
 @ApiSchema({
   description:
@@ -23,10 +24,10 @@ export class OfferView {
   })
   side!: string;
 
-  @ApiProperty({ example: 'base' })
+  @ApiProperty({ example: 'testnet' })
   network!: string;
 
-  @ApiProperty({ example: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' })
+  @ApiProperty({ example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA' })
   token!: string;
 
   @ApiProperty({ example: 'USDC' })
@@ -131,20 +132,34 @@ export class QuoteView {
     enum: ['BUY', 'SELL'],
     example: 'BUY',
     description:
-      'The person’s side: BUY receives tokens for local money, SELL sends tokens for it.',
+      'The person’s side: BUY receives tokens for local money, SELL sends tokens for it (a QR payment is a SELL).',
   })
   side!: string;
 
-  @ApiProperty({ example: 'base' })
+  @ApiProperty({
+    enum: ['BUY', 'SELL', 'QR_PAY'],
+    example: 'BUY',
+    description: 'The order kind the quote is for: its side, or `QR_PAY` for a scanned QR.',
+  })
+  kind!: string;
+
+  @ApiProperty({
+    type: QrSummaryView,
+    nullable: true,
+    description: 'A QR payment’s scanned QR (merchant, city, amount); null otherwise.',
+  })
+  qr!: QrSummaryView | null;
+
+  @ApiProperty({ example: 'testnet' })
   network!: string;
 
-  @ApiProperty({ example: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' })
+  @ApiProperty({ example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA' })
   token!: string;
 
   @ApiProperty({ example: 'USDC' })
   tokenSymbol!: string;
 
-  @ApiProperty({ example: 6 })
+  @ApiProperty({ example: 7 })
   tokenDecimals!: number;
 
   @ApiProperty({ example: 'ARS' })

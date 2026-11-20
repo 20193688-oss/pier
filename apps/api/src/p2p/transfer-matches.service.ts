@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { OrgPrincipal } from '@/auth/auth.types';
 import { DeploymentsService } from '@/chain/deployments.service';
+import { MarketReader } from '@/chain/market-reader.service';
+import type { Tier } from '@/chain/networks';
 import {
   P2P_CURRENCIES,
+  P2P_PERMISSIONS,
   P2P_TRANSFER_MATCHES_LIMIT,
   type P2pCurrency,
 } from '@/p2p/domain/constants';
@@ -14,6 +17,7 @@ import type { TransferMatchView } from '@/p2p/entities/order.entity';
 import { OrdersService } from '@/p2p/orders.service';
 import { fiatUnitsOf } from '@/p2p/quotes.service';
 import { tierOf } from '@/p2p/tier';
+import { TransactionsService } from '@/p2p/transactions.service';
 import { P2P_ORDER_SELECT } from '@/p2p/views';
 import { PrismaService } from '@/prisma/prisma.service';
 
@@ -33,6 +37,8 @@ export class TransferMatchesService {
     private readonly prisma: PrismaService,
     private readonly orders: OrdersService,
     private readonly deployments: DeploymentsService,
+    private readonly reader: MarketReader,
+    private readonly transactions: TransactionsService,
   ) {}
 
   async match(org: OrgPrincipal, dto: TransferMatchesDto): Promise<{ data: TransferMatchView[] }> {
@@ -59,22 +65,24 @@ export class TransferMatchesService {
     for (const row of rows) {
       if (parseDecimalUnits(row.fiatAmount, decimals) !== amount) continue;
       const view = await this.orders.merchantView(row);
+      const signer = dto.signer ?? row.sellerAddress;
       const release = buildOrderAction('release', {
         contract: row.contract,
-        from: row.sellerAddress,
+        from: signer,
         order: row,
         now,
+        releaseOperator: signer !== row.sellerAddress && (await this.canRelease(row, signer)),
       });
       if (!release.ok) continue;
-      matches.push({
-        order: view,
-        ...scoreTransfer(dto, view.payer),
-        transaction: {
-          chainId: view.chainId,
-          value: '0',
-          ...release.value,
-        },
-      });
+      let transaction;
+      try {
+        const d = await this.reader.requireLive(row.tier as Tier, row.network);
+        transaction = await this.transactions.prepared(d, signer, release.value);
+      } catch {
+        // Not releasable right now (the contract refuses, or the node is away).
+        continue;
+      }
+      matches.push({ order: view, ...scoreTransfer(dto, view.payer), transaction });
     }
     matches.sort(
       (a, b) =>
@@ -84,5 +92,21 @@ export class TransferMatchesService {
         a.order.createdAt.getTime() - b.order.createdAt.getTime(),
     );
     return { data: matches.slice(0, P2P_TRANSFER_MATCHES_LIMIT) };
+  }
+
+  /** Whether the indexer saw the order's merchant grant `signer` PERM_RELEASE on its network. */
+  private async canRelease(
+    row: { merchantAccountId: string | null; network: string },
+    signer: string,
+  ): Promise<boolean> {
+    if (!row.merchantAccountId) return false;
+    const account = await this.prisma.p2pAccount.findUnique({
+      where: { id: row.merchantAccountId },
+      select: { operators: true },
+    });
+    const bits = (account?.operators as Record<string, Record<string, number>> | null)?.[
+      row.network
+    ]?.[signer];
+    return typeof bits === 'number' && (bits & P2P_PERMISSIONS.release) !== 0;
   }
 }

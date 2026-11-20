@@ -1,19 +1,17 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 
-const ADDRESS = '0x70997970C51812dc3A010C7d01b50e0d17dc79C8';
+const ADDRESS = 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI';
 
 @ApiSchema({
   description:
-    'A registration challenge: the exact text the wallet signs with `personal_sign` (EIP-191), once, before `expiresAt`.',
+    'A registration challenge: a SEP-10-shaped transaction the account signs (it is never submitted). Besides the single-use nonce and `web_auth_domain`, its `organization` entry names your organization and tier, so it registers nothing else. Sign it once, before `expiresAt`.',
 })
 export class ChallengeView {
-  @ApiProperty({
-    example:
-      'Cosmos Pay P2P market\nRegister wallet: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8\nFor: cosmos_6f1d2a\nTier: testnet\nNonce: 9f2c4e1ab37d5c08e6a1b2c3d4e5f607\nExpires: 2026-11-19T12:10:00.000Z',
-    description:
-      'The message to sign, byte for byte. It names the address, this organization, the tier, a single-use nonce and the expiry, so it registers nothing else.',
-  })
-  message!: string;
+  @ApiProperty({ description: 'The challenge transaction envelope, base64 XDR.' })
+  transaction!: string;
+
+  @ApiProperty({ example: 'Test SDF Network ; September 2015' })
+  network_passphrase!: string;
 
   @ApiProperty({ example: '2026-11-19T12:10:00.000Z' })
   expiresAt!: Date;
@@ -114,7 +112,10 @@ export class BalanceView {
   @ApiProperty({ example: 'USDC' })
   symbol!: string;
 
-  @ApiProperty({ example: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' })
+  @ApiProperty({
+    example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+    description: 'The token’s Stellar Asset Contract.',
+  })
   token!: string;
 
   @ApiProperty({
@@ -130,7 +131,7 @@ export class BalanceView {
   })
   locked!: string;
 
-  @ApiProperty({ example: 6 })
+  @ApiProperty({ example: 7 })
   decimals!: number;
 }
 
@@ -157,7 +158,7 @@ export class MatcherTermsView {
   description: 'An account on one network, read live from the contract.',
 })
 export class AccountNetworkView {
-  @ApiProperty({ example: 'base' })
+  @ApiProperty({ example: 'testnet' })
   network!: string;
 
   @ApiProperty({ type: [BalanceView] })
@@ -169,7 +170,7 @@ export class AccountNetworkView {
   @ApiProperty({
     type: 'object',
     additionalProperties: { type: 'number' },
-    example: { '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC': 6 },
+    example: { GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ: 6 },
     description:
       'Operators the market saw this account grant on this network, with their permission bits (1 open, 2 release, 4 trade, 8 withdraw). A grant of 0 is a revocation and is left out.',
   })

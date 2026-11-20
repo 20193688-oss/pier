@@ -39,7 +39,7 @@ export class CreateChargeDto {
   @Matches(FIAT, { message: 'fiatAmount must be a positive decimal' })
   fiatAmount!: string;
 
-  @ApiProperty({ enum: NETWORK_IDS, example: 'base' })
+  @ApiProperty({ enum: NETWORK_IDS, example: 'testnet' })
   @IsIn(NETWORK_IDS)
   network!: string;
 
@@ -172,7 +172,7 @@ export class PayoutItemDto {
     'Payouts from your balance in the contract: each item is matched with a merchant and opened by the matcher on your balance.',
 })
 export class CreatePayoutDto {
-  @ApiProperty({ enum: NETWORK_IDS, example: 'base' })
+  @ApiProperty({ enum: NETWORK_IDS, example: 'testnet' })
   @IsIn(NETWORK_IDS)
   network!: string;
 

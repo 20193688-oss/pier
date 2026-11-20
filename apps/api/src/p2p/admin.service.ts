@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { DeploymentsService } from '@/chain/deployments.service';
-import { p2pCalldata } from '@/chain/market-codec';
+import { p2pCall } from '@/chain/market-codec';
 import { MarketReader } from '@/chain/market-reader.service';
 import type { Tier } from '@/chain/networks';
+import { TxBuilder } from '@/chain/tx-builder.service';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { DataCipher } from '@/common/data-cipher';
 import { page, type Page } from '@/common/pagination';
@@ -11,10 +12,11 @@ import { isUuid } from '@/p2p/domain/order-ref';
 import type { AdminDisputesQueryDto, AdminResolutionDto } from '@/p2p/dto/admin.dto';
 import type { MerchantOrderView } from '@/p2p/entities/order.entity';
 import { OrdersService } from '@/p2p/orders.service';
+import { refusedByContract } from '@/p2p/transactions.service';
 import { P2P_ORDER_SELECT } from '@/p2p/views';
 import { PrismaService } from '@/prisma/prisma.service';
 
-const MAX_UINT128 = (1n << 128n) - 1n;
+const MAX_I128 = (1n << 127n) - 1n;
 
 /**
  * The platform console's part of the market: the disputes waiting for the
@@ -31,6 +33,7 @@ export class AdminService {
     private readonly reader: MarketReader,
     private readonly orders: OrdersService,
     private readonly cipher: DataCipher,
+    private readonly builder: TxBuilder,
   ) {}
 
   private audit(
@@ -83,7 +86,7 @@ export class AdminService {
         select: {
           kind: true,
           hash: true,
-          nonce: true,
+          sequence: true,
           status: true,
           lastError: true,
           createdAt: true,
@@ -102,7 +105,10 @@ export class AdminService {
       beneficiary: beneficiary
         ? this.cipher.open<Record<string, unknown>>('order.beneficiary', id, beneficiary)
         : null,
-      matcherTransactions: matcherTxs.map((t) => ({ ...t, nonce: t.nonce.toString() })),
+      matcherTransactions: matcherTxs.map((t) => ({
+        ...t,
+        sequence: t.sequence?.toString() ?? null,
+      })),
     };
   }
 
@@ -124,7 +130,7 @@ export class AdminService {
     if (
       toBuyer > BigInt(row.tokenAmount) ||
       bondToSeller > BigInt(row.bond) ||
-      toBuyer > MAX_UINT128
+      toBuyer > MAX_I128
     ) {
       throw ApiError.validation([
         `toBuyer must be at most ${row.tokenAmount} and bondToSeller at most ${row.bond}`,
@@ -138,21 +144,23 @@ export class AdminService {
       );
     }
     const arbiter = await this.reader.arbiter(d);
+    let transaction;
+    try {
+      transaction = await this.builder.invoke(
+        d,
+        arbiter,
+        p2pCall.resolve(d.contract, BigInt(row.onchainId), toBuyer, bondToSeller),
+        'resolve',
+        `Resolve order ${row.onchainId}: ${toBuyer} base units to the buyer, the rest to the seller, ${bondToSeller} of the bond to the seller`,
+      );
+    } catch (err) {
+      refusedByContract(err);
+    }
     await this.audit(this.prisma, actor, 'p2p.resolution.built', 'p2p_order', id, {
       toBuyer: toBuyer.toString(),
       bondToSeller: bondToSeller.toString(),
     });
-    return {
-      orderId: id,
-      arbiter,
-      transaction: {
-        chainId: d.chainId,
-        to: d.contract,
-        data: p2pCalldata.resolve(BigInt(row.onchainId), toBuyer, bondToSeller),
-        value: '0',
-        description: `Resolve order ${row.onchainId}: ${toBuyer} base units to the buyer, the rest to the seller, ${bondToSeller} of the bond to the seller`,
-      },
-    };
+    return { orderId: id, arbiter, transaction };
   }
 
   /** SUSPENDED stops a merchant from being matched; only the platform lifts it. */

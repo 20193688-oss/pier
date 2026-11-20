@@ -1,67 +1,82 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 
 @ApiSchema({
-  description: 'A stablecoin the P2P market trades on one network.',
+  description:
+    'A stablecoin the P2P market trades on one network: a classic Stellar asset, used on-chain through its Stellar Asset Contract.',
 })
 export class TokenView {
   @ApiProperty({ example: 'USDC', description: 'Its symbol.' })
   symbol!: string;
 
-  @ApiProperty({
-    example: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
-    description: 'Its contract address (EIP-55): what requests name it by.',
-  })
-  address!: string;
+  @ApiProperty({ example: 'USDC', description: 'The asset code.' })
+  code!: string;
 
-  @ApiProperty({ example: 6, description: 'Decimal places of its base units.' })
+  @ApiProperty({
+    example: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+    description: 'The issuing account (G...).',
+  })
+  issuer!: string;
+
+  @ApiProperty({
+    example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
+    description: 'Its Stellar Asset Contract (C...): what orders and balances name it by.',
+  })
+  contract!: string;
+
+  @ApiProperty({ example: 7, description: 'Decimal places of its base units (always 7).' })
   decimals!: number;
 }
 
 @ApiSchema({
   description:
-    'One network the P2P market runs on for this API key: where the contract is, and what it trades.',
+    'One Stellar network the P2P market runs on: where the contract is, and what it trades.',
 })
 export class NetworkView {
   @ApiProperty({
-    example: 'base',
+    example: 'testnet',
+    enum: ['local', 'testnet', 'mainnet'],
     description: 'The network id requests use (`network`).',
   })
   id!: string;
 
-  @ApiProperty({ example: 'Base', description: 'Its name, for a picker.' })
+  @ApiProperty({ example: 'Stellar Testnet', description: 'Its name, for a picker.' })
   name!: string;
 
-  @ApiProperty({ example: 84532, description: 'Its EIP-155 chain id.' })
-  chainId!: number;
-
   @ApiProperty({
-    example: 'ETH',
-    description: 'The chain’s own coin (gas), as wallets name it.',
+    example: 'Test SDF Network ; September 2015',
+    description: 'Its network passphrase: what transactions are signed for.',
   })
-  nativeSymbol!: string;
+  networkPassphrase!: string;
 
   @ApiProperty({
     type: String,
     nullable: true,
-    example: 'https://sepolia.basescan.org',
-    description:
-      'An Etherscan-style explorer of this network: append `/tx/<hash>` or `/address/<address>`. Null where none was checked.',
-  })
-  explorerUrl!: string | null;
-
-  @ApiProperty({
-    type: String,
-    nullable: true,
-    example: 'https://sepolia.base.org',
-    description:
-      'A PUBLIC node for `wallet_addEthereumChain`, from the public endpoints this service lists; never the node it reads through. Null where no public one is listed.',
+    example: 'https://soroban-testnet.stellar.org',
+    description: 'A PUBLIC Soroban RPC endpoint; never the node this service reads through.',
   })
   rpcUrl!: string | null;
 
   @ApiProperty({
-    example: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
+    type: String,
+    nullable: true,
+    example: 'https://horizon-testnet.stellar.org',
+    description: 'A public Horizon endpoint, or null.',
+  })
+  horizonUrl!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: 'https://stellar.expert/explorer/testnet',
     description:
-      "The P2P market contract: where balances are deposited and orders lock tokens. Verified against this service's build before it is listed.",
+      'A stellar.expert-style explorer: append `/tx/<hash>`, `/account/<G...>` or `/contract/<C...>`. Null when there is none.',
+  })
+  explorerUrl!: string | null;
+
+  @ApiProperty({
+    example: 'CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7',
+    description:
+      "The P2P market contract (C...): where balances are deposited and orders lock tokens. Verified against this service's build (its wasm hash) before it is listed.",
   })
   contract!: string;
 
@@ -81,6 +96,16 @@ export class NetworkView {
 
   @ApiProperty({ type: [TokenView] })
   tokens!: TokenView[];
+}
+
+@ApiSchema({ description: 'Whether the API pays network fees and reserves for wallets.' })
+export class SponsorView {
+  @ApiProperty({
+    example: true,
+    description:
+      'True: `POST /v1/app/submit` and `/v1/p2p/submit` fee-bump signed transactions with the sponsor account, and activations are sponsored. False: transactions are submitted as signed (the wallet pays its fee).',
+  })
+  enabled!: boolean;
 }
 
 @ApiSchema({ description: 'One field of a payment rail’s account details.' })
@@ -119,6 +144,14 @@ export class RailView {
     description: 'Its name, in English.',
   })
   name!: string;
+
+  @ApiProperty({
+    enum: ['account', 'qr'],
+    example: 'account',
+    description:
+      '`account`: the local money goes to an account (the fields below). `qr`: the rail pays a scanned merchant QR (`QR_PAY` orders); it takes no fields.',
+  })
+  kind!: string;
 
   @ApiProperty({ type: [RailFieldView] })
   fields!: RailFieldView[];
@@ -167,6 +200,25 @@ export class WindowsView {
       'A sale: seconds after the merchant marked it paid with no dispute before anyone may release it. A payout gets it only when the client enabled `autoSettle` for the matcher.',
   })
   sellSettleWindow!: number;
+
+  @ApiProperty({
+    example: 120,
+    description: 'A QR payment: seconds the merchant has to accept it.',
+  })
+  qrAcceptWindow!: number;
+
+  @ApiProperty({
+    example: 600,
+    description: 'A QR payment: seconds the merchant then has to pay the scanned QR.',
+  })
+  qrPaymentWindow!: number;
+
+  @ApiProperty({
+    example: 3600,
+    description:
+      'A QR payment: seconds after the merchant marked it paid with no dispute before anyone may release it.',
+  })
+  qrSettleWindow!: number;
 }
 
 /** `GET /v1/p2p/market`. */
@@ -191,11 +243,14 @@ export class MarketOverviewView {
   @ApiProperty({
     type: String,
     nullable: true,
-    example: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+    example: 'GAXTHY6ASJEWI3OJGM7UZ2KSMBQD7VHCCH27PAL6ALSSSW7D33B5WMMI',
     description:
-      "The matcher: the address a seller authorises with `setMatcher` so purchases and payouts open on its balance. It can open orders within the cap the seller sets and act for a buyer it opened an order for; it can never withdraw or release a seller's tokens.",
+      "The matcher account: what a seller authorises with `set_matcher` so purchases and payouts open on its balance. It can open orders within the cap the seller sets and act for a buyer it opened an order for; it can never withdraw or release a seller's tokens.",
   })
   matcher!: string | null;
+
+  @ApiProperty({ type: SponsorView })
+  sponsor!: SponsorView;
 
   @ApiProperty({
     example: 1000,

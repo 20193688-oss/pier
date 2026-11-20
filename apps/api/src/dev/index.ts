@@ -5,28 +5,46 @@
  */
 export {
   API_ROOT,
-  anvilBinary,
+  LOCAL_PASSPHRASE,
+  dockerAnswers,
   freePort,
   migrate,
   resetDatabase,
-  startAnvil,
   startEmbeddedPostgres,
+  startLocalStellar,
   stopProcess,
-  type RunningAnvil,
+  type RunningLocalStellar,
   type RunningPostgres,
 } from '@/dev/infra';
 export {
-  DEV_MNEMONIC,
   DEV_ROLES,
-  deployLocalMarket,
-  devPublicClient,
-  devSend,
-  devWallet,
-  devWallets,
-  fundDevWallet,
+  DEV_TOKEN_CODE,
+  UNFUNDED_ROLES,
+  devChain,
+  fund,
+  keypair,
+  mintTusd,
+  newDevAccounts,
+  refuseMainnet,
+  setUpDevMarket,
+  trustTusd,
+  type DevAccount,
+  type DevAccounts,
+  type DevChain,
+  type DevMarket,
+  type DevNetwork,
   type DevRole,
-  type DevWallet,
-  type LocalDeployment,
-} from '@/dev/local-chain';
+} from '@/dev/stellar-dev';
 export { localApiEnv } from '@/dev/local-env';
-export { DevApi, refreshDevPrices, seedDevMarket, signIn, type SeedResult } from '@/dev/seed';
+export {
+  DevApi,
+  refreshDevPrices,
+  registerAccount,
+  seedDevMarket,
+  signAndSubmit,
+  signIn,
+  signXdr,
+  type SeedResult,
+  type Submission,
+} from '@/dev/seed';
+export { rpcFor, submitOps } from '@/chain/market-deploy';

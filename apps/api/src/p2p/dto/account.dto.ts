@@ -1,38 +1,51 @@
 import { ApiProperty, ApiPropertyOptional, ApiSchema } from '@nestjs/swagger';
 import { IsIn, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { NETWORK_IDS } from '@/chain/networks';
+import { ACCOUNT_ADDRESS_RE } from '@/common/stellar';
 import { P2P_TEXT_MAX } from '@/p2p/domain/constants';
 
-export const EVM_ADDRESS_PATTERN = /^0x[0-9a-fA-F]{40}$/;
-const EVM_ADDRESS_MESSAGE = 'must be an EVM address (0x + 40 hex)';
+export const ACCOUNT_ADDRESS_MESSAGE = 'must be a Stellar account address (G...)';
+export const EXAMPLE_ACCOUNT = 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI';
+export const EXAMPLE_ACCOUNT_2 = 'GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ';
+export const EXAMPLE_CONTRACT = 'CDLZFC3SYJYDZT7K67VZ75HPJVIEUVNIXF47ZG2FB2RMQQVU2HHGCYSC';
 
-@ApiSchema({ description: 'The wallet a registration challenge is for.' })
+@ApiSchema({ description: 'The account a registration challenge is for.' })
 export class CreateChallengeDto {
   @ApiProperty({
-    example: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-    description: 'The EVM wallet to register. The same address on every network.',
+    example: EXAMPLE_ACCOUNT,
+    description: 'The Stellar account (G...) to register.',
   })
-  @Matches(EVM_ADDRESS_PATTERN, { message: `address ${EVM_ADDRESS_MESSAGE}` })
+  @Matches(ACCOUNT_ADDRESS_RE, { message: `address ${ACCOUNT_ADDRESS_MESSAGE}` })
   address!: string;
+
+  @ApiPropertyOptional({
+    enum: NETWORK_IDS,
+    example: 'testnet',
+    description:
+      'The network whose ledger has the account’s signers; default: the tier’s only network.',
+  })
+  @IsOptional()
+  @IsIn(NETWORK_IDS)
+  network?: string;
 }
 
 @ApiSchema({
   description:
-    'A wallet’s registration: the address, and its EIP-191 signature over the challenge’s message.',
+    'A wallet’s registration: the registration challenge, signed by the account’s signers.',
 })
 export class RegisterAccountDto {
-  @ApiProperty({ example: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8' })
-  @Matches(EVM_ADDRESS_PATTERN, { message: `address ${EVM_ADDRESS_MESSAGE}` })
-  address!: string;
-
   @ApiProperty({
-    example: `0x${'1b'.repeat(65)}`,
-    description: '`personal_sign` of the challenge message by the wallet: 65 bytes, 0x-hex.',
+    description:
+      'The challenge from `POST /v1/p2p/accounts/challenge`, signed (base64 XDR). It names the account, your organization and tier.',
   })
   @IsString()
-  @Matches(/^0x[0-9a-fA-F]{130}$/, {
-    message: 'signature must be 65 bytes of 0x-hex',
-  })
-  signature!: string;
+  @MaxLength(8000)
+  transaction!: string;
+
+  @ApiPropertyOptional({ enum: NETWORK_IDS, example: 'testnet' })
+  @IsOptional()
+  @IsIn(NETWORK_IDS)
+  network?: string;
 
   @ApiPropertyOptional({ example: 'Treasury wallet', maxLength: P2P_TEXT_MAX })
   @IsOptional()

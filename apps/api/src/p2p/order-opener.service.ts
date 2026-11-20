@@ -1,7 +1,7 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, type OnModuleInit } from '@nestjs/common';
 import { ChainCallReverted } from '@/chain/chain-client.service';
 import { DeploymentsService, type Deployment } from '@/chain/deployments.service';
-import { p2pCalldata } from '@/chain/market-codec';
+import { p2pCall } from '@/chain/market-codec';
 import type { Token } from '@/chain/networks';
 import { DataCipher } from '@/common/data-cipher';
 import { APP_CONFIG } from '@/config/config.module';
@@ -47,6 +47,8 @@ export interface P2pNewOrder {
   externalReference?: string | null;
   /** Sealed here, under the order's id. */
   payer?: { name: string; document: string; email?: string };
+  /** QR_PAY: the scanned merchant QR, sealed here under the order's id. */
+  qr?: Record<string, unknown>;
   beneficiary?: {
     holderName: string;
     document: string;
@@ -60,12 +62,12 @@ export interface P2pNewOrder {
 /**
  * Makes orders: one row per trade, written under its merchant's lock (so two
  * orders cannot both take a merchant's last slot), then, for the kinds the
- * matcher opens (purchases, charges, payouts), the matcher's `open`. A revert
- * in that simulation fails the order before anything is signed: the merchant
+ * matcher opens (purchases, charges, payouts), the matcher's `open`. A refusal
+ * in its simulation fails the order before anything is signed: the merchant
  * could no longer fill it.
  */
 @Injectable()
-export class OrderOpener {
+export class OrderOpener implements OnModuleInit {
   private readonly logger = new Logger(OrderOpener.name);
 
   constructor(
@@ -75,6 +77,11 @@ export class OrderOpener {
     private readonly matcher: MatcherService,
     private readonly deployments: DeploymentsService,
   ) {}
+
+  onModuleInit(): void {
+    // A queued opening the contract refuses later, or that never applies, fails its order.
+    this.matcher.onOpenFailed = (orderId, reason) => this.fail(orderId, reason);
+  }
 
   /** Writes the order `pending`, or refuses when its merchant has no slot left. */
   async insert(input: P2pNewOrder): Promise<P2pOrderRow> {
@@ -90,7 +97,7 @@ export class OrderOpener {
       kind: input.kind,
       network: d.network,
       contract: d.contract,
-      token: input.token.address,
+      token: input.token.contract,
       tokenSymbol: input.token.symbol,
       tokenDecimals: input.token.decimals,
       merchantAccountId: match.account.id,
@@ -121,6 +128,7 @@ export class OrderOpener {
       beneficiary: input.beneficiary
         ? this.cipher.seal('order.beneficiary', input.id, input.beneficiary)
         : null,
+      qrPayload: input.qr ? this.cipher.seal('order.qr', input.id, input.qr) : null,
       chargeId: input.chargeId ?? null,
       payoutBatchId: input.payoutBatchId ?? null,
       externalReference: input.externalReference ?? null,
@@ -141,24 +149,24 @@ export class OrderOpener {
   }
 
   /**
-   * The matcher opens the order on its seller's balance. A simulation the
-   * contract would revert fails the order (`no_match`): the merchant's balance
+   * The matcher opens the order on its seller's balance: queued, and signed
+   * and sent as soon as the matcher has nothing else in flight. A simulation
+   * the contract refuses fails the order (`no_match`): the merchant's balance
    * or its matcher terms changed since the quote. Answers the order as it
    * stands after.
    */
   async openViaMatcher(d: Deployment, row: P2pOrderRow): Promise<P2pOrderRow> {
     const params = openParamsOf(row);
     try {
-      const hash = await this.matcher.send(d, {
+      await this.matcher.send(d, {
         kind: 'open',
         orderId: row.id,
-        data: p2pCalldata.open(params),
+        operation: p2pCall.open(d.contract, row.openerAddress, params),
       });
-      return this.prisma.p2pOrder.update({
+      return (await this.prisma.p2pOrder.findUnique({
         where: { id: row.id },
-        data: { openTxHash: hash },
         select: P2P_ORDER_SELECT,
-      });
+      })) as P2pOrderRow;
     } catch (err) {
       if (err instanceof ChainCallReverted) {
         this.logger.warn(
@@ -170,7 +178,7 @@ export class OrderOpener {
         );
         throw noMatch();
       }
-      // Not signed (a node error before the transaction existed): fail it too,
+      // Not queued (a node error before anything was written): fail it too,
       // so it never holds the merchant's slot.
       await this.fail(row.id, 'the order could not be opened');
       throw err;
@@ -190,10 +198,7 @@ export class OrderOpener {
         select: P2P_ORDER_SELECT,
       });
       if (row) {
-        await enqueueWebhooks(
-          tx,
-          orderEvents('P2P_ORDER_FAILED', row, this.deployments.chainIdOf(row)),
-        );
+        await enqueueWebhooks(tx, orderEvents('P2P_ORDER_FAILED', row));
       }
     });
   }

@@ -9,6 +9,8 @@ import type {
   OrderSettlementView,
   PayerView,
   PaymentDetailsView,
+  QrSummaryView,
+  MerchantQrView,
 } from '@/p2p/entities/order.entity';
 import { completionRate } from '@/p2p/domain/matching';
 import {
@@ -262,11 +264,11 @@ function settlementOf(value: unknown): OrderSettlementView | null {
   };
 }
 
-/** An order as its client reads it; `paymentDetails` only when the caller is entitled to them. */
+/** An order as its client reads it; `paymentDetails` and `qr` only when the caller is entitled to them. */
 export function toOrderView(
   row: P2pOrderRow,
-  chainId: number,
   paymentDetails: PaymentDetailsView | null,
+  qr: QrSummaryView | null = null,
 ): OrderView {
   return {
     id: row.id,
@@ -274,7 +276,6 @@ export function toOrderView(
     status: row.status,
     tier: row.tier,
     network: row.network,
-    chainId,
     contract: row.contract,
     token: row.token,
     tokenSymbol: row.tokenSymbol,
@@ -305,6 +306,7 @@ export function toOrderView(
     payoutBatchId: row.payoutBatchId,
     externalReference: row.externalReference,
     paymentDetails,
+    qr,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -313,10 +315,10 @@ export function toOrderView(
 /** An order as its merchant reads it; the other party's details only while it is live. */
 export function toMerchantOrderView(
   row: P2pOrderRow,
-  chainId: number,
   counterparty: {
     payer: PayerView | null;
     beneficiary: BeneficiaryView | null;
+    qr?: MerchantQrView | null;
   },
 ): MerchantOrderView {
   return {
@@ -325,7 +327,6 @@ export function toMerchantOrderView(
     status: row.status,
     tier: row.tier,
     network: row.network,
-    chainId,
     contract: row.contract,
     merchantAccountId: row.merchantAccountId,
     merchantSide: P2P_MERCHANT_SIDE[row.kind as P2pOrderKind],
@@ -352,6 +353,7 @@ export function toMerchantOrderView(
     paidReference: row.paidReference,
     payer: isLive(row.status) ? counterparty.payer : null,
     beneficiary: isLive(row.status) ? counterparty.beneficiary : null,
+    qr: isLive(row.status) ? (counterparty.qr ?? null) : null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -389,7 +391,6 @@ export const P2P_CLIENT_WEBHOOK_KEYS = [
   'status',
   'tier',
   'network',
-  'chainId',
   'contract',
   'token',
   'tokenSymbol',
@@ -435,7 +436,6 @@ export const P2P_MERCHANT_WEBHOOK_KEYS = [
   'status',
   'tier',
   'network',
-  'chainId',
   'contract',
   'merchantAccountId',
   'merchantSide',
@@ -473,18 +473,18 @@ function pickKeys<T extends object>(view: T, keys: readonly (keyof T)[]): Record
  * role's own projection, plus the role. Never a payment method, a payer's
  * identity or a beneficiary's account for either role: delivery bodies are
  * stored in plain text (`webhook_event`), which would undo the seal at
- * rest; the routes are where an entitled party reads them.
+ * rest (a QR payment's scanned QR included); the routes are where an entitled
+ * party reads them.
  */
 export function toOrderWebhookData(
   row: P2pOrderRow,
-  chainId: number,
   role: 'client' | 'merchant',
 ): Record<string, unknown> {
   const body =
     role === 'client'
-      ? pickKeys(toOrderView(row, chainId, null), P2P_CLIENT_WEBHOOK_KEYS)
+      ? pickKeys(toOrderView(row, null), P2P_CLIENT_WEBHOOK_KEYS)
       : pickKeys(
-          toMerchantOrderView(row, chainId, { payer: null, beneficiary: null }),
+          toMerchantOrderView(row, { payer: null, beneficiary: null }),
           P2P_MERCHANT_WEBHOOK_KEYS,
         );
   return { ...body, role };

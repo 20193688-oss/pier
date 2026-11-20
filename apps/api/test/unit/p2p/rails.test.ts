@@ -80,10 +80,10 @@ describe('P2P rails: checksums', () => {
 });
 
 describe('P2P rails: details', () => {
-  it('has one rail per id, each paying in a currency it lists', () => {
+  it('has one rail per id, each paying in a currency it lists; only QR rails take no fields', () => {
     for (const id of P2P_RAIL_IDS) {
       expect(railsFor(P2P_RAILS[id].currency)).toContain(id);
-      expect(P2P_RAILS[id].fields.length).toBeGreaterThan(0);
+      expect(P2P_RAILS[id].fields.length > 0).toBe(!P2P_RAILS[id].qr);
     }
   });
 

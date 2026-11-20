@@ -103,7 +103,7 @@ export class CheckoutService {
     return {
       id: row.id,
       network: row.network,
-      tokenSymbol: d?.tokens.find((t) => t.address === row.token)?.symbol ?? row.token,
+      tokenSymbol: d?.tokens.find((t) => t.contract === row.token)?.symbol ?? row.token,
       currency: row.currency,
       fiatAmount: row.fiatAmount,
       merchantName: row.payeeName,
@@ -161,7 +161,15 @@ export class CheckoutService {
           chargeId: charge.id,
           status: { in: [...P2P_LIVE_STATUSES] },
         };
-        if (!charge.multiUse && (await tx.p2pOrder.count({ where: live })) > 0) {
+        const paying = charge.multiUse
+          ? 0
+          : await tx.p2pChargePayment.count({
+              where: {
+                chargeId: charge.id,
+                OR: [{ status: 'SUBMITTED' }, { status: 'PENDING', expiresAt: { gt: now } }],
+              },
+            });
+        if (!charge.multiUse && (paying > 0 || (await tx.p2pOrder.count({ where: live })) > 0)) {
           throw ApiError.conflict(
             ErrorCode.OperationInFlight,
             'Someone is paying this charge right now: try again when their order ends.',

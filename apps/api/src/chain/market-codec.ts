@@ -1,30 +1,18 @@
-import { P2P_MARKET_ARTIFACT } from '@pedospe/contracts';
-import {
-  decodeErrorResult,
-  decodeEventLog,
-  decodeFunctionResult,
-  encodeDeployData,
-  encodeFunctionData,
-  erc20Abi,
-  getAddress,
-  toEventSelector,
-  zeroAddress,
-  type AbiEvent,
-  type Hex,
-} from 'viem';
+import { MARKET_ERRORS, MARKET_SPEC } from '@pedospe/contracts';
+import { contract, Operation, xdr } from '@stellar/stellar-sdk';
 
 /**
- * The `P2PMarket` codec: calldata, views and events, all through viem over the
- * committed artifact's ABI (never hand-encoded words). A test runs this codec
- * against the contract itself in an in-process EVM.
+ * The `P2PMarket` codec: arguments, results, events and errors, all through
+ * stellar-sdk's `contract.Spec` over the committed artifact's spec (never
+ * hand-encoded values). Names and shapes follow docs/STELLAR.md section 4.
  */
 
-export const MARKET_ABI = P2P_MARKET_ARTIFACT.abi;
-export const ZERO_ADDRESS = zeroAddress;
+export const MARKET = new contract.Spec([...MARKET_SPEC]);
 
-/** `OpenParams`, as `open` and `openWithDeposit` take it. */
+/** `OpenParams`, as `open` and `open_with_deposit` take it. */
 export interface P2pOpenParams {
-  ref: string;
+  /** 32 bytes, hex (no 0x). */
+  refId: string;
   seller: string;
   buyer: string;
   token: string;
@@ -33,98 +21,134 @@ export interface P2pOpenParams {
   acceptWindow: number;
   paymentWindow: number;
   settleWindow: number;
-  /** The zero address for none. */
-  integrator: string;
+  /** Null for none. */
+  integrator: string | null;
   integratorFeeBps: number;
 }
 
-/** The actions that take only an order id. */
-export type P2pOrderAction = 'accept' | 'markPaid' | 'release' | 'settle' | 'cancel' | 'dispute';
+/** The actions that take an acting address and an order id. */
+export type P2pOrderAction = 'accept' | 'mark_paid' | 'release' | 'cancel' | 'dispute';
 
-const hex = (value: string) => value as Hex;
-const addr = (value: string) => getAddress(value);
+/** The market functions a wallet (or the matcher) may be sponsored for. */
+export const MARKET_USER_FUNCTIONS = [
+  'deposit',
+  'withdraw',
+  'withdraw_for',
+  'set_operator',
+  'set_matcher',
+  'open',
+  'open_with_deposit',
+  'accept',
+  'mark_paid',
+  'release',
+  'cancel',
+  'dispute',
+  'settle',
+] as const;
 
-function openTuple(p: P2pOpenParams) {
+export function openParamsArg(p: P2pOpenParams): Record<string, unknown> {
   return {
-    ref: hex(p.ref),
-    seller: addr(p.seller),
-    buyer: addr(p.buyer),
-    token: addr(p.token),
+    ref_id: Buffer.from(p.refId, 'hex'),
+    seller: p.seller,
+    buyer: p.buyer,
+    token: p.token,
     amount: p.amount,
     bond: p.bond,
-    acceptWindow: p.acceptWindow,
-    paymentWindow: p.paymentWindow,
-    settleWindow: p.settleWindow,
-    integrator: addr(p.integrator),
-    integratorFeeBps: p.integratorFeeBps,
+    accept_window: p.acceptWindow,
+    payment_window: p.paymentWindow,
+    settle_window: p.settleWindow,
+    integrator: p.integrator ?? undefined,
+    integrator_fee_bps: p.integratorFeeBps,
   };
 }
 
-function call(functionName: string, args: readonly unknown[] = []): Hex {
-  return encodeFunctionData({
-    abi: MARKET_ABI,
-    functionName,
-    args,
-  } as Parameters<typeof encodeFunctionData>[0]);
+/** A function's arguments, by the spec's parameter names, as `ScVal`s. */
+export function marketArgs(fn: string, args: Record<string, unknown>): xdr.ScVal[] {
+  return MARKET.funcArgsToScVals(fn, args);
 }
 
-export const p2pCalldata = {
-  deposit: (token: string, amount: bigint) => call('deposit', [addr(token), amount]),
-  withdraw: (token: string, amount: bigint) => call('withdraw', [addr(token), amount]),
-  withdrawFor: (account: string, token: string, amount: bigint) =>
-    call('withdrawFor', [addr(account), addr(token), amount]),
-  setOperator: (operator: string, permissions: number) =>
-    call('setOperator', [addr(operator), permissions]),
-  setMatcher: (matcher: string, maxPerOrder: bigint, autoSettle: boolean) =>
-    call('setMatcher', [addr(matcher), maxPerOrder, autoSettle]),
-  open: (p: P2pOpenParams) => call('open', [openTuple(p)]),
-  openWithDeposit: (p: P2pOpenParams) => call('openWithDeposit', [openTuple(p)]),
-  orderAction: (action: P2pOrderAction, id: bigint) => call(action, [id]),
-  resolve: (id: bigint, toBuyer: bigint, bondToSeller: bigint) =>
-    call('resolve', [id, toBuyer, bondToSeller]),
-  getOrder: (id: bigint) => call('getOrder', [id]),
-  orderIdOf: (opener: string, ref: string) => call('orderIdOf', [addr(opener), hex(ref)]),
-  balanceOf: (account: string, token: string) => call('balanceOf', [addr(account), addr(token)]),
-  permissionsOf: (account: string, operator: string) =>
-    call('permissionsOf', [addr(account), addr(operator)]),
-  matcherTermsOf: (seller: string, matcher: string) =>
-    call('matcherTermsOf', [addr(seller), addr(matcher)]),
-  tokenAllowed: (token: string) => call('tokenAllowed', [addr(token)]),
-  protocolFeeBps: () => call('protocolFeeBps'),
-  paused: () => call('paused'),
-  owner: () => call('owner'),
-  arbiter: () => call('arbiter'),
-  treasury: () => call('treasury'),
-  setToken: (token: string, allowed: boolean) => call('setToken', [addr(token), allowed]),
-  transferOwnership: (to: string) => call('transferOwnership', [addr(to)]),
-};
-
-/** An ERC-20 `approve(spender, amount)`: the exact amount, never unlimited. */
-export function approveCalldata(spender: string, amount: bigint): Hex {
-  return encodeFunctionData({
-    abi: erc20Abi,
-    functionName: 'approve',
-    args: [addr(spender), amount],
+/** One `invokeContract` operation on the market. */
+export function marketOperation(
+  contractId: string,
+  fn: string,
+  args: Record<string, unknown> = {},
+): xdr.Operation {
+  return Operation.invokeContractFunction({
+    contract: contractId,
+    function: fn,
+    args: marketArgs(fn, args),
   });
 }
 
-/** The init code of a P2PMarket with these constructor arguments. */
-export function marketInitCode(args: {
-  owner: string;
-  treasury: string;
-  arbiter: string;
-  feeBps: number;
-}): Hex {
-  return encodeDeployData({
-    abi: MARKET_ABI,
-    bytecode: P2P_MARKET_ARTIFACT.bytecode as Hex,
-    args: [addr(args.owner), addr(args.treasury), addr(args.arbiter), args.feeBps],
-  } as Parameters<typeof encodeDeployData>[0]);
+/** The market's calls, by what they do. */
+export const p2pCall = {
+  deposit: (c: string, account: string, token: string, amount: bigint) =>
+    marketOperation(c, 'deposit', { account, token, amount }),
+  withdraw: (c: string, account: string, token: string, amount: bigint) =>
+    marketOperation(c, 'withdraw', { account, token, amount }),
+  withdrawFor: (c: string, operator: string, account: string, token: string, amount: bigint) =>
+    marketOperation(c, 'withdraw_for', { operator, account, token, amount }),
+  setOperator: (c: string, account: string, operator: string, perms: number) =>
+    marketOperation(c, 'set_operator', { account, operator, perms }),
+  setMatcher: (
+    c: string,
+    seller: string,
+    matcher: string,
+    maxPerOrder: bigint,
+    autoSettle: boolean,
+  ) =>
+    marketOperation(c, 'set_matcher', {
+      seller,
+      matcher,
+      max_per_order: maxPerOrder,
+      auto_settle: autoSettle,
+    }),
+  open: (c: string, caller: string, p: P2pOpenParams) =>
+    marketOperation(c, 'open', { caller, p: openParamsArg(p) }),
+  openWithDeposit: (c: string, p: P2pOpenParams) =>
+    marketOperation(c, 'open_with_deposit', { p: openParamsArg(p) }),
+  orderAction: (c: string, action: P2pOrderAction, caller: string, id: bigint) =>
+    marketOperation(c, action, { caller, id }),
+  settle: (c: string, id: bigint) => marketOperation(c, 'settle', { id }),
+  resolve: (c: string, id: bigint, toBuyer: bigint, bondToSeller: bigint) =>
+    marketOperation(c, 'resolve', { id, to_buyer: toBuyer, bond_to_seller: bondToSeller }),
+  setToken: (c: string, token: string, allowed: boolean) =>
+    marketOperation(c, 'set_token', { token, allowed }),
+  transferOwnership: (c: string, to: string) => marketOperation(c, 'transfer_ownership', { to }),
+  // views
+  config: (c: string) => marketOperation(c, 'config'),
+  getOrder: (c: string, id: bigint) => marketOperation(c, 'get_order', { id }),
+  orderIdOf: (c: string, opener: string, refId: string) =>
+    marketOperation(c, 'order_id_of', { opener, ref_id: Buffer.from(refId, 'hex') }),
+  balanceOf: (c: string, account: string, token: string) =>
+    marketOperation(c, 'balance_of', { account, token }),
+  permissionsOf: (c: string, account: string, operator: string) =>
+    marketOperation(c, 'permissions_of', { account, operator }),
+  matcherTermsOf: (c: string, seller: string, matcher: string) =>
+    marketOperation(c, 'matcher_terms_of', { seller, matcher }),
+  tokenAllowed: (c: string, token: string) => marketOperation(c, 'token_allowed', { token }),
+  orderCount: (c: string) => marketOperation(c, 'order_count'),
+};
+
+/** A function's return value as a JS value (bigint for i128/u64). */
+export function decodeResult<T>(fn: string, value: xdr.ScVal): T {
+  return MARKET.funcResToNative(fn, value) as T;
 }
 
-// --- views ---------------------------------------------------------------------
+// --- native value helpers --------------------------------------------------------
 
-/** The contract's order statuses, in declaration order. */
+const str = (v: unknown): string => (typeof v === 'string' ? v : String(v));
+const big = (v: unknown): bigint => (typeof v === 'bigint' ? v : BigInt(str(v)));
+const num = (v: unknown): number => Number(v);
+const optStr = (v: unknown): string | null => (v === undefined || v === null ? null : str(v));
+const hex = (v: unknown): string =>
+  v instanceof Uint8Array
+    ? Buffer.from(v).toString('hex')
+    : str(v).replace(/^0x/, '').toLowerCase();
+
+// --- views ------------------------------------------------------------------------
+
+/** The contract's order statuses, by their `#[repr(u32)]` value. */
 export const P2P_CHAIN_STATUSES = [
   'None',
   'Offered',
@@ -137,59 +161,58 @@ export const P2P_CHAIN_STATUSES = [
 ] as const;
 export type P2pChainStatus = (typeof P2P_CHAIN_STATUSES)[number];
 
-/** `getOrder(id)`, as the contract stores it. */
+function statusOf(v: unknown): P2pChainStatus {
+  if (typeof v === 'string' && (P2P_CHAIN_STATUSES as readonly string[]).includes(v)) {
+    return v as P2pChainStatus;
+  }
+  const status = P2P_CHAIN_STATUSES[num(v)];
+  if (!status) throw new Error(`unknown order status ${str(v)}`);
+  return status;
+}
+
+/** `get_order(id)`, as the contract stores it. */
 export interface P2pChainOrder {
   seller: string;
-  acceptDeadline: number;
-  paymentDeadline: number;
-  status: P2pChainStatus;
-  fromBalance: boolean;
   buyer: string;
-  paidAt: number;
-  paymentWindow: number;
-  feeBps: number;
-  viaMatcher: boolean;
   token: string;
-  settleWindow: number;
-  integratorFeeBps: number;
   opener: string;
-  integrator: string;
+  integrator: string | null;
   amount: bigint;
   bond: bigint;
-  ref: string;
+  status: P2pChainStatus;
+  fromBalance: boolean;
+  viaMatcher: boolean;
+  feeBps: number;
+  integratorFeeBps: number;
+  acceptDeadline: number;
+  paymentDeadline: number;
+  paidAt: number;
+  paymentWindow: number;
+  settleWindow: number;
+  /** Hex, no 0x. */
+  refId: string;
 }
 
-function decodeResult(functionName: string, data: string): unknown {
-  return decodeFunctionResult({
-    abi: MARKET_ABI,
-    functionName,
-    data: hex(data),
-  } as Parameters<typeof decodeFunctionResult>[0]);
-}
-
-export function decodeChainOrder(data: string): P2pChainOrder {
-  const o = decodeResult('getOrder', data) as Record<string, unknown>;
-  const status = P2P_CHAIN_STATUSES[Number(o.status)];
-  if (!status) throw new Error(`unknown order status ${String(o.status)}`);
+export function toChainOrder(o: Record<string, unknown>): P2pChainOrder {
   return {
-    seller: o.seller as string,
-    acceptDeadline: Number(o.acceptDeadline),
-    paymentDeadline: Number(o.paymentDeadline),
-    status,
-    fromBalance: o.fromBalance as boolean,
-    buyer: o.buyer as string,
-    paidAt: Number(o.paidAt),
-    paymentWindow: Number(o.paymentWindow),
-    feeBps: Number(o.feeBps),
-    viaMatcher: o.viaMatcher as boolean,
-    token: o.token as string,
-    settleWindow: Number(o.settleWindow),
-    integratorFeeBps: Number(o.integratorFeeBps),
-    opener: o.opener as string,
-    integrator: o.integrator as string,
-    amount: o.amount as bigint,
-    bond: o.bond as bigint,
-    ref: o.ref as string,
+    seller: str(o.seller),
+    buyer: str(o.buyer),
+    token: str(o.token),
+    opener: str(o.opener),
+    integrator: optStr(o.integrator),
+    amount: big(o.amount),
+    bond: big(o.bond),
+    status: statusOf(o.status),
+    fromBalance: Boolean(o.from_balance),
+    viaMatcher: Boolean(o.via_matcher),
+    feeBps: num(o.fee_bps),
+    integratorFeeBps: num(o.integrator_fee_bps),
+    acceptDeadline: num(o.accept_deadline),
+    paymentDeadline: num(o.payment_deadline),
+    paidAt: num(o.paid_at ?? 0),
+    paymentWindow: num(o.payment_window),
+    settleWindow: num(o.settle_window),
+    refId: hex(o.ref_id),
   };
 }
 
@@ -198,53 +221,56 @@ export interface P2pMatcherTerms {
   autoSettle: boolean;
 }
 
-export function decodeMatcherTerms(data: string): P2pMatcherTerms {
-  const t = decodeResult('matcherTermsOf', data) as { maxPerOrder: bigint; autoSettle: boolean };
-  return { maxPerOrder: t.maxPerOrder, autoSettle: t.autoSettle };
+export function toMatcherTerms(t: Record<string, unknown>): P2pMatcherTerms {
+  return { maxPerOrder: big(t.max_per_order), autoSettle: Boolean(t.auto_settle) };
 }
 
-/** A view's single return value (`balanceOf`, `protocolFeeBps`, `paused`, `arbiter`...). */
-export function decodeView<T>(functionName: string, data: string): T {
-  return decodeResult(functionName, data) as T;
+export interface P2pMarketConfig {
+  owner: string;
+  pendingOwner: string | null;
+  treasury: string;
+  arbiter: string;
+  protocolFeeBps: number;
+  paused: boolean;
+}
+
+export function toMarketConfig(c: Record<string, unknown>): P2pMarketConfig {
+  return {
+    owner: str(c.owner),
+    pendingOwner: optStr(c.pending_owner),
+    treasury: str(c.treasury),
+    arbiter: str(c.arbiter),
+    protocolFeeBps: num(c.protocol_fee_bps),
+    paused: Boolean(c.paused),
+  };
 }
 
 // --- events ----------------------------------------------------------------------
 
 export type P2pMarketEvent =
-  | { name: 'OperatorSet'; account: string; operator: string; permissions: number }
+  | { name: 'operator_set'; account: string; operator: string; permissions: number }
   | {
-      name: 'MatcherSet';
+      name: 'matcher_set';
       seller: string;
       matcher: string;
       maxPerOrder: bigint;
       autoSettle: boolean;
     }
+  | ({ name: 'order_opened'; id: bigint } & Omit<P2pChainOrder, 'paidAt'>)
+  | { name: 'order_accepted'; id: bigint; paymentDeadline: number }
+  | { name: 'order_paid'; id: bigint; by: string | null }
   | {
-      name: 'OrderOpened';
+      name: 'order_released';
       id: bigint;
-      opener: string;
-      ref: string;
-      seller: string;
-      buyer: string;
-      token: string;
-      amount: bigint;
-      bond: bigint;
-      viaMatcher: boolean;
-    }
-  | { name: 'OrderAccepted'; id: bigint; paymentDeadline: number }
-  | { name: 'OrderPaid'; id: bigint; by: string }
-  | {
-      name: 'OrderReleased';
-      id: bigint;
-      by: string;
+      by: string | null;
       toBuyer: bigint;
       protocolFee: bigint;
       integratorFee: bigint;
     }
-  | { name: 'OrderCancelled'; id: bigint; by: string }
-  | { name: 'OrderDisputed'; id: bigint; by: string }
+  | { name: 'order_cancelled'; id: bigint; by: string | null }
+  | { name: 'order_disputed'; id: bigint; by: string | null }
   | {
-      name: 'OrderResolved';
+      name: 'order_resolved';
       id: bigint;
       toBuyer: bigint;
       toSeller: bigint;
@@ -254,132 +280,102 @@ export type P2pMarketEvent =
     };
 export type P2pMarketEventName = P2pMarketEvent['name'];
 
-export const P2P_EVENT_NAMES = [
-  'OperatorSet',
-  'MatcherSet',
-  'OrderOpened',
-  'OrderAccepted',
-  'OrderPaid',
-  'OrderReleased',
-  'OrderCancelled',
-  'OrderDisputed',
-  'OrderResolved',
+/** The events the indexer reads (`matcher_set` is read live, never stored). */
+export const P2P_INDEXED_EVENTS = [
+  'operator_set',
+  'order_opened',
+  'order_accepted',
+  'order_paid',
+  'order_released',
+  'order_cancelled',
+  'order_disputed',
+  'order_resolved',
 ] as const satisfies readonly P2pMarketEventName[];
 
-/** topic0 of each event the indexer reads. */
-export const P2P_EVENT_TOPICS = Object.fromEntries(
-  P2P_EVENT_NAMES.map((name) => {
-    const event = MARKET_ABI.find((item) => item.type === 'event' && item.name === name) as
-      AbiEvent | undefined;
-    if (!event) throw new Error(`P2PMarket ABI has no event ${name}`);
-    return [name, toEventSelector(event)];
-  }),
-) as Record<P2pMarketEventName, Hex>;
-
-const NAME_BY_TOPIC = new Map(
-  Object.entries(P2P_EVENT_TOPICS).map(([name, topic]) => [topic.toLowerCase(), name]),
-);
-
-/** A log as `eth_getLogs` answers it (only the parts decoding reads). */
-export interface P2pRawLog {
-  topics: readonly string[];
-  data: string;
+/** `OrderOpened` → `order_opened`; snake_case stays. */
+export function snakeCase(name: string): string {
+  return name
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z])([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase();
 }
 
 /**
- * Decodes one of the contract's logs, or answers null for a log that is not
- * one of {@link P2P_EVENT_NAMES}. Throws on a log whose topic0 matches but
- * whose shape does not (strict decoding): that is not this contract, and the
- * indexer must not guess.
+ * Decodes one of the market's events, or answers null for an event that is
+ * not one the indexer reads. Throws on an event whose name matches but whose
+ * shape does not: that is not this contract, and the indexer must not guess.
  */
-export function decodeP2pMarketLog(log: P2pRawLog): P2pMarketEvent | null {
-  const topic0 = (log.topics[0] ?? '').toLowerCase();
-  if (!NAME_BY_TOPIC.has(topic0)) return null;
-  const decoded = decodeEventLog({
-    abi: MARKET_ABI,
-    topics: log.topics as [Hex, ...Hex[]],
-    data: hex(log.data),
-    strict: true,
-  } as Parameters<typeof decodeEventLog>[0]) as {
-    eventName: string;
-    args: Record<string, unknown>;
-  };
-  const a = decoded.args;
-  switch (decoded.eventName) {
-    case 'OperatorSet':
+export function decodeMarketEvent(
+  topics: xdr.ScVal[] | string[],
+  value: xdr.ScVal | string,
+): P2pMarketEvent | null {
+  const parsed = MARKET.parseEvent(topics, value);
+  if (!parsed) return null;
+  const name = snakeCase(parsed.name);
+  const d = parsed.data;
+  switch (name) {
+    case 'operator_set':
       return {
-        name: 'OperatorSet',
-        account: a.account as string,
-        operator: a.operator as string,
-        permissions: Number(a.permissions),
+        name,
+        account: str(d.account),
+        operator: str(d.operator),
+        permissions: num(d.permissions ?? d.perms),
       };
-    case 'MatcherSet':
+    case 'matcher_set':
       return {
-        name: 'MatcherSet',
-        seller: a.seller as string,
-        matcher: a.matcher as string,
-        maxPerOrder: a.maxPerOrder as bigint,
-        autoSettle: a.autoSettle as boolean,
+        name,
+        seller: str(d.seller),
+        matcher: str(d.matcher),
+        maxPerOrder: big(d.max_per_order),
+        autoSettle: Boolean(d.auto_settle),
       };
-    case 'OrderOpened':
+    case 'order_opened': {
+      const { paidAt: _paidAt, ...order } = toChainOrder({ ...d, paid_at: 0 });
+      return { name, id: big(d.id), ...order };
+    }
+    case 'order_accepted':
+      return { name, id: big(d.id), paymentDeadline: num(d.payment_deadline) };
+    case 'order_paid':
+    case 'order_cancelled':
+    case 'order_disputed':
+      return { name, id: big(d.id), by: optStr(d.by) };
+    case 'order_released':
       return {
-        name: 'OrderOpened',
-        id: a.id as bigint,
-        opener: a.opener as string,
-        ref: (a.ref as string).toLowerCase(),
-        seller: a.seller as string,
-        buyer: a.buyer as string,
-        token: a.token as string,
-        amount: a.amount as bigint,
-        bond: a.bond as bigint,
-        viaMatcher: a.viaMatcher as boolean,
+        name,
+        id: big(d.id),
+        by: optStr(d.by),
+        toBuyer: big(d.to_buyer),
+        protocolFee: big(d.protocol_fee),
+        integratorFee: big(d.integrator_fee),
       };
-    case 'OrderAccepted':
+    case 'order_resolved':
       return {
-        name: 'OrderAccepted',
-        id: a.id as bigint,
-        paymentDeadline: Number(a.paymentDeadline),
-      };
-    case 'OrderPaid':
-    case 'OrderCancelled':
-    case 'OrderDisputed':
-      return { name: decoded.eventName, id: a.id as bigint, by: a.by as string };
-    case 'OrderReleased':
-      return {
-        name: 'OrderReleased',
-        id: a.id as bigint,
-        by: a.by as string,
-        toBuyer: a.toBuyer as bigint,
-        protocolFee: a.protocolFee as bigint,
-        integratorFee: a.integratorFee as bigint,
-      };
-    case 'OrderResolved':
-      return {
-        name: 'OrderResolved',
-        id: a.id as bigint,
-        toBuyer: a.toBuyer as bigint,
-        toSeller: a.toSeller as bigint,
-        bondToSeller: a.bondToSeller as bigint,
-        protocolFee: a.protocolFee as bigint,
-        integratorFee: a.integratorFee as bigint,
+        name,
+        id: big(d.id),
+        toBuyer: big(d.to_buyer),
+        toSeller: big(d.to_seller),
+        bondToSeller: big(d.bond_to_seller),
+        protocolFee: big(d.protocol_fee),
+        integratorFee: big(d.integrator_fee),
       };
     default:
       return null;
   }
 }
 
+/** The topic filter (`getEvents`) that matches one event by its name topic. */
+export function eventNameTopic(name: string): string {
+  return xdr.ScVal.scvSymbol(name).toXdr('base64');
+}
+
+// --- errors ------------------------------------------------------------------------
+
 /**
- * The name of the contract error a revert carries (`InsufficientBalance`), or
- * null when the data is not one of them.
+ * The name of the market error a simulation or result carries
+ * (`Error(Contract, #14)` → `InsufficientBalance`), or null when it is not one.
  */
-export function p2pRevertName(data: unknown): string | null {
-  if (typeof data !== 'string' || !/^0x[0-9a-fA-F]{8}/.test(data)) return null;
-  try {
-    const decoded = decodeErrorResult({ abi: MARKET_ABI, data: hex(data) } as Parameters<
-      typeof decodeErrorResult
-    >[0]);
-    return decoded.errorName === 'Error' ? null : decoded.errorName;
-  } catch {
-    return null;
-  }
+export function marketErrorName(text: string): string | null {
+  const match = /Error\(Contract, #(\d+)\)/.exec(text);
+  if (!match) return null;
+  return (MARKET_ERRORS as Readonly<Record<number, string>>)[Number(match[1])] ?? null;
 }

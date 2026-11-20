@@ -3,21 +3,28 @@
  *
  *   1. Postgres: docker compose when the Docker daemon answers, else an
  *      embedded Postgres from npm (never starts Docker itself).
- *   2. A local EVM node (anvil from npm), chain id 31337, funded dev wallets.
- *   3. P2PMarket and a mintable test dollar deployed (first run, or --reset).
- *   4. The API (matcher, indexer, expiry and webhook jobs on), seeded through
- *      its own routes: a merchant with liquidity, offers and payment methods,
- *      a business with a test API key and a charge.
- *   5. The web app, when apps/web exists and has a `dev` script.
+ *   2. Stellar: the local quickstart network (`stellar container start
+ *      local`) when a Docker daemon answers, else testnet with friendbot.
+ *   3. Dev accounts (owner, arbiter, treasury, matcher, sponsor, SEP-10 signer,
+ *      merchant, business, user, TUSD issuer), the dev dollar TUSD minted, and
+ *      the market deployed (first run, --reset, or when the network lost it).
+ *   4. The API (matcher, indexer, expiry, submission and webhook jobs on),
+ *      seeded through its own routes: a merchant with liquidity, offers (QR
+ *      payments included) and payment methods, a business with a test API key
+ *      and a charge, and the user's account activated by the sponsor.
+ *   5. The web app, when apps/web has a `dev` script.
  *
- * Chain state and the database persist in .dev-stack/ between runs (a
- * restart resumes); `--reset` starts over. Stop with Ctrl+C, or from another
- * terminal with `npm run dev:stack -- --stop`. Only the processes started here
- * are stopped, each by its own PID.
+ * State persists in .dev-stack/ (a restart resumes); `--reset` starts over.
+ * Stop with Ctrl+C, or from another terminal with `npm run dev:stack -- --stop`.
+ * Only the processes started here are stopped, each by its own PID.
  *
- * Flags: --reset, --stop, --no-web, --no-build.
+ * Flags: --reset, --stop, --no-web, --no-build, --testnet (skip the local
+ * network even when Docker answers), --api-port N, --web-port N, --pg-port N
+ * (also DEV_STACK_API_PORT, DEV_STACK_WEB_PORT, DEV_STACK_PG_PORT). Defaults:
+ * API 4100, web 3100, Postgres 54339.
  */
 import { spawn, spawnSync, type ChildProcess } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import {
   createWriteStream,
   existsSync,
@@ -26,24 +33,37 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs';
-import { randomBytes } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { LocalDeployment, SeedResult } from '@pedospe/api/dev';
+import type { DevAccounts, DevChain, DevMarket, SeedResult } from '@pedospe/api/dev';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STATE_DIR = join(ROOT, '.dev-stack');
 const STOP_FILE = join(STATE_DIR, 'stop');
 const STACK_FILE = join(STATE_DIR, 'stack.json');
-const API_PORT = 4000;
-const RPC_PORT = 8545;
-const PG_PORT = 54329;
-const WEB_ORIGIN = 'http://localhost:3000';
 
-const flags = new Set(process.argv.slice(2));
+const args = process.argv.slice(2);
+const flags = new Set(args.filter((a) => a.startsWith('--')));
+
+function portOption(flag: string, env: string, fallback: number): number {
+  const i = args.indexOf(flag);
+  const raw = (i >= 0 ? args[i + 1] : undefined) ?? process.env[env];
+  const port = raw ? Number(raw) : fallback;
+  if (!Number.isInteger(port) || port < 1 || port > 65535)
+    throw new Error(`${flag} must be a port`);
+  return port;
+}
+
+const API_PORT = portOption('--api-port', 'DEV_STACK_API_PORT', 4100);
+const WEB_PORT = portOption('--web-port', 'DEV_STACK_WEB_PORT', 3100);
+const PG_PORT = portOption('--pg-port', 'DEV_STACK_PG_PORT', 54339);
+const WEB_ORIGIN = `http://localhost:${WEB_PORT}`;
+const API_URL = `http://localhost:${API_PORT}`;
 
 interface StackState {
-  deployment: LocalDeployment;
+  chain: DevChain;
+  accounts: DevAccounts;
+  market: DevMarket;
   dataEncryptionKey: string;
   seed: SeedResult;
 }
@@ -52,22 +72,14 @@ function log(message: string): void {
   console.log(`[dev-stack] ${message}`);
 }
 
-function run(command: string, args: string[], cwd = ROOT): void {
-  const result = spawnSync(command, args, {
-    cwd,
+function run(command: string, cmdArgs: string[], env: NodeJS.ProcessEnv = process.env): void {
+  const result = spawnSync(command, cmdArgs, {
+    cwd: ROOT,
     stdio: 'inherit',
     shell: process.platform === 'win32',
+    env,
   });
-  if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} failed`);
-}
-
-function dockerAvailable(): boolean {
-  const result = spawnSync('docker', ['info', '--format', '{{.ServerVersion}}'], {
-    timeout: 8_000,
-    stdio: 'ignore',
-    shell: process.platform === 'win32',
-  });
-  return result.status === 0;
+  if (result.status !== 0) throw new Error(`${command} ${cmdArgs.join(' ')} failed`);
 }
 
 async function portFree(port: number): Promise<boolean> {
@@ -134,37 +146,57 @@ async function main(): Promise<void> {
   rmSync(STOP_FILE, { force: true });
 
   if (!flags.has('--no-build')) {
-    log('building contracts and API');
-    run('npm', ['run', 'build', '-w', '@pedospe/contracts', '-w', '@pedospe/api']);
+    log('building contracts, payment-qr and the API');
+    run('npm', [
+      'run',
+      'build',
+      '-w',
+      '@pedospe/contracts',
+      '-w',
+      '@pedospe/payment-qr',
+      '-w',
+      '@pedospe/api',
+    ]);
   }
   const dev = await import('@pedospe/api/dev');
 
   for (const [port, what] of [
     [API_PORT, 'the API'],
-    [RPC_PORT, 'the EVM node'],
+    [WEB_PORT, 'the web app'],
   ] as const) {
     if (!(await portFree(port)))
-      throw new Error(`port ${port} (${what}) is in use: stop whatever holds it first`);
+      throw new Error(
+        `port ${port} (${what}) is in use: stop whatever holds it, or pick another port`,
+      );
   }
 
-  const reset = flags.has('--reset');
-  if (reset) {
+  if (flags.has('--reset')) {
     log('--reset: starting over');
-    rmSync(join(STATE_DIR, 'anvil-state.json'), { force: true });
     rmSync(STACK_FILE, { force: true });
   }
+  let state: StackState | null = existsSync(STACK_FILE)
+    ? (JSON.parse(readFileSync(STACK_FILE, 'utf8')) as StackState)
+    : null;
 
   // --- Postgres ---------------------------------------------------------------
   let databaseUrl: string;
   let stopPostgres: () => Promise<void>;
-  if (dockerAvailable()) {
-    log('Postgres: docker compose (the Docker daemon answered)');
-    run('docker', ['compose', '-f', 'docker-compose.dev.yml', 'up', '-d', '--wait', 'postgres']);
+  const docker = dev.dockerAnswers();
+  if (docker) {
+    log(`Postgres: docker compose on ${PG_PORT} (the Docker daemon answered)`);
+    const env = { ...process.env, DEV_STACK_PG_PORT: String(PG_PORT) };
+    run(
+      'docker',
+      ['compose', '-f', 'docker-compose.dev.yml', 'up', '-d', '--wait', 'postgres'],
+      env,
+    );
     databaseUrl = `postgresql://pedospe:pedospe@127.0.0.1:${PG_PORT}/pedospe`;
     stopPostgres = async () =>
-      run('docker', ['compose', '-f', 'docker-compose.dev.yml', 'stop', 'postgres']);
+      run('docker', ['compose', '-f', 'docker-compose.dev.yml', 'stop', 'postgres'], env);
   } else {
-    log('Postgres: embedded (no Docker daemon answered; Docker is never started from here)');
+    log(
+      `Postgres: embedded on ${PG_PORT} (no Docker daemon answered; Docker is never started from here)`,
+    );
     if (!(await portFree(PG_PORT))) throw new Error(`port ${PG_PORT} (Postgres) is in use`);
     const pg = await dev.startEmbeddedPostgres({
       dataDir: join(STATE_DIR, 'pg'),
@@ -176,14 +208,39 @@ async function main(): Promise<void> {
     stopPostgres = pg.stop;
   }
 
-  // --- the chain ------------------------------------------------------------------
-  log(`EVM node: anvil on ${RPC_PORT} (chain id 31337)`);
-  const anvil = await dev.startAnvil({
-    port: RPC_PORT,
-    stateFile: join(STATE_DIR, 'anvil-state.json'),
-    logFile: join(STATE_DIR, 'anvil.log'),
-  });
-  const rpcUrl = anvil.rpcUrl;
+  // --- Stellar ------------------------------------------------------------------
+  let stopStellar: () => void = () => undefined;
+  let chain: DevChain;
+  if (docker && !flags.has('--testnet')) {
+    log('Stellar: the local network (stellar container start local)');
+    const local = await dev.startLocalStellar();
+    stopStellar = local.stop;
+    chain = dev.devChain('local', {
+      rpcUrl: local.rpcUrl,
+      horizonUrl: local.horizonUrl,
+      friendbotUrl: local.friendbotUrl,
+    });
+  } else {
+    log('Stellar: testnet with friendbot (no Docker daemon answered)');
+    chain = dev.devChain('testnet');
+  }
+  if (state && state.chain.network !== chain.network) {
+    log(
+      `the saved stack is on ${state.chain.network}, this run is on ${chain.network}: starting over`,
+    );
+    state = null;
+  }
+  if (state) {
+    const server = await dev.rpcFor(chain.rpcUrl, chain.passphrase);
+    const gone = await server.getContractInstance(state.market.contract).then(
+      () => false,
+      () => true,
+    );
+    if (gone) {
+      log('the saved market is gone from the network (reset or archived): starting over');
+      state = null;
+    }
+  }
 
   let api: ChildProcess | undefined;
   let web: ChildProcess | undefined;
@@ -195,44 +252,35 @@ async function main(): Promise<void> {
     log(`stopping (${reason})`);
     await stopChild(web, true);
     await stopChild(api, false);
-    await anvil.stop();
     await stopPostgres().catch((err: unknown) => log(`Postgres stop: ${String(err)}`));
+    stopStellar();
     rmSync(STOP_FILE, { force: true });
     if (watcher) clearInterval(watcher);
     log('stopped');
-    // Everything started here is stopped: let the event loop drain.
     process.exitCode = code;
   };
   process.on('SIGINT', () => void shutdown('Ctrl+C'));
   process.on('SIGTERM', () => void shutdown('SIGTERM'));
 
   try {
-    let state: StackState | null = existsSync(STACK_FILE)
-      ? (JSON.parse(readFileSync(STACK_FILE, 'utf8')) as StackState)
-      : null;
-    const client = await dev.devPublicClient(rpcUrl);
-    if (state && (await client.getCode({ address: state.deployment.market })) === undefined) {
-      log('the saved chain state has no market (state file lost): starting over');
-      state = null;
-    }
-    const fresh = state === null;
+    // A stack whose seed never finished starts its database over (its keys and market stay).
+    const fresh = !state?.seed;
     if (fresh) {
       log('resetting the database');
       await dev.resetDatabase(databaseUrl);
     }
     dev.migrate(databaseUrl);
 
-    const deployment = state?.deployment ?? (await dev.deployLocalMarket(rpcUrl));
-    if (fresh)
-      log(
-        `deployed P2PMarket ${deployment.market} and ${deployment.tokenSymbol} ${deployment.token}`,
-      );
+    const accounts = state?.accounts ?? dev.newDevAccounts();
+    const market =
+      state?.market ?? (await dev.setUpDevMarket(chain, accounts, { log: (m) => log(m) }));
     const dataEncryptionKey = state?.dataEncryptionKey ?? randomBytes(32).toString('hex');
     const env = dev.localApiEnv({
       port: API_PORT,
       databaseUrl,
-      rpcUrl,
-      deployment,
+      chain,
+      market,
+      accounts,
       dataEncryptionKey,
       webOrigin: WEB_ORIGIN,
     });
@@ -242,8 +290,15 @@ async function main(): Promise<void> {
         .map(([k, v]) => `${k}=${v}`)
         .join('\n') + '\n',
     );
+    if (!state) {
+      // Persist the keys before anything else can fail: they hold testnet funds.
+      writeFileSync(
+        STACK_FILE,
+        JSON.stringify({ chain, accounts, market, dataEncryptionKey }, null, 2),
+      );
+    }
 
-    log(`API on http://localhost:${API_PORT}`);
+    log(`API on ${API_URL}`);
     api = spawn(process.execPath, [join(ROOT, 'apps', 'api', 'dist', 'main.js')], {
       cwd: join(ROOT, 'apps', 'api'),
       env: { ...process.env, ...env },
@@ -251,28 +306,24 @@ async function main(): Promise<void> {
       windowsHide: true,
     });
     pipeOutput(api, 'api');
-    await waitFor(`http://localhost:${API_PORT}/health`, 60);
+    await waitFor(`${API_URL}/health`, 60);
 
     let seed: SeedResult;
-    if (fresh || !state) {
-      log('seeding through the API');
+    if (fresh || !state?.seed) {
+      log('seeding through the API (on testnet this takes a few minutes)');
       seed = await dev.seedDevMarket({
-        apiUrl: `http://localhost:${API_PORT}`,
-        rpcUrl,
-        siweDomain: new URL(WEB_ORIGIN).host,
+        apiUrl: API_URL,
         webOrigin: WEB_ORIGIN,
-        checkoutUrl: `${WEB_ORIGIN}/pay`,
-        deployment,
+        chain,
+        market,
+        accounts,
+        log: (m) => log(m),
       });
-      state = { deployment, dataEncryptionKey, seed };
+      state = { chain, accounts, market, dataEncryptionKey, seed };
       writeFileSync(STACK_FILE, JSON.stringify(state, null, 2));
     } else {
       seed = state.seed;
-      const n = await dev.refreshDevPrices(
-        `http://localhost:${API_PORT}`,
-        WEB_ORIGIN,
-        seed.merchant.apiKey,
-      );
+      const n = await dev.refreshDevPrices(API_URL, WEB_ORIGIN, seed.merchant.apiKey);
       log(`resumed; refreshed ${n} offer prices`);
     }
 
@@ -289,17 +340,15 @@ async function main(): Promise<void> {
       log('web app: skipped (apps/web has no dev script here)');
     } else {
       log(`web app on ${WEB_ORIGIN}`);
-      const apiUrl = `http://localhost:${API_PORT}`;
       web = spawn('npm', ['run', 'dev'], {
         cwd: join(ROOT, 'apps', 'web'),
         env: {
           ...process.env,
-          PORT: '3000',
-          API_URL: apiUrl,
-          PUBLIC_API_URL: apiUrl,
-          PUBLIC_PEDOSPE_API_URL: apiUrl,
-          NEXT_PUBLIC_API_URL: apiUrl,
-          VITE_API_URL: apiUrl,
+          PORT: String(WEB_PORT),
+          PEDOSPE_API_URL: API_URL,
+          API_URL,
+          VITE_API_URL: API_URL,
+          PUBLIC_API_URL: API_URL,
         },
         stdio: ['ignore', 'pipe', 'pipe'],
         shell: process.platform === 'win32',
@@ -308,30 +357,32 @@ async function main(): Promise<void> {
       pipeOutput(web, 'web');
     }
 
-    const wallets = dev.devWallets();
+    const explorer =
+      chain.network === 'testnet' ? 'https://stellar.expert/explorer/testnet' : '(none on local)';
     const lines = [
       '',
       '================ pedospe dev stack ================',
-      `API            http://localhost:${API_PORT}   (OpenAPI: /v1/openapi.json)`,
-      `Market         http://localhost:${API_PORT}/v1/market?tier=test`,
+      `API            ${API_URL}   (OpenAPI: /v1/openapi.json)`,
+      `Market         ${API_URL}/v1/market?tier=test`,
       `Web app        ${webDev && !flags.has('--no-web') ? WEB_ORIGIN : '(not started)'}`,
       `Charge page    ${seed.charge.url}`,
-      `EVM node       ${rpcUrl}   chain id 31337`,
-      `P2PMarket      ${deployment.market}`,
-      `Test dollar    ${deployment.token} (${deployment.tokenSymbol}, ${deployment.tokenDecimals} decimals)`,
+      `Stellar        ${chain.network}   RPC ${chain.rpcUrl}`,
+      `Explorer       ${explorer}`,
+      `P2PMarket      ${market.contract}`,
+      `TUSD           ${market.tusd.code}:${market.tusd.issuer}  (SAC ${market.tusd.contract})`,
       '',
       'API keys (test tier):',
       `  merchant  ${seed.merchant.apiKey}`,
       `  business  ${seed.business.apiKey}`,
       '',
-      'Dev wallets (DEV CHAIN ONLY: these keys are public, never use them elsewhere):',
-      ...wallets.map((w) => `  ${w.role.padEnd(9)} ${w.address}  ${w.privateKey}`),
+      `Dev accounts (${chain.network.toUpperCase()} ONLY: these are test keys, never use them on mainnet):`,
+      ...Object.values(accounts).map((a) => `  ${a.role.padEnd(9)} ${a.publicKey}  ${a.secret}`),
       '',
-      'Browser wallet: add a network with RPC http://127.0.0.1:8545 and chain id 31337,',
-      'then import the "user" private key above (it holds test dollars and ETH).',
+      'Sign in on the web with a dev key (the web’s dev-key wallet), e.g. the "user" secret above:',
+      'it holds TUSD, its account was created and its trustline opened by the sponsor.',
       '',
       'Simulate a bank transfer for an order:',
-      '  npm run dev:simulate -- <orderId>',
+      `  npm run dev:simulate -- <orderId> --api ${API_URL}`,
       '',
       'Stop: Ctrl+C here, or `npm run dev:stack -- --stop` from another terminal.',
       '===================================================',

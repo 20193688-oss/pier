@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+  '/.well-known/stellar.toml': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * stellar.toml (SEP-1)
+     * @description Names the SEP-10 endpoint (`WEB_AUTH_ENDPOINT`), the key that signs challenges (`SIGNING_KEY`) and the network (`NETWORK_PASSPHRASE`). Served at the web host, which proxies `/.well-known` here.
+     */
+    get: operations['wellKnownStellarToml'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/health': {
     parameters: {
       query?: never;
@@ -95,6 +115,126 @@ export interface paths {
      * @description Unsigned `resolve(id, toBuyer, bondToSeller)` for the arbiter’s own wallet (a multisig) to sign: this server never holds the arbiter key.
      */
     post: operations['adminResolution'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/activate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Sponsored activation
+     * @description Creates the account when it is missing and opens the token’s trustline, the sponsor paying the reserves (CAP-33: begin_sponsoring_future_reserves, create_account with 0 XLM, change_trust, end_sponsoring_future_reserves). `transaction: null` when there is nothing to do. Submit it with `POST /v1/app/submit`, which adds the sponsor’s signature; limited per account and per IP, within the sponsor’s budget.
+     */
+    post: operations['appWalletActivate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/activity': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Your activity
+     * @description Orders and transfers, newest first, paged by `cursor`. Payments that reached you from outside the app appear as transfers with `fromHandle: null`; they are read from the token contracts’ `transfer` events (CAP-67) as far back as the RPC keeps them (about 7 days on SDF’s RPC).
+     */
+    get: operations['appWalletActivity'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/balances': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Your balances
+     * @description Whether the account exists, its lumens, and each listed token with its trustline state.
+     */
+    get: operations['appWalletBalances'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/charges/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * A charge, as its payer sees it
+     * @description With `payWithBalance`: the token amount the business would receive through the market now (the best quote), held for 60 s.
+     */
+    get: operations['appWalletCharge'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/charges/{id}/payments': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Pay a charge from your balance
+     * @description A token transfer to the charge’s receiving account, priced now and valid for 60 s. The charge is paid once the submitted transfer succeeds on-chain (`P2P_CHARGE_SUCCEEDED`, `paidWith: TOKEN`).
+     */
+    post: operations['appWalletPay'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/handles/{handle}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Who an @handle is
+     * @description One handle at a time (there is no listing route). Rate-limited.
+     */
+    get: operations['appWalletHandle'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -216,6 +356,27 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/app/profile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Your account and @handle */
+    get: operations['appWalletProfile'];
+    /**
+     * Claim or change your @handle
+     * @description Normalised to lower case; unique; reserved words refused. `409 handle_taken` when someone has it.
+     */
+    put: operations['appWalletSetProfile'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/v1/app/quotes': {
     parameters: {
       query?: never;
@@ -230,6 +391,100 @@ export interface paths {
      * @description As `POST /v1/p2p/quotes`, on the app’s tier; a merchant at your own address is never matched.
      */
     post: operations['appQuote'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/submissions/{hash}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One of your submissions, by its hash */
+    get: operations['appWalletSubmission'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/submit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Submit a signed transaction (gasless)
+     * @description The signed inner envelope this API built for your account: checked (network, source = your account, one allowed operation or the sponsored activation, time bounds, fee cap, rate limits, budget), fee-bumped by the sponsor when gasless is on, recorded, broadcast; waits up to about 15 s.
+     */
+    post: operations['appWalletSubmit'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/transfers': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Send tokens
+     * @description To a G, M or C address or an @handle. A G or M recipient gets a classic `payment`, a C recipient a SAC `transfer`; the note becomes a text memo (classic payments only). Refused: a recipient that cannot receive (`recipient_cannot_receive`), yourself, more than your balance (`insufficient_balance`).
+     */
+    post: operations['appWalletTransfer'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/app/transfers/{id}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One of your transfers (sent or received) */
+    get: operations['appWalletGetTransfer'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/auth/challenge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get a sign-in challenge
+     * @description A SEP-10 challenge for the account: signed by this service’s SEP-10 key, with a single-use nonce, the `web_auth_domain` entry and 5-minute time bounds.
+     */
+    get: operations['authChallenge'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -256,20 +511,24 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/v1/auth/nonce': {
+  '/v1/auth/sep10': {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /**
+     * SEP-10 endpoint: get a challenge
+     * @description The `WEB_AUTH_ENDPOINT` of `/.well-known/stellar.toml`, for SEP-10 clients: the same as `GET /v1/auth/challenge`.
+     */
+    get: operations['authSep10Challenge'];
     put?: never;
     /**
-     * Get a sign-in nonce
-     * @description A single-use nonce, valid for minutes, to put in an EIP-4361 (SIWE) message.
+     * SEP-10 endpoint: verify a signed challenge
+     * @description The `WEB_AUTH_ENDPOINT` of `/.well-known/stellar.toml`, for SEP-10 clients: the same as `POST /v1/auth/verify`.
      */
-    post: operations['authNonce'];
+    post: operations['authSep10Verify'];
     delete?: never;
     options?: never;
     head?: never;
@@ -284,7 +543,7 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * The signed-in wallet
+     * The signed-in account
      * @description Its address, its organizations and roles, and whether it is a platform operator.
      */
     get: operations['authSession'];
@@ -306,8 +565,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Sign in with a signed SIWE message
-     * @description Verifies the message (domain, URI, nonce, times) and the wallet signature, spends the nonce and opens a session: an HttpOnly cookie, and the token in the body for non-browser clients.
+     * Sign in with a signed challenge
+     * @description Verifies the challenge (server signature, time bounds, domains, nonce) and the account’s signatures (its medium threshold, or the master key of an account not created yet), spends the nonce and opens a session: an HttpOnly cookie, and the token in the body for other clients.
      */
     post: operations['authVerify'];
     delete?: never;
@@ -978,6 +1237,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/v1/p2p/submissions/{hash}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** One of your organization’s submissions, by its hash */
+    get: operations['submitSubmission'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/v1/p2p/submit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Submit a signed transaction (gasless)
+     * @description A transaction this API built for one of your registered accounts (`POST /v1/p2p/transactions`, a sale’s `open_with_deposit`, a transfer match’s `release`), signed: checked as `POST /v1/app/submit` (source = an account of yours on this tier), fee-bumped when gasless is on, recorded, broadcast.
+     */
+    post: operations['submitSubmit'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/v1/p2p/transactions': {
     parameters: {
       query?: never;
@@ -1069,7 +1365,7 @@ export interface components {
     AccountDetailView: {
       /**
        * @description The wallet, EIP-55. The same on every network.
-       * @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+       * @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI
        */
       address: string;
       /**
@@ -1130,12 +1426,12 @@ export interface components {
     AccountNetworkView: {
       balances: components['schemas']['BalanceView'][];
       matcher: components['schemas']['MatcherTermsView'];
-      /** @example base */
+      /** @example testnet */
       network: string;
       /**
        * @description Operators the market saw this account grant on this network, with their permission bits (1 open, 2 release, 4 trade, 8 withdraw). A grant of 0 is a revocation and is left out.
        * @example {
-       *       "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": 6
+       *       "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ": 6
        *     }
        */
       operators: {
@@ -1146,7 +1442,7 @@ export interface components {
     AccountView: {
       /**
        * @description The wallet, EIP-55. The same on every network.
-       * @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+       * @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI
        */
       address: string;
       /**
@@ -1191,8 +1487,21 @@ export interface components {
        */
       verifiedAt: string;
     };
+    /** @description Create your account and open a token’s trustline, sponsored. */
+    Activate: {
+      /**
+       * @example testnet
+       * @enum {string}
+       */
+      network?: 'local' | 'testnet' | 'mainnet';
+      /**
+       * @description By symbol, contract (C...) or CODE:ISSUER.
+       * @example USDC
+       */
+      token: string;
+    };
     AddMember: {
-      /** @example 0x90F79bf6EB2c4f870365E785982E1f101E93b906 */
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
       address: string;
       /**
        * @example member
@@ -1222,7 +1531,7 @@ export interface components {
       /** @description The arbiter the contract names now: the wallet that must sign. */
       arbiter: string;
       orderId: string;
-      transaction: components['schemas']['TransactionView'];
+      transaction: components['schemas']['P2pTransaction'];
     };
     /** @description How the arbiter splits a disputed order. */
     AdminResolutionDto: {
@@ -1261,73 +1570,326 @@ export interface components {
     ApiKeyList: {
       data: components['schemas']['ApiKey'][];
     };
-    /** @description An order from your quote. A purchase (BUY) needs `payer`; a sale (SELL) needs `beneficiary`. */
+    /** @description Whether the account exists on the network. */
+    AppAccountState: {
+      /** @example true */
+      exists: boolean;
+    };
+    /** @description The sponsored activation to sign, if any. */
+    AppActivation: {
+      /** @description Null when there is nothing to do. When the account is missing its source is the sponsor (a missing account has no sequence number); the API adds the sponsor’s signature at submit. */
+      transaction: components['schemas']['P2pTransaction'] | null;
+    };
+    /** @description Your activity, newest first. */
+    AppActivity: {
+      items: components['schemas']['AppActivityItem'][];
+      /** @description Pass it as `cursor` for the next page. */
+      nextCursor: string | null;
+    };
+    /** @description One line of your activity: an order (`order`) or a transfer (`transfer`). */
+    AppActivityItem: {
+      /**
+       * Format: date-time
+       * @description When it happened (its creation).
+       */
+      at: string;
+      order?: components['schemas']['OrderView'];
+      transfer?: components['schemas']['AppTransfer'];
+      /**
+       * @example transfer
+       * @enum {string}
+       */
+      type: 'order' | 'transfer';
+    };
+    /** @description Your balances on one network. */
+    AppBalances: {
+      account: components['schemas']['AppAccountState'];
+      /** @example testnet */
+      network: string;
+      tokens: components['schemas']['AppTokenBalance'][];
+      /**
+       * @description Lumens, stroops (fees are sponsored: usually 0).
+       * @example 0
+       */
+      xlm: string;
+    };
+    /** @description A charge as its payer sees it. */
+    AppCharge: {
+      /** @example ARS */
+      currency: string;
+      description: string | null;
+      /** Format: date-time */
+      expiresAt: string;
+      /** @example 25000.00 */
+      fiatAmount: string;
+      id: string;
+      /**
+       * @description Who charges.
+       * @example Panaderia La Salteña
+       */
+      merchantName: string;
+      /** @example testnet */
+      network: string;
+      /** @description Null when the charge is not open or no quote prices it now. */
+      payWithBalance: components['schemas']['AppPayWithBalance'] | null;
+      /** @description Rails the pesos checkout offers now. */
+      rails: string[];
+      /** @enum {string} */
+      status: 'open' | 'paid' | 'cancelled' | 'expired';
+      /** @example USDC */
+      tokenSymbol: string;
+    };
+    /** @description A charge paid from a wallet’s balance. */
+    AppChargePayment: {
+      /** @example 199500000 */
+      amount: string;
+      chargeId: string;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      expiresAt: string;
+      /** @example 6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f */
+      hash: string;
+      id: string;
+      /** @example testnet */
+      network: string;
+      /** @enum {string} */
+      status: 'PENDING' | 'SUBMITTED' | 'COMPLETED' | 'FAILED' | 'EXPIRED';
+      /** @example USDC */
+      token: string;
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
+      tokenContract: string;
+    };
+    /** @description A charge payment and the transaction to sign. */
+    AppCreatedChargePayment: {
+      payment: components['schemas']['AppChargePayment'];
+      /** @description The token transfer to the charge’s receiving account; it expires with the price. */
+      transaction: components['schemas']['P2pTransaction'];
+    };
+    /** @description A transfer and the transaction to sign. */
+    AppCreatedTransfer: {
+      /** @description A classic `payment` to a G or M recipient, a SAC `transfer` to a C recipient; the note is its text memo. */
+      transaction: components['schemas']['P2pTransaction'];
+      transfer: components['schemas']['AppTransfer'];
+    };
+    /** @description Who an @handle is. */
+    AppHandle: {
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
+      address: string;
+      /** @example maria_salta */
+      handle: string;
+    };
+    /** @description An order from your quote. A purchase (BUY) needs `payer`; a sale (SELL) needs `beneficiary`; a QR payment (`kind: QR_PAY`) needs the same `qr` its quote was made for. */
     AppOrder: {
       /** @description SELL: required. */
       beneficiary?: components['schemas']['BeneficiaryDto'];
       /** @example order-881 */
       externalReference?: string;
+      /**
+       * @description Optional; when given it must be the quote’s kind.
+       * @example QR_PAY
+       * @enum {string}
+       */
+      kind?: 'BUY' | 'SELL' | 'QR_PAY';
       /** @description BUY: required. */
       payer?: components['schemas']['PayerDto'];
+      /** @description A QR payment: the scanned QR, exactly as quoted. */
+      qr?: string;
       /**
        * @description A quote of yours, not expired. One order per quote.
        * @example cm3p2pqte0001l70g8v5q3z2w
        */
       quoteId: string;
     };
-    /** @description A trade the signed-in wallet wants to make. */
+    /** @description What paying a charge from your balance costs now. */
+    AppPayWithBalance: {
+      /**
+       * @description Base units: what the business would have received, at the current best quote.
+       * @example 199500000
+       */
+      amount: string;
+      /**
+       * Format: date-time
+       * @description The price holds until then (60 s).
+       */
+      expiresAt: string;
+      /**
+       * @description The account (G) or contract (C) the payment goes to.
+       * @example GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ
+       */
+      recipient: string;
+      /** @example USDC */
+      token: string;
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
+      tokenContract: string;
+    };
+    /** @description Your account and its @handle. */
+    AppProfile: {
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
+      address: string;
+      /** @example maria_salta */
+      handle: string | null;
+    };
+    /** @description What the signed-in wallet wants to do. A trade: `side`, `network`, `token`, `currency`, `rail` and one of `fiatAmount` or `tokenAmount`. A QR payment: `kind: QR_PAY`, `network`, `token`, `qr` and, when the QR carries no amount, `fiatAmount` (the currency and rail come from the QR). */
     AppQuote: {
       /**
+       * @description A trade only.
        * @example ARS
        * @enum {string}
        */
-      currency: 'ARS' | 'BRL' | 'MXN' | 'COP' | 'PEN' | 'CLP';
+      currency?: 'ARS' | 'BRL' | 'MXN' | 'COP' | 'PEN' | 'CLP';
       /**
-       * @description BUY: what the person pays. SELL: what the person receives. Up to the currency’s decimals.
+       * @description Local money. A trade: what the person pays (BUY) or receives (SELL). A QR payment: what the shop gets, required when the QR carries no amount and equal to it when it does.
        * @example 125050
        */
       fiatAmount?: string;
       /**
-       * @example base
+       * @description Omitted: the trade `side` says it. `QR_PAY`: pay a scanned merchant QR.
+       * @example QR_PAY
        * @enum {string}
        */
-      network: 'eth' | 'base' | 'arb' | 'op' | 'pol' | 'bsc' | 'avax' | 'monad' | 'local';
+      kind?: 'BUY' | 'SELL' | 'QR_PAY';
       /**
+       * @example testnet
+       * @enum {string}
+       */
+      network: 'local' | 'testnet' | 'mainnet';
+      /**
+       * @description A QR payment: the scanned merchant QR exactly as read (Argentina’s interoperable QR or PIX). Its CRC must check.
+       * @example 00020101021243650016com.mercadolibre...6304ABCD
+       */
+      qr?: string;
+      /**
+       * @description A trade only.
        * @example ar_bank_transfer
        * @enum {string}
        */
-      rail:
+      rail?:
         | 'ar_bank_transfer'
         | 'br_pix'
         | 'mx_spei'
         | 'co_bank_transfer'
         | 'pe_bank_transfer'
-        | 'cl_bank_transfer';
+        | 'cl_bank_transfer'
+        | 'ar_qr'
+        | 'br_pix_qr';
       /**
-       * @description BUY: the person receives tokens and pays local money. SELL: the person sends tokens and receives local money.
+       * @description A trade: BUY receives tokens and pays local money; SELL sends tokens and receives local money. Required unless `kind` is `QR_PAY`.
        * @example BUY
        * @enum {string}
        */
-      side: 'BUY' | 'SELL';
+      side?: 'BUY' | 'SELL';
       /**
-       * @description By contract address or symbol.
+       * @description By symbol, contract (C...) or CODE:ISSUER.
        * @example USDC
        */
       token: string;
       /**
-       * @description The token amount the order locks, base units.
-       * @example 100000000
+       * @description A trade only: the token amount the order locks, base units.
+       * @example 1000000000
        */
       tokenAmount?: string;
+    };
+    /** @description One token the market lists, as the account holds it. */
+    AppTokenBalance: {
+      /**
+       * @description Base units (7 decimals); 0 without a trustline.
+       * @example 125000000
+       */
+      amount: string;
+      /**
+       * @description Whether the issuer authorised that trustline.
+       * @example true
+       */
+      authorized: boolean;
+      /**
+       * @description Its Stellar Asset Contract.
+       * @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA
+       */
+      contract: string;
+      /** @example USDC */
+      symbol: string;
+      /**
+       * @description Whether the account has a trustline to it.
+       * @example true
+       */
+      trustline: boolean;
     };
     /** @description An action your own wallet signs on your order. */
     AppTransaction: {
       /**
-       * @description Usually `release` (a sale you were paid for), `dispute` or `cancel`; refused when your wallet may not do it now.
+       * @description Usually `release` (a sale or QR payment you were paid for), `dispute` or `cancel`; refused when your wallet may not do it now.
        * @example release
        * @enum {string}
        */
       action: 'accept' | 'markPaid' | 'release' | 'cancel' | 'dispute';
+    };
+    /** @description A token transfer between wallets. */
+    AppTransfer: {
+      /**
+       * @description Base units (7 decimals).
+       * @example 25000000
+       */
+      amount: string;
+      /** Format: date-time */
+      completedAt: string | null;
+      /** Format: date-time */
+      createdAt: string;
+      /**
+       * @description From your side.
+       * @example out
+       * @enum {string}
+       */
+      direction: 'in' | 'out';
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
+      from: string;
+      /**
+       * @description Null for a payment from outside the app, or a sender without a handle.
+       * @example null
+       */
+      fromHandle: string | null;
+      /** @example 6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f */
+      hash: string | null;
+      /** @example 0b6c9a3e-2f1d-4c5b-8a7e-6d5c4b3a2f10 */
+      id: string;
+      /** @example testnet */
+      network: string;
+      /** @example Empanadas */
+      note: string | null;
+      /**
+       * @example COMPLETED
+       * @enum {string}
+       */
+      status: 'PENDING' | 'SUBMITTED' | 'COMPLETED' | 'FAILED';
+      /**
+       * @description As sent to: a G, M or C address.
+       * @example GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ
+       */
+      to: string;
+      /** @example maria_salta */
+      toHandle: string | null;
+      /**
+       * @description The token’s symbol.
+       * @example USDC
+       */
+      token: string;
+      /**
+       * @description The token’s Stellar Asset Contract.
+       * @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA
+       */
+      tokenContract: string;
+    };
+    /** @description A SEP-10 challenge: a transaction the account signs (it is never submitted). The SEP-10 response shape. */
+    AuthChallenge: {
+      /**
+       * @description The network passphrase the challenge is signed for.
+       * @example Test SDF Network ; September 2015
+       */
+      network_passphrase: string;
+      /** @description The challenge transaction envelope, base64 XDR. */
+      transaction: string;
     };
     /** @description A balance an account holds in the contract. */
     BalanceView: {
@@ -1336,7 +1898,7 @@ export interface components {
        * @example 250000000
        */
       amount: string;
-      /** @example 6 */
+      /** @example 7 */
       decimals: number;
       /**
        * @description Base units locked in live orders: those this account sells in, plus the bonds it locked accepting as a buyer. Derived from this service’s order records (an order opened outside this API is not counted); the free balance above is read from the contract.
@@ -1345,7 +1907,10 @@ export interface components {
       locked: string;
       /** @example USDC */
       symbol: string;
-      /** @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e */
+      /**
+       * @description The token’s Stellar Asset Contract.
+       * @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA
+       */
       token: string;
     };
     /** @description Where the merchant pays the local money on a sale or a payout: a holder, their document and the rail’s account details. */
@@ -1390,7 +1955,6 @@ export interface components {
        * @enum {string}
        */
       action:
-        | 'approve'
         | 'deposit'
         | 'withdraw'
         | 'setOperator'
@@ -1414,28 +1978,22 @@ export interface components {
        */
       from: string;
       /**
-       * @example base
+       * @example testnet
        * @enum {string}
        */
-      network: 'eth' | 'base' | 'arb' | 'op' | 'pol' | 'bsc' | 'avax' | 'monad' | 'local';
+      network: 'local' | 'testnet' | 'mainnet';
     };
-    /** @description A registration challenge: the exact text the wallet signs with `personal_sign` (EIP-191), once, before `expiresAt`. */
+    /** @description A registration challenge: a SEP-10-shaped transaction the account signs (it is never submitted). Besides the single-use nonce and `web_auth_domain`, its `organization` entry names your organization and tier, so it registers nothing else. Sign it once, before `expiresAt`. */
     ChallengeView: {
       /**
        * Format: date-time
        * @example 2026-11-19T12:10:00.000Z
        */
       expiresAt: string;
-      /**
-       * @description The message to sign, byte for byte. It names the address, this organization, the tier, a single-use nonce and the expiry, so it registers nothing else.
-       * @example Cosmos Pay P2P market
-       *     Register wallet: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
-       *     For: cosmos_6f1d2a
-       *     Tier: testnet
-       *     Nonce: 9f2c4e1ab37d5c08e6a1b2c3d4e5f607
-       *     Expires: 2026-11-19T12:10:00.000Z
-       */
-      message: string;
+      /** @example Test SDF Network ; September 2015 */
+      network_passphrase: string;
+      /** @description The challenge transaction envelope, base64 XDR. */
+      transaction: string;
     };
     /** @description A page of charges. */
     ChargeListView: {
@@ -1472,7 +2030,7 @@ export interface components {
        * @example false
        */
       multiUse: boolean;
-      /** @example base */
+      /** @example testnet */
       network: string;
       /**
        * Format: date-time
@@ -1491,7 +2049,7 @@ export interface components {
       payeeName: string;
       /** @example cm3p2pacc0001l70g8v5q3z2w */
       recipientAccountId: string;
-      /** @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 */
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
       recipientAddress: string;
       /**
        * @description `expired` is read from `expiresAt`, never stored.
@@ -1504,7 +2062,7 @@ export interface components {
        * @enum {string}
        */
       tier: 'live' | 'test';
-      /** @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e */
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
       token: string;
       /** @example USDC */
       tokenSymbol: string;
@@ -1539,7 +2097,7 @@ export interface components {
        * @example Tienda Salta
        */
       merchantName: string;
-      /** @example base */
+      /** @example testnet */
       network: string;
       /**
        * @description Rails a merchant offers for this currency, network and token now.
@@ -1703,13 +2261,19 @@ export interface components {
        */
       tier: 'live' | 'test';
     };
-    /** @description The wallet a registration challenge is for. */
+    /** @description The account a registration challenge is for. */
     CreateChallengeDto: {
       /**
-       * @description The EVM wallet to register. The same address on every network.
-       * @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+       * @description The Stellar account (G...) to register.
+       * @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI
        */
       address: string;
+      /**
+       * @description The network whose ledger has the account’s signers; default: the tier’s only network.
+       * @example testnet
+       * @enum {string}
+       */
+      network?: 'local' | 'testnet' | 'mainnet';
     };
     /** @description A charge in local money: the payer pays it on the hosted page and the tokens go to `recipient`. */
     CreateChargeDto: {
@@ -1737,10 +2301,10 @@ export interface components {
        */
       multiUse: boolean;
       /**
-       * @example base
+       * @example testnet
        * @enum {string}
        */
-      network: 'eth' | 'base' | 'arb' | 'op' | 'pol' | 'bsc' | 'avax' | 'monad' | 'local';
+      network: 'local' | 'testnet' | 'mainnet';
       /**
        * @description Who the payer is paying, as the payer page shows it (your business name). Never taken from your account.
        * @example Tienda Salta
@@ -1770,7 +2334,9 @@ export interface components {
         | 'mx_spei'
         | 'co_bank_transfer'
         | 'pe_bank_transfer'
-        | 'cl_bank_transfer';
+        | 'cl_bank_transfer'
+        | 'ar_qr'
+        | 'br_pix_qr';
     };
     /** @description A merchant’s standing price. Its bot refreshes `price` (a PATCH) before `priceTtlSeconds` runs out, or the offer stops matching. */
     CreateOfferDto: {
@@ -1800,10 +2366,10 @@ export interface components {
        */
       minFiat: string;
       /**
-       * @example base
+       * @example testnet
        * @enum {string}
        */
-      network: 'eth' | 'base' | 'arb' | 'op' | 'pol' | 'bsc' | 'avax' | 'monad' | 'local';
+      network: 'local' | 'testnet' | 'mainnet';
       /**
        * @description Local money per one token, up to 6 decimals.
        * @example 1250.5
@@ -1828,6 +2394,8 @@ export interface components {
         | 'co_bank_transfer'
         | 'pe_bank_transfer'
         | 'cl_bank_transfer'
+        | 'ar_qr'
+        | 'br_pix_qr'
       )[];
       /**
        * @description SELL_TOKEN: you sell tokens from your balance in the contract (authorise the matcher for it). BUY_TOKEN: you buy tokens, accepting each order with a bond from your balance.
@@ -1862,12 +2430,12 @@ export interface components {
       quoteId: string;
       /**
        * @description BUY: the wallet that receives the tokens.
-       * @example 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+       * @example GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ
        */
       recipient?: string;
       /**
        * @description SELL: the wallet that holds the tokens and signs the two transactions. Refunds go back to it.
-       * @example 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+       * @example GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ
        */
       seller?: string;
     };
@@ -1910,7 +2478,9 @@ export interface components {
         | 'mx_spei'
         | 'co_bank_transfer'
         | 'pe_bank_transfer'
-        | 'cl_bank_transfer';
+        | 'cl_bank_transfer'
+        | 'ar_qr'
+        | 'br_pix_qr';
     };
     /** @description Payouts from your balance in the contract: each item is matched with a merchant and opened by the matcher on your balance. */
     CreatePayoutDto: {
@@ -1921,10 +2491,10 @@ export interface components {
       accountId?: string;
       items: components['schemas']['PayoutItemDto'][];
       /**
-       * @example base
+       * @example testnet
        * @enum {string}
        */
-      network: 'eth' | 'base' | 'arb' | 'op' | 'pol' | 'bsc' | 'avax' | 'monad' | 'local';
+      network: 'local' | 'testnet' | 'mainnet';
       /** @example USDC */
       token: string;
     };
@@ -1952,10 +2522,10 @@ export interface components {
        */
       integratorFeeBps: number;
       /**
-       * @example base
+       * @example testnet
        * @enum {string}
        */
-      network: 'eth' | 'base' | 'arb' | 'op' | 'pol' | 'bsc' | 'avax' | 'monad' | 'local';
+      network: 'local' | 'testnet' | 'mainnet';
       /**
        * @example ar_bank_transfer
        * @enum {string}
@@ -1966,7 +2536,9 @@ export interface components {
         | 'mx_spei'
         | 'co_bank_transfer'
         | 'pe_bank_transfer'
-        | 'cl_bank_transfer';
+        | 'cl_bank_transfer'
+        | 'ar_qr'
+        | 'br_pix_qr';
       /**
        * @description BUY: the person receives tokens and pays local money. SELL: the person sends tokens and receives local money.
        * @example BUY
@@ -1974,7 +2546,7 @@ export interface components {
        */
       side: 'BUY' | 'SELL';
       /**
-       * @description By contract address or symbol.
+       * @description By symbol, Stellar Asset Contract (C...) or CODE:ISSUER.
        * @example USDC
        */
       token: string;
@@ -1983,6 +2555,34 @@ export interface components {
        * @example 100000000
        */
       tokenAmount?: string;
+    };
+    /** @description Send tokens to an address or an @handle. */
+    CreateTransfer: {
+      /**
+       * @description Base units (7 decimals): 2.5 USDC is 25000000.
+       * @example 25000000
+       */
+      amount: string;
+      /**
+       * @example testnet
+       * @enum {string}
+       */
+      network?: 'local' | 'testnet' | 'mainnet';
+      /**
+       * @description At most 28 bytes; it becomes the transaction’s text memo.
+       * @example Empanadas
+       */
+      note?: string;
+      /**
+       * @description A G (account), M (muxed account) or C (contract) address, or an @handle.
+       * @example @maria_salta
+       */
+      to: string;
+      /**
+       * @description By symbol, contract (C...) or CODE:ISSUER.
+       * @example USDC
+       */
+      token: string;
     };
     CreateWebhookEndpoint: {
       /** @example Order bot */
@@ -2032,7 +2632,7 @@ export interface components {
       /** @enum {string} */
       tier: 'live' | 'test';
     };
-    /** @description A new order. A sale (`SELL`) also carries the two transactions the seller’s wallet signs, in order: the exact token approval, then `openWithDeposit`. */
+    /** @description A new order. A sale (`SELL`) or a QR payment (`QR_PAY`) also carries the one transaction the seller’s wallet signs: `open_with_deposit`, whose token pull into the market is authorised by the same signature (no approval). */
     CreatedOrderView: {
       /**
        * Format: date-time
@@ -2044,13 +2644,11 @@ export interface components {
        * @example 0
        */
       bond: string;
-      /** @example 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC */
+      /** @example GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ */
       buyerAddress: string;
-      /** @example 84532 */
-      chainId: number;
       /** @example null */
       chargeId: string | null;
-      /** @example 0x5FbDB2315678afecb367f032d93F642f64180aa3 */
+      /** @example CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7 */
       contract: string;
       /**
        * Format: date-time
@@ -2081,18 +2679,18 @@ export interface components {
       /** @example 0 */
       integratorFeeBps: number;
       /**
-       * @description BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.
+       * @description BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. QR_PAY: a person pays a shop’s local-money QR through a merchant that buys their tokens. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.
        * @example BUY
        * @enum {string}
        */
-      kind: 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';
+      kind: 'BUY' | 'SELL' | 'QR_PAY' | 'CHARGE' | 'PAYOUT';
       merchant: components['schemas']['OrderMerchantView'];
       /**
        * @description Base units its buyer receives after fees.
        * @example 99500000
        */
       netAmount: string;
-      /** @example base */
+      /** @example testnet */
       network: string;
       /**
        * @description The order id in the contract, once indexed.
@@ -2122,9 +2720,11 @@ export interface components {
       price: string;
       /** @example 50 */
       protocolFeeBps: number;
+      /** @description A QR payment’s scanned QR, as its payer reads it (one order, not lists). */
+      qr: components['schemas']['QrSummaryView'] | null;
       /** @example ar_bank_transfer */
       rail: string;
-      /** @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 */
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
       sellerAddress: string;
       /**
        * Format: date-time
@@ -2153,19 +2753,19 @@ export interface components {
        * @enum {string}
        */
       tier: 'live' | 'test';
-      /** @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e */
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
       token: string;
       /**
        * @description Base units the order locks.
        * @example 100000000
        */
       tokenAmount: string;
-      /** @example 6 */
+      /** @example 7 */
       tokenDecimals: number;
       /** @example USDC */
       tokenSymbol: string;
-      /** @description Empty except on a sale. */
-      transactions: components['schemas']['TransactionView'][];
+      /** @description Empty except on a sale or a QR payment still waiting for its signature. */
+      transactions: components['schemas']['P2pTransaction'][];
       txHashes: components['schemas']['OrderTxHashesView'];
       /**
        * Format: date-time
@@ -2248,7 +2848,15 @@ export interface components {
         | 'signature_invalid'
         | 'account_taken'
         | 'charge_closed'
-        | 'last_owner';
+        | 'last_owner'
+        | 'account_missing'
+        | 'restore_required'
+        | 'handle_taken'
+        | 'recipient_cannot_receive'
+        | 'insufficient_balance'
+        | 'qr_invalid'
+        | 'submission_refused'
+        | 'sponsor_budget_exhausted';
       /**
        * @example [
        *       "fiatAmount must be a positive decimal"
@@ -2292,8 +2900,8 @@ export interface components {
       bondBps: number;
       currencies: components['schemas']['CurrencyView'][];
       /**
-       * @description The matcher: the address a seller authorises with `setMatcher` so purchases and payouts open on its balance. It can open orders within the cap the seller sets and act for a buyer it opened an order for; it can never withdraw or release a seller's tokens.
-       * @example 0x90F79bf6EB2c4f870365E785982E1f101E93b906
+       * @description The matcher account: what a seller authorises with `set_matcher` so purchases and payouts open on its balance. It can open orders within the cap the seller sets and act for a buyer it opened an order for; it can never withdraw or release a seller's tokens.
+       * @example GAXTHY6ASJEWI3OJGM7UZ2KSMBQD7VHCCH27PAL6ALSSSW7D33B5WMMI
        */
       matcher: string | null;
       /**
@@ -2302,6 +2910,7 @@ export interface components {
        */
       maxIntegratorFeeBps: number;
       networks: components['schemas']['NetworkView'][];
+      sponsor: components['schemas']['SponsorView'];
       /**
        * @description The tier the API key's environment selects (`prod`: public).
        * @example test
@@ -2325,7 +2934,7 @@ export interface components {
     };
     /** @description A wallet that signs in for an organization. */
     Member: {
-      /** @example 0x90F79bf6EB2c4f870365E785982E1f101E93b906 */
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
       address: string;
       /** Format: date-time */
       createdAt: string;
@@ -2356,11 +2965,9 @@ export interface components {
       beneficiary: components['schemas']['BeneficiaryView'] | null;
       /** @example 0 */
       bond: string;
-      /** @example 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC */
+      /** @example GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ */
       buyerAddress: string;
-      /** @example 84532 */
-      chainId: number;
-      /** @example 0x5FbDB2315678afecb367f032d93F642f64180aa3 */
+      /** @example CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7 */
       contract: string;
       /**
        * Format: date-time
@@ -2382,18 +2989,18 @@ export interface components {
        * @example BUY
        * @enum {string}
        */
-      kind: 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';
+      kind: 'BUY' | 'SELL' | 'QR_PAY' | 'CHARGE' | 'PAYOUT';
       /** @example cm3p2pacc0001l70g8v5q3z2w */
       merchantAccountId: string | null;
       /**
-       * @description The merchant’s side: seller on purchases and charges (it releases), buyer on sales and payouts (it accepts and pays).
+       * @description The merchant’s side: seller on purchases and charges (it releases), buyer on sales, QR payments and payouts (it accepts and pays).
        * @example seller
        * @enum {string}
        */
       merchantSide: 'seller' | 'buyer';
       /** @example 99500000 */
       netAmount: string;
-      /** @example base */
+      /** @example testnet */
       network: string;
       /** @example 7 */
       onchainId: string | null;
@@ -2412,9 +3019,11 @@ export interface components {
       paymentDeadline: string | null;
       /** @example 1250.5 */
       price: string;
+      /** @description A live QR payment’s QR: what the merchant pays. Null otherwise. */
+      qr: components['schemas']['MerchantQrView'] | null;
       /** @example ar_bank_transfer */
       rail: string;
-      /** @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 */
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
       sellerAddress: string;
       /**
        * Format: date-time
@@ -2443,11 +3052,11 @@ export interface components {
        * @enum {string}
        */
       tier: 'live' | 'test';
-      /** @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e */
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
       token: string;
       /** @example 100000000 */
       tokenAmount: string;
-      /** @example 6 */
+      /** @example 7 */
       tokenDecimals: number;
       /** @example USDC */
       tokenSymbol: string;
@@ -2457,6 +3066,29 @@ export interface components {
        * @example 2026-11-19T12:01:00.000Z
        */
       updatedAt: string;
+    };
+    /** @description A QR payment’s scanned QR, for its merchant while the order is live: draw the QR from `payload` and pay it with your banking app, then mark the order paid. */
+    MerchantQrView: {
+      /** @example 12500.00 */
+      amount: string | null;
+      /** @example ARS */
+      currency: string | null;
+      /** @example Salta */
+      merchantCity: string | null;
+      /** @example Panaderia La Salteña */
+      merchantName: string | null;
+      /**
+       * @description The exact text scanned (EMV), CRC included.
+       * @example 00020101021243650016com.mercadolibre...6304ABCD
+       */
+      payload: string;
+      /** @example TICKET-0042 */
+      reference: string | null;
+      /**
+       * @example ar-interoperable
+       * @enum {string}
+       */
+      standard: 'pix' | 'ar-interoperable';
     };
     /** @description A merchant's track record, as quotes show it. */
     MerchantStatsView: {
@@ -2486,38 +3118,39 @@ export interface components {
        */
       medianReleaseSeconds: number | null;
     };
-    /** @description One network the P2P market runs on for this API key: where the contract is, and what it trades. */
+    /** @description One Stellar network the P2P market runs on: where the contract is, and what it trades. */
     NetworkView: {
       /**
-       * @description Its EIP-155 chain id.
-       * @example 84532
-       */
-      chainId: number;
-      /**
-       * @description The P2P market contract: where balances are deposited and orders lock tokens. Verified against this service's build before it is listed.
-       * @example 0x5FbDB2315678afecb367f032d93F642f64180aa3
+       * @description The P2P market contract (C...): where balances are deposited and orders lock tokens. Verified against this service's build (its wasm hash) before it is listed.
+       * @example CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7
        */
       contract: string;
       /**
-       * @description An Etherscan-style explorer of this network: append `/tx/<hash>` or `/address/<address>`. Null where none was checked.
-       * @example https://sepolia.basescan.org
+       * @description A stellar.expert-style explorer: append `/tx/<hash>`, `/account/<G...>` or `/contract/<C...>`. Null when there is none.
+       * @example https://stellar.expert/explorer/testnet
        */
       explorerUrl: string | null;
       /**
-       * @description The network id requests use (`network`).
-       * @example base
+       * @description A public Horizon endpoint, or null.
+       * @example https://horizon-testnet.stellar.org
        */
-      id: string;
+      horizonUrl: string | null;
+      /**
+       * @description The network id requests use (`network`).
+       * @example testnet
+       * @enum {string}
+       */
+      id: 'local' | 'testnet' | 'mainnet';
       /**
        * @description Its name, for a picker.
-       * @example Base
+       * @example Stellar Testnet
        */
       name: string;
       /**
-       * @description The chain’s own coin (gas), as wallets name it.
-       * @example ETH
+       * @description Its network passphrase: what transactions are signed for.
+       * @example Test SDF Network ; September 2015
        */
-      nativeSymbol: string;
+      networkPassphrase: string;
       /**
        * @description Whether the contract is paused: no new deposits, orders or acceptances, while every withdrawal, release, cancellation and dispute still works.
        * @example false
@@ -2529,8 +3162,8 @@ export interface components {
        */
       protocolFeeBps: number;
       /**
-       * @description A PUBLIC node for `wallet_addEthereumChain`, from the public endpoints this service lists; never the node it reads through. Null where no public one is listed.
-       * @example https://sepolia.base.org
+       * @description A PUBLIC Soroban RPC endpoint; never the node this service reads through.
+       * @example https://soroban-testnet.stellar.org
        */
       rpcUrl: string | null;
       tokens: components['schemas']['TokenView'][];
@@ -2573,7 +3206,7 @@ export interface components {
        * @example 5000
        */
       minFiat: string;
-      /** @example base */
+      /** @example testnet */
       network: string;
       /**
        * @description Local money per one token.
@@ -2604,7 +3237,7 @@ export interface components {
        * @enum {string}
        */
       side: 'SELL_TOKEN' | 'BUY_TOKEN';
-      /** @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e */
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
       token: string;
       /** @example USDC */
       tokenSymbol: string;
@@ -2659,7 +3292,7 @@ export interface components {
       cancel: string | null;
       /** @example null */
       dispute: string | null;
-      /** @example 0x6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f */
+      /** @example 6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f */
       open: string | null;
       /** @example null */
       paid: string | null;
@@ -2680,13 +3313,11 @@ export interface components {
        * @example 0
        */
       bond: string;
-      /** @example 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC */
+      /** @example GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ */
       buyerAddress: string;
-      /** @example 84532 */
-      chainId: number;
       /** @example null */
       chargeId: string | null;
-      /** @example 0x5FbDB2315678afecb367f032d93F642f64180aa3 */
+      /** @example CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7 */
       contract: string;
       /**
        * Format: date-time
@@ -2717,18 +3348,18 @@ export interface components {
       /** @example 0 */
       integratorFeeBps: number;
       /**
-       * @description BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.
+       * @description BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. QR_PAY: a person pays a shop’s local-money QR through a merchant that buys their tokens. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.
        * @example BUY
        * @enum {string}
        */
-      kind: 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';
+      kind: 'BUY' | 'SELL' | 'QR_PAY' | 'CHARGE' | 'PAYOUT';
       merchant: components['schemas']['OrderMerchantView'];
       /**
        * @description Base units its buyer receives after fees.
        * @example 99500000
        */
       netAmount: string;
-      /** @example base */
+      /** @example testnet */
       network: string;
       /**
        * @description The order id in the contract, once indexed.
@@ -2758,9 +3389,11 @@ export interface components {
       price: string;
       /** @example 50 */
       protocolFeeBps: number;
+      /** @description A QR payment’s scanned QR, as its payer reads it (one order, not lists). */
+      qr: components['schemas']['QrSummaryView'] | null;
       /** @example ar_bank_transfer */
       rail: string;
-      /** @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 */
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
       sellerAddress: string;
       /**
        * Format: date-time
@@ -2789,14 +3422,14 @@ export interface components {
        * @enum {string}
        */
       tier: 'live' | 'test';
-      /** @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e */
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
       token: string;
       /**
        * @description Base units the order locks.
        * @example 100000000
        */
       tokenAmount: string;
-      /** @example 6 */
+      /** @example 7 */
       tokenDecimals: number;
       /** @example USDC */
       tokenSymbol: string;
@@ -2839,6 +3472,55 @@ export interface components {
     };
     OrganizationList: {
       data: components['schemas']['Organization'][];
+    };
+    /** @description An unsigned Stellar transaction for a wallet (or a bot holding its own key) to sign: one operation, the wallet as source, time bounds at most 5 minutes ahead, already prepared (simulation, resource fee, footprint). Sign the envelope as it is and submit it with `POST /v1/app/submit` or `POST /v1/p2p/submit` (the sponsor pays the fee), or submit it yourself. This service never signs it. */
+    P2pTransaction: {
+      /**
+       * @description What it does: a market function (`deposit`, `open_with_deposit`, `release`...), `transfer` (a token payment) or `activate`.
+       * @example release
+       */
+      action: string;
+      /**
+       * @description What signing it does, in one line, for a confirmation screen.
+       * @example Release order 7: pays its buyer 98.5 USDC
+       */
+      description: string;
+      /**
+       * Format: date-time
+       * @description Its upper time bound: sign and submit it before then.
+       * @example 2026-11-19T12:05:00.000Z
+       */
+      expiresAt: string;
+      /**
+       * @description The hex hash of the transaction (the inner one when it is fee-bumped).
+       * @example 6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f
+       */
+      hash: string;
+      /**
+       * @description The network it is for.
+       * @example testnet
+       * @enum {string}
+       */
+      network: 'local' | 'testnet' | 'mainnet';
+      /**
+       * @description The unsigned, prepared `TransactionEnvelope`, base64 XDR.
+       * @example AAAAAgAAAAA...
+       */
+      xdr: string;
+    };
+    /** @description Pay a charge with tokens from your balance. */
+    PayCharge: {
+      /**
+       * @description The charge’s network.
+       * @example testnet
+       * @enum {string}
+       */
+      network?: 'local' | 'testnet' | 'mainnet';
+      /**
+       * @description The charge’s token.
+       * @example USDC
+       */
+      token: string;
     };
     /** @description Who pays the local money on a purchase: the merchant checks the transfer comes from this person. */
     PayerDto: {
@@ -2966,7 +3648,7 @@ export interface components {
       id: string;
       /** @example 2 */
       itemCount: number;
-      /** @example base */
+      /** @example testnet */
       network: string;
       /** @description Empty in a list; the batch read carries them. */
       orders: components['schemas']['OrderView'][];
@@ -2981,7 +3663,7 @@ export interface components {
        * @enum {string}
        */
       tier: 'live' | 'test';
-      /** @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e */
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
       token: string;
     };
     /** @description One payout: an amount of local money to a beneficiary on one rail. */
@@ -3009,7 +3691,28 @@ export interface components {
         | 'mx_spei'
         | 'co_bank_transfer'
         | 'pe_bank_transfer'
-        | 'cl_bank_transfer';
+        | 'cl_bank_transfer'
+        | 'ar_qr'
+        | 'br_pix_qr';
+    };
+    /** @description What a QR payment’s scanned QR reads, for the person who scanned it (never the payload itself). */
+    QrSummaryView: {
+      /**
+       * @description The amount a dynamic QR asks for; null for a static one.
+       * @example 12500.00
+       */
+      amount: string | null;
+      /** @example ARS */
+      currency: string | null;
+      /** @example Salta */
+      merchantCity: string | null;
+      /** @example Panaderia La Salteña */
+      merchantName: string | null;
+      /**
+       * @example ar-interoperable
+       * @enum {string}
+       */
+      standard: 'pix' | 'ar-interoperable';
     };
     /** @description The merchant a quote matched, as people see it: a name and a track record, never its address or accounts. */
     QuoteMerchantView: {
@@ -3069,13 +3772,19 @@ export interface components {
       integratorFee: string;
       /** @example 0 */
       integratorFeeBps: number;
+      /**
+       * @description The order kind the quote is for: its side, or `QR_PAY` for a scanned QR.
+       * @example BUY
+       * @enum {string}
+       */
+      kind: 'BUY' | 'SELL' | 'QR_PAY';
       merchant: components['schemas']['QuoteMerchantView'];
       /**
        * @description Base units the buyer of the tokens receives after fees: the person on a BUY, the merchant on a SELL.
        * @example 99500000
        */
       netAmount: string;
-      /** @example base */
+      /** @example testnet */
       network: string;
       /**
        * @description Local money per one token.
@@ -3089,22 +3798,24 @@ export interface components {
       protocolFee: string;
       /** @example 50 */
       protocolFeeBps: number;
+      /** @description A QR payment’s scanned QR (merchant, city, amount); null otherwise. */
+      qr: components['schemas']['QrSummaryView'] | null;
       /** @example ar_bank_transfer */
       rail: string;
       /**
-       * @description The person’s side: BUY receives tokens for local money, SELL sends tokens for it.
+       * @description The person’s side: BUY receives tokens for local money, SELL sends tokens for it (a QR payment is a SELL).
        * @example BUY
        * @enum {string}
        */
       side: 'BUY' | 'SELL';
-      /** @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e */
+      /** @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA */
       token: string;
       /**
        * @description Base units the order locks (gross).
        * @example 100000000
        */
       tokenAmount: string;
-      /** @example 6 */
+      /** @example 7 */
       tokenDecimals: number;
       /** @example USDC */
       tokenSymbol: string;
@@ -3145,15 +3856,19 @@ export interface components {
        */
       id: string;
       /**
+       * @description `account`: the local money goes to an account (the fields below). `qr`: the rail pays a scanned merchant QR (`QR_PAY` orders); it takes no fields.
+       * @example account
+       * @enum {string}
+       */
+      kind: 'account' | 'qr';
+      /**
        * @description Its name, in English.
        * @example Bank transfer (CBU, CVU or alias)
        */
       name: string;
     };
-    /** @description A wallet’s registration: the address, and its EIP-191 signature over the challenge’s message. */
+    /** @description A wallet’s registration: the registration challenge, signed by the account’s signers. */
     RegisterAccountDto: {
-      /** @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 */
-      address: string;
       /**
        * @description The name people see on quotes when this account is a merchant.
        * @example Pampa Cambio
@@ -3162,22 +3877,25 @@ export interface components {
       /** @example Treasury wallet */
       label?: string;
       /**
-       * @description `personal_sign` of the challenge message by the wallet: 65 bytes, 0x-hex.
-       * @example 0x1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b
+       * @example testnet
+       * @enum {string}
        */
-      signature: string;
+      network?: 'local' | 'testnet' | 'mainnet';
+      /** @description The challenge from `POST /v1/p2p/accounts/challenge`, signed (base64 XDR). It names the account, your organization and tier. */
+      transaction: string;
     };
     /** @description The payment report: the transfer’s reference, when there is one. */
     ReportPaidDto: {
       /** @example TRX-88213 */
       reference?: string;
     };
-    /** @description The signed-in wallet. */
+    /** @description The signed-in account. */
     Session: {
+      /** @example GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI */
       address: string;
       /** Format: date-time */
       expiresAt: string;
-      /** @description Whether the wallet may use `/v1/admin/*`. */
+      /** @description Whether the account may use `/v1/admin/*`. */
       isAdmin: boolean;
       organizations: components['schemas']['SessionMembership'][];
     };
@@ -3189,83 +3907,87 @@ export interface components {
     };
     /** @description A new session. */
     SessionToken: {
-      /** @example 0x70997970C51812dc3A010C7d01b50e0d17dc79C8 */
-      address: string;
-      /** Format: date-time */
-      expiresAt: string;
+      session: components['schemas']['Session'];
       /**
-       * @description Shown once. Browsers use the HttpOnly cookie set with it; other clients send it as `Authorization: Bearer`.
+       * @description Shown once (SEP-10’s `token`). Browsers use the HttpOnly cookie set with it; other clients send it as `Authorization: Bearer`.
        * @example ps_sess_x2...
        */
       token: string;
     };
-    /** @description A signed EIP-4361 message. */
+    /** @description A signed SEP-10 challenge. */
     SignIn: {
-      /** @description The SIWE message, byte for byte as signed. */
-      message: string;
-      /**
-       * @description `personal_sign` of the message.
-       * @example 0x1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b
-       */
-      signature: string;
+      /** @description The challenge transaction, signed by the account’s signers, base64 XDR. */
+      transaction: string;
     };
-    /** @description A single-use nonce for a SIWE message. */
-    SiweNonce: {
+    /** @description Whether the API pays network fees and reserves for wallets. */
+    SponsorView: {
       /**
-       * @description The `domain` the SIWE message must name (and its URI host).
-       * @example localhost:3000
+       * @description True: `POST /v1/app/submit` and `/v1/p2p/submit` fee-bump signed transactions with the sponsor account, and activations are sponsored. False: transactions are submitted as signed (the wallet pays its fee).
+       * @example true
        */
-      domain: string;
-      /** Format: date-time */
-      expiresAt: string;
-      /** @example 9f2c4e1ab37d5c08e6a1b2c3d4e5f607 */
-      nonce: string;
+      enabled: boolean;
     };
-    /** @description A stablecoin the P2P market trades on one network. */
+    /** @description A signed transaction the API submitted (fee-bumped by its sponsor when gasless is on). */
+    Submission: {
+      /** @description Why it failed. */
+      error: string | null;
+      /** @description The sponsor’s fee-bump hash. */
+      feeBumpHash: string | null;
+      /**
+       * @description The inner transaction’s hash.
+       * @example 6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f
+       */
+      hash: string;
+      /** @description The ledger it was applied in. */
+      ledger: number | null;
+      /** @example testnet */
+      network: string;
+      /** @description Whether the sponsor paid its fee. */
+      sponsored: boolean;
+      /**
+       * @example SUCCESS
+       * @enum {string}
+       */
+      status: 'PENDING' | 'SUCCESS' | 'FAILED';
+    };
+    /** @description A transaction your wallet signed, to submit. */
+    Submit: {
+      /**
+       * @description Default: the tier’s only network.
+       * @example testnet
+       * @enum {string}
+       */
+      network?: 'local' | 'testnet' | 'mainnet';
+      /** @description The signed inner `TransactionEnvelope` (base64 XDR), exactly as built by this API and signed. Never a fee-bump. */
+      xdr: string;
+    };
+    /** @description A stablecoin the P2P market trades on one network: a classic Stellar asset, used on-chain through its Stellar Asset Contract. */
     TokenView: {
       /**
-       * @description Its contract address (EIP-55): what requests name it by.
-       * @example 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+       * @description The asset code.
+       * @example USDC
        */
-      address: string;
+      code: string;
       /**
-       * @description Decimal places of its base units.
-       * @example 6
+       * @description Its Stellar Asset Contract (C...): what orders and balances name it by.
+       * @example CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA
+       */
+      contract: string;
+      /**
+       * @description Decimal places of its base units (always 7).
+       * @example 7
        */
       decimals: number;
+      /**
+       * @description The issuing account (G...).
+       * @example GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
+       */
+      issuer: string;
       /**
        * @description Its symbol.
        * @example USDC
        */
       symbol: string;
-    };
-    /** @description An unsigned EVM transaction for a wallet (or a bot holding its own key) to sign and send: `eth_sendTransaction` takes `to`, `data` and `value` as they are, on the chain `chainId` names. This service never signs it. */
-    TransactionView: {
-      /**
-       * @description The EIP-155 chain id the wallet must be on.
-       * @example 84532
-       */
-      chainId: number;
-      /**
-       * @description The calldata, 0x-hex.
-       * @example 0xa7b0e3b50000000000000000000000000000000000000000000000000000000000000007
-       */
-      data: string;
-      /**
-       * @description What signing it does, in one line, for a confirmation screen.
-       * @example Release order 7: pays its buyer 98.5 USDC
-       */
-      description: string;
-      /**
-       * @description The contract to call: the P2P market, or the token for an approval.
-       * @example 0x5FbDB2315678afecb367f032d93F642f64180aa3
-       */
-      to: string;
-      /**
-       * @description Native coin to send with it: always 0.
-       * @example 0
-       */
-      value: string;
     };
     /** @description Orders a transfer may settle, best first. */
     TransferMatchListView: {
@@ -3287,8 +4009,8 @@ export interface components {
        * @example 3
        */
       score: number;
-      /** @description `release` for the order, for the merchant’s wallet or its bot (PERM_RELEASE) to sign. */
-      transaction: components['schemas']['TransactionView'];
+      /** @description `release` for the order, prepared with the merchant account as source and acting address: the merchant’s key (or its bot holding it) signs it and submits it (`POST /v1/p2p/submit`). */
+      transaction: components['schemas']['P2pTransaction'];
     };
     /** @description An incoming bank transfer as your bank notified it: the orders it most likely settles come back with their release ready. */
     TransferMatchesDto: {
@@ -3313,6 +4035,11 @@ export interface components {
       receivedAt?: string;
       /** @example TRX-88213 */
       reference?: string;
+      /**
+       * @description The account that signs the releases: the merchant account (default), or an operator it granted PERM_RELEASE (`set_operator`), so a bot never needs the merchant’s own key.
+       * @example GAXTHY6ASJEWI3OJGM7UZ2KSMBQD7VHCCH27PAL6ALSSSW7D33B5WMMI
+       */
+      signer?: string;
     };
     /** @description What an account owner may change. */
     UpdateAccountDto: {
@@ -3355,6 +4082,8 @@ export interface components {
         | 'co_bank_transfer'
         | 'pe_bank_transfer'
         | 'cl_bank_transfer'
+        | 'ar_qr'
+        | 'br_pix_qr'
       )[];
     };
     UpdateOrganization: {
@@ -3379,6 +4108,14 @@ export interface components {
       holderName?: string;
       /** @example Main account */
       label?: string;
+    };
+    /** @description Claim or change your @handle. */
+    UpdateProfile: {
+      /**
+       * @description 3 to 20 of a-z, 0-9 and underscore (a leading @ and upper case are accepted and normalised). Unique, case-insensitive; reserved words are refused.
+       * @example maria_salta
+       */
+      handle: string;
     };
     UpdateWebhookEndpoint: {
       /** @description false pauses deliveries to it. */
@@ -3476,6 +4213,21 @@ export interface components {
        */
       buyPaymentWindow: number;
       /**
+       * @description A QR payment: seconds the merchant has to accept it.
+       * @example 120
+       */
+      qrAcceptWindow: number;
+      /**
+       * @description A QR payment: seconds the merchant then has to pay the scanned QR.
+       * @example 600
+       */
+      qrPaymentWindow: number;
+      /**
+       * @description A QR payment: seconds after the merchant marked it paid with no dispute before anyone may release it.
+       * @example 3600
+       */
+      qrSettleWindow: number;
+      /**
        * @description A sale or a payout: seconds the merchant has to accept it (locking its bond).
        * @example 300
        */
@@ -3500,6 +4252,25 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  wellKnownStellarToml: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'text/plain': string;
+        };
+      };
+    };
+  };
   healthHealth: {
     parameters: {
       query?: never;
@@ -3733,6 +4504,413 @@ export interface operations {
       };
     };
   };
+  appWalletActivate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Activate'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppActivation'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletActivity: {
+    parameters: {
+      query?: {
+        /** @description Default: the app’s only network. */
+        network?: 'local' | 'testnet' | 'mainnet';
+        /** @description The `nextCursor` of the previous page. */
+        cursor?: string;
+        limit?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppActivity'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletBalances: {
+    parameters: {
+      query?: {
+        /** @description Default: the app’s only network. */
+        network?: 'local' | 'testnet' | 'mainnet';
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppBalances'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletCharge: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppCharge'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `not_found`: nothing of yours with that id on this tier. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletPay: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PayCharge'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppCreatedChargePayment'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `not_found`: nothing of yours with that id on this tier. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletHandle: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        handle: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppHandle'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `not_found`: nothing of yours with that id on this tier. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
   appList: {
     parameters: {
       query?: {
@@ -3751,8 +4929,8 @@ export interface operations {
           | 'expired'
           | 'resolved'
           | 'failed';
-        kind?: 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';
-        /** @description Only orders where this wallet is the buyer or the seller (any case). */
+        kind?: 'BUY' | 'SELL' | 'QR_PAY' | 'CHARGE' | 'PAYOUT';
+        /** @description Only orders where this account is the buyer or the seller. */
         address?: string;
       };
       header?: never;
@@ -4154,7 +5332,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['TransactionView'];
+          'application/json': components['schemas']['P2pTransaction'];
         };
       };
       /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
@@ -4186,6 +5364,111 @@ export interface operations {
       };
       /** @description `not_found`: nothing of yours with that id on this tier. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletProfile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppProfile'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletSetProfile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateProfile'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppProfile'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
         headers: {
           [name: string]: unknown;
         };
@@ -4272,6 +5555,296 @@ export interface operations {
       };
     };
   };
+  appWalletSubmission: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        hash: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Submission'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `not_found`: nothing of yours with that id on this tier. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletSubmit: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Submit'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Submission'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletTransfer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateTransfer'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppCreatedTransfer'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `not_found`: nothing of yours with that id on this tier. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  appWalletGetTransfer: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppTransfer'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `not_found`: nothing of yours with that id on this tier. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  authChallenge: {
+    parameters: {
+      query: {
+        /** @description The account (G...) that signs in. */
+        account: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthChallenge'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
   authLogout: {
     parameters: {
       query?: never;
@@ -4307,9 +5880,12 @@ export interface operations {
       };
     };
   };
-  authNonce: {
+  authSep10Challenge: {
     parameters: {
-      query?: never;
+      query: {
+        /** @description The account (G...) that signs in. */
+        account: string;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -4321,11 +5897,79 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['SiweNonce'];
+          'application/json': components['schemas']['AuthChallenge'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
         };
       };
       /** @description `rate_limited`: retry after the `Retry-After` header. */
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  authSep10Verify: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SignIn'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SessionToken'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
         headers: {
           [name: string]: unknown;
         };
@@ -4404,6 +6048,15 @@ export interface operations {
       };
       /** @description `rate_limited`: retry after the `Retry-After` header. */
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
         headers: {
           [name: string]: unknown;
         };
@@ -5975,8 +7628,8 @@ export interface operations {
           | 'expired'
           | 'resolved'
           | 'failed';
-        kind?: 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';
-        /** @description Only orders where this wallet is the buyer or the seller (any case). */
+        kind?: 'BUY' | 'SELL' | 'QR_PAY' | 'CHARGE' | 'PAYOUT';
+        /** @description Only orders where this account is the buyer or the seller. */
         address?: string;
       };
       header?: {
@@ -6419,8 +8072,8 @@ export interface operations {
           | 'expired'
           | 'resolved'
           | 'failed';
-        kind?: 'BUY' | 'SELL' | 'CHARGE' | 'PAYOUT';
-        /** @description Only orders where this wallet is the buyer or the seller (any case). */
+        kind?: 'BUY' | 'SELL' | 'QR_PAY' | 'CHARGE' | 'PAYOUT';
+        /** @description Only orders where this account is the buyer or the seller. */
         address?: string;
       };
       header?: {
@@ -7380,6 +9033,141 @@ export interface operations {
       };
     };
   };
+  submitSubmission: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
+        'Pedospe-Organization'?: string;
+        /** @description Wallet sessions only: the tier to act on (default `test`). */
+        'Pedospe-Tier'?: 'live' | 'test';
+      };
+      path: {
+        hash: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Submission'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `not_found`: nothing of yours with that id on this tier. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
+  submitSubmit: {
+    parameters: {
+      query?: never;
+      header?: {
+        /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
+        'Pedospe-Organization'?: string;
+        /** @description Wallet sessions only: the tier to act on (default `test`). */
+        'Pedospe-Tier'?: 'live' | 'test';
+      };
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Submit'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Submission'];
+        };
+      };
+      /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `rate_limited`: retry after the `Retry-After` header. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+      /** @description `service_unavailable`: the market is not available on that network right now. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['Error'];
+        };
+      };
+    };
+  };
   ordersBuild: {
     parameters: {
       query?: never;
@@ -7403,7 +9191,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['TransactionView'];
+          'application/json': components['schemas']['P2pTransaction'];
         };
       };
       /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */

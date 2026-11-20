@@ -1,13 +1,12 @@
-import { randomBytes } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { getAddress, verifyMessage, type Hex } from 'viem';
 import type { OrgPrincipal } from '@/auth/auth.types';
+import { Sep10Service } from '@/auth/sep10.service';
 import { DeploymentsService } from '@/chain/deployments.service';
 import { MarketReader } from '@/chain/market-reader.service';
 import type { Tier } from '@/chain/networks';
 import { ApiError, ErrorCode } from '@/common/api-error';
-import { EVM_ADDRESS_RE } from '@/common/evm';
 import { page, type Page, type PageQueryDto } from '@/common/pagination';
+import { isAccountAddress } from '@/common/stellar';
 import { Prisma } from '@/generated/prisma/client';
 import type {
   CreateChallengeDto,
@@ -20,20 +19,16 @@ import type {
   AccountView,
   ChallengeView,
 } from '@/p2p/entities/account.entity';
-import { P2P_CHALLENGE_NONCE_BYTES, P2P_CHALLENGE_TTL_SECONDS } from '@/p2p/domain/constants';
 import { P2P_LIVE_STATUSES } from '@/p2p/domain/order-status';
-import { registrationMessage } from '@/p2p/domain/registration-message';
 import { tierOf } from '@/p2p/tier';
 import { P2P_ACCOUNT_SELECT, toAccountView, type P2pAccountRow } from '@/p2p/views';
 import { PrismaService } from '@/prisma/prisma.service';
 
-/** Open challenges a registration is tried against (the newest first). */
-const CHALLENGES_TRIED = 5;
-
 /**
- * An organization's on-chain wallets. Each is proven by an EIP-191 signature
- * over a single-use challenge naming the address, the organization, the tier,
- * a nonce and an expiry; a wallet belongs to one organization per tier.
+ * An organization's Stellar accounts. Each is proven by a SEP-10-shaped
+ * challenge (never a message signature) whose `organization` entry binds it
+ * to the organization and tier; the account's signers must reach its medium
+ * threshold. An account belongs to one organization per tier.
  */
 @Injectable()
 export class AccountsService {
@@ -41,83 +36,30 @@ export class AccountsService {
     private readonly prisma: PrismaService,
     private readonly deployments: DeploymentsService,
     private readonly reader: MarketReader,
+    private readonly sep10: Sep10Service,
   ) {}
 
   async challenge(org: OrgPrincipal, dto: CreateChallengeDto): Promise<ChallengeView> {
     const tier = tierOf(org, this.deployments);
-    const address = getAddress(dto.address);
-    const nonce = randomBytes(P2P_CHALLENGE_NONCE_BYTES).toString('hex');
-    const expiresAt = new Date(Date.now() + P2P_CHALLENGE_TTL_SECONDS * 1000);
-    await this.prisma.p2pAccountChallenge.create({
-      data: { organizationId: org.organizationId, tier, address, nonce, expiresAt },
+    const network = this.deployments.pick(tier, dto.network);
+    return this.sep10.challenge(dto.address, 'account', network, {
+      organizationId: org.organizationId,
+      tier,
     });
-    return {
-      message: registrationMessage({
-        address,
-        organizationId: org.organizationId,
-        tier,
-        nonce,
-        expiresAt,
-      }),
-      expiresAt,
-    };
   }
 
   /**
-   * Registers a wallet: the signature must recover the address over one of
-   * its open challenges for this organization and tier, and that challenge is
-   * then spent (compare-and-swap on `usedAt`), so a signature registers once.
+   * Registers an account: its signed challenge must be one issued for this
+   * organization and tier, and is then spent (compare-and-swap), so a
+   * signature registers once.
    */
   async register(org: OrgPrincipal, dto: RegisterAccountDto): Promise<AccountView> {
     const tier = tierOf(org, this.deployments);
-    const address = getAddress(dto.address);
-    const now = new Date();
-    const open = await this.prisma.p2pAccountChallenge.findMany({
-      where: {
-        organizationId: org.organizationId,
-        tier,
-        address,
-        usedAt: null,
-        expiresAt: { gt: now },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: CHALLENGES_TRIED,
-      select: { id: true, nonce: true, expiresAt: true },
+    const network = this.deployments.pick(tier, dto.network);
+    const address = await this.sep10.verify(dto.transaction, 'account', network, {
+      organizationId: org.organizationId,
+      tier,
     });
-    const invalid = () =>
-      ApiError.badRequest(
-        ErrorCode.ChallengeInvalid,
-        'This challenge is unknown, already used or expired, or it was issued for another wallet: ask for a new one.',
-      );
-    if (open.length === 0) throw invalid();
-    let signed: (typeof open)[number] | undefined;
-    for (const c of open) {
-      const message = registrationMessage({
-        address,
-        organizationId: org.organizationId,
-        tier,
-        nonce: c.nonce,
-        expiresAt: c.expiresAt,
-      });
-      const ok = await verifyMessage({ address, message, signature: dto.signature as Hex }).catch(
-        () => false,
-      );
-      if (ok) {
-        signed = c;
-        break;
-      }
-    }
-    if (!signed) {
-      throw ApiError.badRequest(
-        ErrorCode.SignatureInvalid,
-        'The signature does not verify against this wallet for the challenge message.',
-      );
-    }
-    const used = await this.prisma.p2pAccountChallenge.updateMany({
-      where: { id: signed.id, usedAt: null, expiresAt: { gt: now } },
-      data: { usedAt: now },
-    });
-    if (used.count !== 1) throw invalid();
     try {
       const row = await this.prisma.p2pAccount.create({
         data: {
@@ -126,7 +68,7 @@ export class AccountsService {
           address,
           label: dto.label?.trim() || null,
           displayName: dto.displayName?.trim() || null,
-          verifiedAt: now,
+          verifiedAt: new Date(),
         },
         select: P2P_ACCOUNT_SELECT,
       });
@@ -135,7 +77,7 @@ export class AccountsService {
       if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
         throw ApiError.conflict(
           ErrorCode.AccountTaken,
-          `This wallet is already registered on the ${tier} tier.`,
+          `This account is already registered on the ${tier} tier.`,
         );
       }
       throw err;
@@ -179,10 +121,10 @@ export class AccountsService {
             Promise.all(
               d.tokens.map(async (t) => ({
                 symbol: t.symbol,
-                token: t.address,
+                token: t.contract,
                 decimals: t.decimals,
-                amount: (await this.reader.balanceOf(d, row.address, t.address, true)).toString(),
-                locked: (locked.get(`${d.network}:${t.address}`) ?? 0n).toString(),
+                amount: (await this.reader.balanceOf(d, row.address, t.contract, true)).toString(),
+                locked: (locked.get(`${d.network}:${t.contract}`) ?? 0n).toString(),
               })),
             ),
             matcher
@@ -303,10 +245,9 @@ export class AccountsService {
 
   /** The organization's account by id or by address on its tier, or a 404. */
   async ownedByRef(organizationId: string, tier: Tier, ref: string): Promise<P2pAccountRow> {
-    const byAddress = EVM_ADDRESS_RE.test(ref);
     const row = await this.prisma.p2pAccount.findFirst({
-      where: byAddress
-        ? { address: getAddress(ref), organizationId, tier }
+      where: isAccountAddress(ref)
+        ? { address: ref, organizationId, tier }
         : { id: ref, organizationId, tier },
       select: P2P_ACCOUNT_SELECT,
     });

@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
-import { getAddress } from 'viem';
 import { ApiKeysService } from '@/auth/api-keys.service';
 import { ROLE_RANK, type MemberRole, type Scope } from '@/auth/auth.types';
 import type { Tier } from '@/chain/networks';
+import { isAccountAddress } from '@/common/stellar';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import type {
   ApiKeyView,
@@ -106,7 +106,10 @@ export class OrganizationsService {
         `An organization has at most ${MAX_MEMBERS} members.`,
       );
     }
-    const address = getAddress(input.address);
+    const address = input.address;
+    if (!isAccountAddress(address)) {
+      throw ApiError.validation(['address must be a Stellar account address (G...)']);
+    }
     const existing = await this.prisma.member.findFirst({ where: { organizationId, address } });
     if (existing) throw ApiError.conflict(ErrorCode.Conflict, 'This wallet is already a member.');
     return this.prisma.member.create({

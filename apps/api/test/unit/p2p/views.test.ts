@@ -14,13 +14,13 @@ const ROW: P2pOrderRow = {
   kind: 'BUY',
   endUserAddress: null,
   network: 'base',
-  contract: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-  token: '0x036CbD53842c5426634e7929541eC2318f3dCF7e',
+  contract: 'CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7',
+  token: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
   tokenSymbol: 'USDC',
   tokenDecimals: 6,
   merchantAccountId: 'acc_merchant',
   merchantOrganizationId: 'org_merchant',
-  merchantAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
+  merchantAddress: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI',
   merchantDisplayName: 'Pampa Cambio',
   merchantPaymentMethodId: 'pm_1',
   currency: 'ARS',
@@ -31,21 +31,21 @@ const ROW: P2pOrderRow = {
   netAmount: '99500000',
   protocolFeeBps: 50,
   integratorFeeBps: 25,
-  integratorAddress: '0x90F79bf6EB2c4f870365E785982E1f101E93b906',
+  integratorAddress: 'GAXTHY6ASJEWI3OJGM7UZ2KSMBQD7VHCCH27PAL6ALSSSW7D33B5WMMI',
   bond: '0',
   acceptWindow: 0,
   paymentWindow: 1800,
   settleWindow: 0,
-  openerAddress: '0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65',
-  sellerAddress: '0x70997970C51812dc3A010C7d01b50e0d17dc79C8',
-  buyerAddress: '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC',
+  openerAddress: 'GBUHPZXBNYCJAVEVZRDNUTEPKIVG3NF36KQXVOZNIGI5NMJTUOROAP4R',
+  sellerAddress: 'GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI',
+  buyerAddress: 'GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ',
   onchainId: '7',
   status: 'awaiting_payment',
   acceptDeadline: null,
   paymentDeadline: new Date('2026-11-19T12:31:00Z'),
   paidAt: null,
   endedAt: null,
-  openTxHash: `0x${'ab'.repeat(32)}`,
+  openTxHash: 'ab'.repeat(32),
   acceptTxHash: null,
   paidTxHash: null,
   releaseTxHash: null,
@@ -83,7 +83,7 @@ const PERSONAL = ['paymentDetails', 'payer', 'beneficiary'];
 
 describe('P2P views', () => {
   it('gives the merchant webhook exactly the merchant projection’s public keys', () => {
-    const body = toOrderWebhookData(ROW, 84532, 'merchant');
+    const body = toOrderWebhookData(ROW, 'merchant');
     expect(Object.keys(body).sort()).toEqual(
       [
         'id',
@@ -91,7 +91,6 @@ describe('P2P views', () => {
         'status',
         'tier',
         'network',
-        'chainId',
         'contract',
         'merchantAccountId',
         'merchantSide',
@@ -129,7 +128,7 @@ describe('P2P views', () => {
   });
 
   it('gives the client webhook its own order, without anyone’s personal details', () => {
-    const body = toOrderWebhookData(ROW, 84532, 'client');
+    const body = toOrderWebhookData(ROW, 'client');
     expect(body).toMatchObject({
       role: 'client',
       externalReference: 'client-secret-ref-881',
@@ -151,7 +150,7 @@ describe('P2P views', () => {
   });
 
   it('never shows the merchant the client’s own fields on its order routes', () => {
-    const view = toMerchantOrderView(ROW, 84532, {
+    const view = toMerchantOrderView(ROW, {
       payer: { name: 'Juan Gómez', document: '20123456786' },
       beneficiary: null,
     });
@@ -160,15 +159,18 @@ describe('P2P views', () => {
   });
 
   it('shows the counterparty’s details to the merchant only while the order is live', () => {
-    const ended = toMerchantOrderView({ ...ROW, status: 'completed' }, 84532, {
-      payer: { name: 'Juan Gómez', document: '20123456786' },
-      beneficiary: {
-        holderName: 'Ana',
-        document: '27234567891',
-        rail: 'ar_bank_transfer',
-        details: {},
+    const ended = toMerchantOrderView(
+      { ...ROW, status: 'completed' },
+      {
+        payer: { name: 'Juan Gómez', document: '20123456786' },
+        beneficiary: {
+          holderName: 'Ana',
+          document: '27234567891',
+          rail: 'ar_bank_transfer',
+          details: {},
+        },
       },
-    });
+    );
     expect(ended.payer).toBeNull();
     expect(ended.beneficiary).toBeNull();
   });
@@ -182,18 +184,17 @@ describe('P2P views', () => {
     expect(settleDeadlineOf({ paidAt: null, settleWindow: 21_600 })).toBeNull();
     const view = toMerchantOrderView(
       { ...ROW, kind: 'SELL', status: 'paid', paidAt, settleWindow: 21_600 },
-      84532,
       { payer: null, beneficiary: null },
     );
     expect(view.settleDeadline).toEqual(new Date('2026-11-19T18:00:00Z'));
-    expect(toOrderWebhookData({ ...ROW, paidAt, settleWindow: 3600 }, 1, 'client')).toHaveProperty(
+    expect(toOrderWebhookData({ ...ROW, paidAt, settleWindow: 3600 }, 'client')).toHaveProperty(
       'settleDeadline',
       new Date('2026-11-19T13:00:00Z'),
     );
   });
 
   it('never shows the client the merchant’s internal ids', () => {
-    const view = toOrderView(ROW, 84532, null);
+    const view = toOrderView(ROW, null);
     for (const key of [
       'organizationId',
       'merchantOrganizationId',
