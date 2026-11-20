@@ -11,7 +11,7 @@ import { decimalsFrom } from '@/lib/p2p/normalize';
 import { useSession } from '@/lib/session';
 import { useAppData } from '@/features/app/data';
 import { ActionTile } from '@/features/app/shell';
-import { ActivationCard, ActivityRow, useLocal, useUsd } from '@/features/app/parts';
+import { ActivationCard, ActivityRow, InstallBanner, useLocal, useUsd } from '@/features/app/parts';
 import type { ActivityItem } from '@/lib/app/types';
 
 const HIDE_KEY = 'pedospe.app.hide-balance';
@@ -122,6 +122,8 @@ export default function Home() {
         </span>
         <Icon name="chevronRight" size={20} />
       </Link>
+
+      <InstallBanner />
 
       <section aria-labelledby="recent-h" className="pb-2">
         <div className="flex items-center justify-between">

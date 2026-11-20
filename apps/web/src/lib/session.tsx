@@ -100,7 +100,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       setLocal(w);
       setLocalReady(true);
     };
-    if (kind === 'demo' && MOCK) {
+    // Compile-time guards: a production build has neither module, not even as a chunk.
+    if (kind === 'demo' && (import.meta.env.DEV || import.meta.env.VITE_MOCK === '1') && MOCK) {
       import('@/lib/mock/wallet').then((m) => done(m.restoreDemoWallet()), () => done(null));
     } else if (kind === 'dev-key' && import.meta.env.DEV) {
       import('@/lib/wallet/dev-key').then((m) => done(m.restoreDevKey()), () => done(null));

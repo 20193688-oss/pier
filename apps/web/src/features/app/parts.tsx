@@ -13,6 +13,7 @@ import { localValue, usd } from '@/lib/app/money';
 import { toBaseUnits } from '@/lib/p2p/amounts';
 import { useAppData } from '@/features/app/data';
 import { useSession } from '@/lib/session';
+import { install, usePwa } from '@/lib/pwa';
 import type { ActivityItem, AppTransfer } from '@/lib/app/types';
 
 /** "US$ 12,50" in the reader's language. */
@@ -152,5 +153,52 @@ export function Facts({ rows }: { rows: [string, ReactNode][] }) {
         </div>
       ))}
     </dl>
+  );
+}
+
+const INSTALL_KEY = 'pedospe.app.install-dismissed';
+
+/** Install the app: Android's prompt when the browser offers one, else iOS's "Add to Home
+    Screen" hint; dismissed for good with "Not now". */
+export function InstallBanner() {
+  const { t } = useI18n();
+  const p = t.app.pwa;
+  const pwa = usePwa();
+  const [dismissed, setDismissed] = useState(() => {
+    try {
+      return localStorage.getItem(INSTALL_KEY) === '1';
+    } catch {
+      return false;
+    }
+  });
+  if (dismissed || pwa.installed || (!pwa.canInstall && !pwa.iosHint)) return null;
+  const dismiss = () => {
+    setDismissed(true);
+    try {
+      localStorage.setItem(INSTALL_KEY, '1');
+    } catch {
+      /* this page only */
+    }
+  };
+  return (
+    <section className="flex items-start gap-3 rounded-[18px] border border-line bg-sheet p-4" aria-labelledby="install-h">
+      <Icon name="download" size={22} />
+      <div className="flex-1">
+        <h2 id="install-h" className="text-[1.05rem]">
+          {pwa.canInstall ? p.installTitle : p.iosTitle}
+        </h2>
+        <p className="mt-0.5 text-[0.9375rem] text-ink-2">{pwa.canInstall ? p.installBody : p.iosBody}</p>
+        <div className="mt-3 flex gap-2">
+          {pwa.canInstall && (
+            <button type="button" className="btn btn-ink btn-sm" onClick={() => void install()}>
+              {p.install}
+            </button>
+          )}
+          <button type="button" className="btn btn-quiet btn-sm" onClick={dismiss}>
+            {p.later}
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }

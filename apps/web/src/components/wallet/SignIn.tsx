@@ -26,6 +26,9 @@ import { ApiError } from '@/lib/api/client';
 import type { Session } from '@/lib/api/types';
 
 const DEV = import.meta.env.DEV;
+/* Compile-time: a production build has neither the demo wallet nor the dev key, not even as a
+   chunk (these constants fold to false and the imports below are dropped). */
+const MOCK_BUILD = import.meta.env.DEV || import.meta.env.VITE_MOCK === '1';
 const PERSONAS = ['user', 'merchant', 'business', 'fresh'] as const;
 type Persona = (typeof PERSONAS)[number];
 
@@ -128,8 +131,10 @@ export function SignIn({
     }
   };
 
-  const demo = (p: Persona) =>
-    run('Demo', async () => (await import('@/lib/mock/wallet')).demoWallet(p));
+  const demo = (p: Persona) => {
+    if (!MOCK_BUILD) return;
+    void run('Demo', async () => (await import('@/lib/mock/wallet')).demoWallet(p));
+  };
 
   const sendCode = async (e: FormEvent) => {
     e.preventDefault();
@@ -163,6 +168,7 @@ export function SignIn({
 
   const submitDevKey = async (e: FormEvent) => {
     e.preventDefault();
+    if (!import.meta.env.DEV) return;
     const m = await import('@/lib/wallet/dev-key');
     if (!m.isDevSecret(secret)) return setSecretError(w.devKeyInvalid);
     setSecretError(null);
@@ -183,7 +189,7 @@ export function SignIn({
   return (
     <div className="flex flex-col gap-4">
       {expired && <Notice tone="warn">{w.expired}</Notice>}
-      {MOCK && (
+      {MOCK_BUILD && MOCK && (
         <div className="flex flex-col gap-2">
           <Notice>{w.demo}</Notice>
           <p className="text-[0.875rem] font-semibold text-ink-3">{w.demoAs}</p>
@@ -192,7 +198,7 @@ export function SignIn({
               <li key={p}>
                 <button
                   type="button"
-                  onClick={() => void demo(p)}
+                  onClick={() => demo(p)}
                   className="flex min-h-[56px] w-full items-center gap-3 rounded-[16px] border border-line bg-paper px-4 py-3 text-left font-semibold transition-colors hover:border-ink"
                 >
                   <Icon name={p === 'user' ? 'wallet' : p === 'fresh' ? 'plus' : 'users'} />
