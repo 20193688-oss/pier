@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["contracts/p2p-market"]
+
+[workspace.dependencies]
+soroban-sdk = "=29.0.1"
+
+# The Soroban release profile. `overflow-checks` stays on: an arithmetic
+# overflow aborts the call instead of wrapping.
+[profile.release]
+opt-level = "z"
+overflow-checks = true
+debug = 0
+strip = "symbols"
+debug-assertions = false
+panic = "abort"
+codegen-units = 1
+lto = true

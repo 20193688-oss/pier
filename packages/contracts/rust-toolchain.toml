@@ -1,0 +1,7 @@
+# Pinned so the committed wasm (src/p2p-market.artifact.ts) is reproducible:
+# the same rustc, target and Cargo.lock always build the same bytes.
+[toolchain]
+channel = "1.97.1"
+targets = ["wasm32v1-none"]
+components = ["rustfmt", "clippy"]
+profile = "minimal"
