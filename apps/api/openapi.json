@@ -6,7 +6,7 @@
         "properties": {
           "address": {
             "description": "The wallet, EIP-55. The same on every network.",
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "createdAt": {
@@ -133,7 +133,7 @@
             "$ref": "#/components/schemas/MatcherTermsView"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "operators": {
@@ -142,7 +142,7 @@
             },
             "description": "Operators the market saw this account grant on this network, with their permission bits (1 open, 2 release, 4 trade, 8 withdraw). A grant of 0 is a revocation and is left out.",
             "example": {
-              "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC": 6
+              "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ": 6
             },
             "type": "object"
           }
@@ -160,7 +160,7 @@
         "properties": {
           "address": {
             "description": "The wallet, EIP-55. The same on every network.",
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "createdAt": {
@@ -236,10 +236,33 @@
         ],
         "type": "object"
       },
+      "Activate": {
+        "description": "Create your account and open a token’s trustline, sponsored.",
+        "properties": {
+          "network": {
+            "enum": [
+              "local",
+              "testnet",
+              "mainnet"
+            ],
+            "example": "testnet",
+            "type": "string"
+          },
+          "token": {
+            "description": "By symbol, contract (C...) or CODE:ISSUER.",
+            "example": "USDC",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
+        ],
+        "type": "object"
+      },
       "AddMember": {
         "properties": {
           "address": {
-            "example": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "role": {
@@ -322,7 +345,7 @@
             "type": "string"
           },
           "transaction": {
-            "$ref": "#/components/schemas/TransactionView"
+            "$ref": "#/components/schemas/P2pTransaction"
           }
         },
         "required": [
@@ -426,8 +449,325 @@
         ],
         "type": "object"
       },
+      "AppAccountState": {
+        "description": "Whether the account exists on the network.",
+        "properties": {
+          "exists": {
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "exists"
+        ],
+        "type": "object"
+      },
+      "AppActivation": {
+        "description": "The sponsored activation to sign, if any.",
+        "properties": {
+          "transaction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/P2pTransaction"
+              }
+            ],
+            "description": "Null when there is nothing to do. When the account is missing its source is the sponsor (a missing account has no sequence number); the API adds the sponsor’s signature at submit.",
+            "nullable": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "transaction"
+        ],
+        "type": "object"
+      },
+      "AppActivity": {
+        "description": "Your activity, newest first.",
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/AppActivityItem"
+            },
+            "type": "array"
+          },
+          "nextCursor": {
+            "description": "Pass it as `cursor` for the next page.",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "items",
+          "nextCursor"
+        ],
+        "type": "object"
+      },
+      "AppActivityItem": {
+        "description": "One line of your activity: an order (`order`) or a transfer (`transfer`).",
+        "properties": {
+          "at": {
+            "description": "When it happened (its creation).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "order": {
+            "$ref": "#/components/schemas/OrderView"
+          },
+          "transfer": {
+            "$ref": "#/components/schemas/AppTransfer"
+          },
+          "type": {
+            "enum": [
+              "order",
+              "transfer"
+            ],
+            "example": "transfer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "at"
+        ],
+        "type": "object"
+      },
+      "AppBalances": {
+        "description": "Your balances on one network.",
+        "properties": {
+          "account": {
+            "$ref": "#/components/schemas/AppAccountState"
+          },
+          "network": {
+            "example": "testnet",
+            "type": "string"
+          },
+          "tokens": {
+            "items": {
+              "$ref": "#/components/schemas/AppTokenBalance"
+            },
+            "type": "array"
+          },
+          "xlm": {
+            "description": "Lumens, stroops (fees are sponsored: usually 0).",
+            "example": "0",
+            "type": "string"
+          }
+        },
+        "required": [
+          "network",
+          "account",
+          "xlm",
+          "tokens"
+        ],
+        "type": "object"
+      },
+      "AppCharge": {
+        "description": "A charge as its payer sees it.",
+        "properties": {
+          "currency": {
+            "example": "ARS",
+            "type": "string"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "fiatAmount": {
+            "example": "25000.00",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "merchantName": {
+            "description": "Who charges.",
+            "example": "Panaderia La Salteña",
+            "type": "string"
+          },
+          "network": {
+            "example": "testnet",
+            "type": "string"
+          },
+          "payWithBalance": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AppPayWithBalance"
+              }
+            ],
+            "description": "Null when the charge is not open or no quote prices it now.",
+            "nullable": true,
+            "type": "object"
+          },
+          "rails": {
+            "description": "Rails the pesos checkout offers now.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "paid",
+              "cancelled",
+              "expired"
+            ],
+            "type": "string"
+          },
+          "tokenSymbol": {
+            "example": "USDC",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "network",
+          "tokenSymbol",
+          "currency",
+          "fiatAmount",
+          "merchantName",
+          "description",
+          "status",
+          "rails",
+          "expiresAt",
+          "payWithBalance"
+        ],
+        "type": "object"
+      },
+      "AppChargePayment": {
+        "description": "A charge paid from a wallet’s balance.",
+        "properties": {
+          "amount": {
+            "example": "199500000",
+            "type": "string"
+          },
+          "chargeId": {
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "hash": {
+            "example": "6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f",
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "network": {
+            "example": "testnet",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "SUBMITTED",
+              "COMPLETED",
+              "FAILED",
+              "EXPIRED"
+            ],
+            "type": "string"
+          },
+          "token": {
+            "example": "USDC",
+            "type": "string"
+          },
+          "tokenContract": {
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "chargeId",
+          "network",
+          "token",
+          "tokenContract",
+          "amount",
+          "status",
+          "hash",
+          "expiresAt",
+          "completedAt",
+          "createdAt"
+        ],
+        "type": "object"
+      },
+      "AppCreatedChargePayment": {
+        "description": "A charge payment and the transaction to sign.",
+        "properties": {
+          "payment": {
+            "$ref": "#/components/schemas/AppChargePayment"
+          },
+          "transaction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/P2pTransaction"
+              }
+            ],
+            "description": "The token transfer to the charge’s receiving account; it expires with the price."
+          }
+        },
+        "required": [
+          "payment",
+          "transaction"
+        ],
+        "type": "object"
+      },
+      "AppCreatedTransfer": {
+        "description": "A transfer and the transaction to sign.",
+        "properties": {
+          "transaction": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/P2pTransaction"
+              }
+            ],
+            "description": "A classic `payment` to a G or M recipient, a SAC `transfer` to a C recipient; the note is its text memo."
+          },
+          "transfer": {
+            "$ref": "#/components/schemas/AppTransfer"
+          }
+        },
+        "required": [
+          "transfer",
+          "transaction"
+        ],
+        "type": "object"
+      },
+      "AppHandle": {
+        "description": "Who an @handle is.",
+        "properties": {
+          "address": {
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
+            "type": "string"
+          },
+          "handle": {
+            "example": "maria_salta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle",
+          "address"
+        ],
+        "type": "object"
+      },
       "AppOrder": {
-        "description": "An order from your quote. A purchase (BUY) needs `payer`; a sale (SELL) needs `beneficiary`.",
+        "description": "An order from your quote. A purchase (BUY) needs `payer`; a sale (SELL) needs `beneficiary`; a QR payment (`kind: QR_PAY`) needs the same `qr` its quote was made for.",
         "properties": {
           "beneficiary": {
             "allOf": [
@@ -442,6 +782,16 @@
             "maxLength": 140,
             "type": "string"
           },
+          "kind": {
+            "description": "Optional; when given it must be the quote’s kind.",
+            "enum": [
+              "BUY",
+              "SELL",
+              "QR_PAY"
+            ],
+            "example": "QR_PAY",
+            "type": "string"
+          },
           "payer": {
             "allOf": [
               {
@@ -449,6 +799,10 @@
               }
             ],
             "description": "BUY: required."
+          },
+          "qr": {
+            "description": "A QR payment: the scanned QR, exactly as quoted.",
+            "type": "string"
           },
           "quoteId": {
             "description": "A quote of yours, not expired. One order per quote.",
@@ -461,10 +815,66 @@
         ],
         "type": "object"
       },
+      "AppPayWithBalance": {
+        "description": "What paying a charge from your balance costs now.",
+        "properties": {
+          "amount": {
+            "description": "Base units: what the business would have received, at the current best quote.",
+            "example": "199500000",
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "The price holds until then (60 s).",
+            "format": "date-time",
+            "type": "string"
+          },
+          "recipient": {
+            "description": "The account (G) or contract (C) the payment goes to.",
+            "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
+            "type": "string"
+          },
+          "token": {
+            "example": "USDC",
+            "type": "string"
+          },
+          "tokenContract": {
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token",
+          "tokenContract",
+          "amount",
+          "recipient",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "AppProfile": {
+        "description": "Your account and its @handle.",
+        "properties": {
+          "address": {
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
+            "type": "string"
+          },
+          "handle": {
+            "example": "maria_salta",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "address",
+          "handle"
+        ],
+        "type": "object"
+      },
       "AppQuote": {
-        "description": "A trade the signed-in wallet wants to make.",
+        "description": "What the signed-in wallet wants to do. A trade: `side`, `network`, `token`, `currency`, `rail` and one of `fiatAmount` or `tokenAmount`. A QR payment: `kind: QR_PAY`, `network`, `token`, `qr` and, when the QR carries no amount, `fiatAmount` (the currency and rail come from the QR).",
         "properties": {
           "currency": {
+            "description": "A trade only.",
             "enum": [
               "ARS",
               "BRL",
@@ -477,39 +887,51 @@
             "type": "string"
           },
           "fiatAmount": {
-            "description": "BUY: what the person pays. SELL: what the person receives. Up to the currency’s decimals.",
+            "description": "Local money. A trade: what the person pays (BUY) or receives (SELL). A QR payment: what the shop gets, required when the QR carries no amount and equal to it when it does.",
             "example": "125050",
+            "type": "string"
+          },
+          "kind": {
+            "description": "Omitted: the trade `side` says it. `QR_PAY`: pay a scanned merchant QR.",
+            "enum": [
+              "BUY",
+              "SELL",
+              "QR_PAY"
+            ],
+            "example": "QR_PAY",
             "type": "string"
           },
           "network": {
             "enum": [
-              "eth",
-              "base",
-              "arb",
-              "op",
-              "pol",
-              "bsc",
-              "avax",
-              "monad",
-              "local"
+              "local",
+              "testnet",
+              "mainnet"
             ],
-            "example": "base",
+            "example": "testnet",
+            "type": "string"
+          },
+          "qr": {
+            "description": "A QR payment: the scanned merchant QR exactly as read (Argentina’s interoperable QR or PIX). Its CRC must check.",
+            "example": "00020101021243650016com.mercadolibre...6304ABCD",
             "type": "string"
           },
           "rail": {
+            "description": "A trade only.",
             "enum": [
               "ar_bank_transfer",
               "br_pix",
               "mx_spei",
               "co_bank_transfer",
               "pe_bank_transfer",
-              "cl_bank_transfer"
+              "cl_bank_transfer",
+              "ar_qr",
+              "br_pix_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
           },
           "side": {
-            "description": "BUY: the person receives tokens and pays local money. SELL: the person sends tokens and receives local money.",
+            "description": "A trade: BUY receives tokens and pays local money; SELL sends tokens and receives local money. Required unless `kind` is `QR_PAY`.",
             "enum": [
               "BUY",
               "SELL"
@@ -518,22 +940,56 @@
             "type": "string"
           },
           "token": {
-            "description": "By contract address or symbol.",
+            "description": "By symbol, contract (C...) or CODE:ISSUER.",
             "example": "USDC",
             "type": "string"
           },
           "tokenAmount": {
-            "description": "The token amount the order locks, base units.",
-            "example": "100000000",
+            "description": "A trade only: the token amount the order locks, base units.",
+            "example": "1000000000",
             "type": "string"
           }
         },
         "required": [
-          "side",
           "network",
-          "token",
-          "currency",
-          "rail"
+          "token"
+        ],
+        "type": "object"
+      },
+      "AppTokenBalance": {
+        "description": "One token the market lists, as the account holds it.",
+        "properties": {
+          "amount": {
+            "description": "Base units (7 decimals); 0 without a trustline.",
+            "example": "125000000",
+            "type": "string"
+          },
+          "authorized": {
+            "description": "Whether the issuer authorised that trustline.",
+            "example": true,
+            "type": "boolean"
+          },
+          "contract": {
+            "description": "Its Stellar Asset Contract.",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+            "type": "string"
+          },
+          "symbol": {
+            "example": "USDC",
+            "type": "string"
+          },
+          "trustline": {
+            "description": "Whether the account has a trustline to it.",
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "symbol",
+          "contract",
+          "amount",
+          "trustline",
+          "authorized"
         ],
         "type": "object"
       },
@@ -541,7 +997,7 @@
         "description": "An action your own wallet signs on your order.",
         "properties": {
           "action": {
-            "description": "Usually `release` (a sale you were paid for), `dispute` or `cancel`; refused when your wallet may not do it now.",
+            "description": "Usually `release` (a sale or QR payment you were paid for), `dispute` or `cancel`; refused when your wallet may not do it now.",
             "enum": [
               "accept",
               "markPaid",
@@ -558,6 +1014,129 @@
         ],
         "type": "object"
       },
+      "AppTransfer": {
+        "description": "A token transfer between wallets.",
+        "properties": {
+          "amount": {
+            "description": "Base units (7 decimals).",
+            "example": "25000000",
+            "type": "string"
+          },
+          "completedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "direction": {
+            "description": "From your side.",
+            "enum": [
+              "in",
+              "out"
+            ],
+            "example": "out",
+            "type": "string"
+          },
+          "from": {
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
+            "type": "string"
+          },
+          "fromHandle": {
+            "description": "Null for a payment from outside the app, or a sender without a handle.",
+            "example": null,
+            "nullable": true,
+            "type": "string"
+          },
+          "hash": {
+            "example": "6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f",
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "example": "0b6c9a3e-2f1d-4c5b-8a7e-6d5c4b3a2f10",
+            "type": "string"
+          },
+          "network": {
+            "example": "testnet",
+            "type": "string"
+          },
+          "note": {
+            "example": "Empanadas",
+            "nullable": true,
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "SUBMITTED",
+              "COMPLETED",
+              "FAILED"
+            ],
+            "example": "COMPLETED",
+            "type": "string"
+          },
+          "to": {
+            "description": "As sent to: a G, M or C address.",
+            "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
+            "type": "string"
+          },
+          "toHandle": {
+            "example": "maria_salta",
+            "nullable": true,
+            "type": "string"
+          },
+          "token": {
+            "description": "The token’s symbol.",
+            "example": "USDC",
+            "type": "string"
+          },
+          "tokenContract": {
+            "description": "The token’s Stellar Asset Contract.",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "network",
+          "token",
+          "tokenContract",
+          "amount",
+          "from",
+          "fromHandle",
+          "to",
+          "toHandle",
+          "note",
+          "direction",
+          "status",
+          "hash",
+          "createdAt",
+          "completedAt"
+        ],
+        "type": "object"
+      },
+      "AuthChallenge": {
+        "description": "A SEP-10 challenge: a transaction the account signs (it is never submitted). The SEP-10 response shape.",
+        "properties": {
+          "network_passphrase": {
+            "description": "The network passphrase the challenge is signed for.",
+            "example": "Test SDF Network ; September 2015",
+            "type": "string"
+          },
+          "transaction": {
+            "description": "The challenge transaction envelope, base64 XDR.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "transaction",
+          "network_passphrase"
+        ],
+        "type": "object"
+      },
       "BalanceView": {
         "description": "A balance an account holds in the contract.",
         "properties": {
@@ -567,7 +1146,7 @@
             "type": "string"
           },
           "decimals": {
-            "example": 6,
+            "example": 7,
             "type": "number"
           },
           "locked": {
@@ -580,7 +1159,8 @@
             "type": "string"
           },
           "token": {
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            "description": "The token’s Stellar Asset Contract.",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           }
         },
@@ -664,7 +1244,6 @@
         "properties": {
           "action": {
             "enum": [
-              "approve",
               "deposit",
               "withdraw",
               "setOperator",
@@ -692,17 +1271,11 @@
           },
           "network": {
             "enum": [
-              "eth",
-              "base",
-              "arb",
-              "op",
-              "pol",
-              "bsc",
-              "avax",
-              "monad",
-              "local"
+              "local",
+              "testnet",
+              "mainnet"
             ],
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           }
         },
@@ -714,21 +1287,25 @@
         "type": "object"
       },
       "ChallengeView": {
-        "description": "A registration challenge: the exact text the wallet signs with `personal_sign` (EIP-191), once, before `expiresAt`.",
+        "description": "A registration challenge: a SEP-10-shaped transaction the account signs (it is never submitted). Besides the single-use nonce and `web_auth_domain`, its `organization` entry names your organization and tier, so it registers nothing else. Sign it once, before `expiresAt`.",
         "properties": {
           "expiresAt": {
             "example": "2026-11-19T12:10:00.000Z",
             "format": "date-time",
             "type": "string"
           },
-          "message": {
-            "description": "The message to sign, byte for byte. It names the address, this organization, the tier, a single-use nonce and the expiry, so it registers nothing else.",
-            "example": "Cosmos Pay P2P market\nRegister wallet: 0x70997970C51812dc3A010C7d01b50e0d17dc79C8\nFor: cosmos_6f1d2a\nTier: testnet\nNonce: 9f2c4e1ab37d5c08e6a1b2c3d4e5f607\nExpires: 2026-11-19T12:10:00.000Z",
+          "network_passphrase": {
+            "example": "Test SDF Network ; September 2015",
+            "type": "string"
+          },
+          "transaction": {
+            "description": "The challenge transaction envelope, base64 XDR.",
             "type": "string"
           }
         },
         "required": [
-          "message",
+          "transaction",
+          "network_passphrase",
           "expiresAt"
         ],
         "type": "object"
@@ -799,7 +1376,7 @@
             "type": "boolean"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "paidAt": {
@@ -823,7 +1400,7 @@
             "type": "string"
           },
           "recipientAddress": {
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "status": {
@@ -846,7 +1423,7 @@
             "type": "string"
           },
           "token": {
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           },
           "tokenSymbol": {
@@ -918,7 +1495,7 @@
             "type": "string"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "rails": {
@@ -1223,11 +1800,21 @@
         "type": "object"
       },
       "CreateChallengeDto": {
-        "description": "The wallet a registration challenge is for.",
+        "description": "The account a registration challenge is for.",
         "properties": {
           "address": {
-            "description": "The EVM wallet to register. The same address on every network.",
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "description": "The Stellar account (G...) to register.",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
+            "type": "string"
+          },
+          "network": {
+            "description": "The network whose ledger has the account’s signers; default: the tier’s only network.",
+            "enum": [
+              "local",
+              "testnet",
+              "mainnet"
+            ],
+            "example": "testnet",
             "type": "string"
           }
         },
@@ -1274,17 +1861,11 @@
           },
           "network": {
             "enum": [
-              "eth",
-              "base",
-              "arb",
-              "op",
-              "pol",
-              "bsc",
-              "avax",
-              "monad",
-              "local"
+              "local",
+              "testnet",
+              "mainnet"
             ],
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "payeeName": {
@@ -1328,7 +1909,9 @@
               "mx_spei",
               "co_bank_transfer",
               "pe_bank_transfer",
-              "cl_bank_transfer"
+              "cl_bank_transfer",
+              "ar_qr",
+              "br_pix_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -1377,17 +1960,11 @@
           },
           "network": {
             "enum": [
-              "eth",
-              "base",
-              "arb",
-              "op",
-              "pol",
-              "bsc",
-              "avax",
-              "monad",
-              "local"
+              "local",
+              "testnet",
+              "mainnet"
             ],
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "price": {
@@ -1415,7 +1992,9 @@
                 "mx_spei",
                 "co_bank_transfer",
                 "pe_bank_transfer",
-                "cl_bank_transfer"
+                "cl_bank_transfer",
+                "ar_qr",
+                "br_pix_qr"
               ],
               "type": "string"
             },
@@ -1489,12 +2068,12 @@
           },
           "recipient": {
             "description": "BUY: the wallet that receives the tokens.",
-            "example": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+            "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
             "type": "string"
           },
           "seller": {
             "description": "SELL: the wallet that holds the tokens and signs the two transactions. Refunds go back to it.",
-            "example": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+            "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
             "type": "string"
           }
         },
@@ -1565,7 +2144,9 @@
               "mx_spei",
               "co_bank_transfer",
               "pe_bank_transfer",
-              "cl_bank_transfer"
+              "cl_bank_transfer",
+              "ar_qr",
+              "br_pix_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -1597,17 +2178,11 @@
           },
           "network": {
             "enum": [
-              "eth",
-              "base",
-              "arb",
-              "op",
-              "pol",
-              "bsc",
-              "avax",
-              "monad",
-              "local"
+              "local",
+              "testnet",
+              "mainnet"
             ],
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "token": {
@@ -1657,17 +2232,11 @@
           },
           "network": {
             "enum": [
-              "eth",
-              "base",
-              "arb",
-              "op",
-              "pol",
-              "bsc",
-              "avax",
-              "monad",
-              "local"
+              "local",
+              "testnet",
+              "mainnet"
             ],
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "rail": {
@@ -1677,7 +2246,9 @@
               "mx_spei",
               "co_bank_transfer",
               "pe_bank_transfer",
-              "cl_bank_transfer"
+              "cl_bank_transfer",
+              "ar_qr",
+              "br_pix_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -1692,7 +2263,7 @@
             "type": "string"
           },
           "token": {
-            "description": "By contract address or symbol.",
+            "description": "By symbol, Stellar Asset Contract (C...) or CODE:ISSUER.",
             "example": "USDC",
             "type": "string"
           },
@@ -1708,6 +2279,46 @@
           "token",
           "currency",
           "rail"
+        ],
+        "type": "object"
+      },
+      "CreateTransfer": {
+        "description": "Send tokens to an address or an @handle.",
+        "properties": {
+          "amount": {
+            "description": "Base units (7 decimals): 2.5 USDC is 25000000.",
+            "example": "25000000",
+            "type": "string"
+          },
+          "network": {
+            "enum": [
+              "local",
+              "testnet",
+              "mainnet"
+            ],
+            "example": "testnet",
+            "type": "string"
+          },
+          "note": {
+            "description": "At most 28 bytes; it becomes the transaction’s text memo.",
+            "example": "Empanadas",
+            "type": "string"
+          },
+          "to": {
+            "description": "A G (account), M (muxed account) or C (contract) address, or an @handle.",
+            "example": "@maria_salta",
+            "type": "string"
+          },
+          "token": {
+            "description": "By symbol, contract (C...) or CODE:ISSUER.",
+            "example": "USDC",
+            "type": "string"
+          }
+        },
+        "required": [
+          "to",
+          "token",
+          "amount"
         ],
         "type": "object"
       },
@@ -1816,7 +2427,7 @@
         "type": "object"
       },
       "CreatedOrderView": {
-        "description": "A new order. A sale (`SELL`) also carries the two transactions the seller’s wallet signs, in order: the exact token approval, then `openWithDeposit`.",
+        "description": "A new order. A sale (`SELL`) or a QR payment (`QR_PAY`) also carries the one transaction the seller’s wallet signs: `open_with_deposit`, whose token pull into the market is authorised by the same signature (no approval).",
         "properties": {
           "acceptDeadline": {
             "example": null,
@@ -1830,12 +2441,8 @@
             "type": "string"
           },
           "buyerAddress": {
-            "example": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+            "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
             "type": "string"
-          },
-          "chainId": {
-            "example": 84532,
-            "type": "number"
           },
           "chargeId": {
             "example": null,
@@ -1843,7 +2450,7 @@
             "type": "string"
           },
           "contract": {
-            "example": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+            "example": "CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7",
             "type": "string"
           },
           "createdAt": {
@@ -1886,10 +2493,11 @@
             "type": "number"
           },
           "kind": {
-            "description": "BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.",
+            "description": "BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. QR_PAY: a person pays a shop’s local-money QR through a merchant that buys their tokens. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.",
             "enum": [
               "BUY",
               "SELL",
+              "QR_PAY",
               "CHARGE",
               "PAYOUT"
             ],
@@ -1905,7 +2513,7 @@
             "type": "string"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "onchainId": {
@@ -1955,12 +2563,22 @@
             "example": 50,
             "type": "number"
           },
+          "qr": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QrSummaryView"
+              }
+            ],
+            "description": "A QR payment’s scanned QR, as its payer reads it (one order, not lists).",
+            "nullable": true,
+            "type": "object"
+          },
           "rail": {
             "example": "ar_bank_transfer",
             "type": "string"
           },
           "sellerAddress": {
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "settleDeadline": {
@@ -2004,7 +2622,7 @@
             "type": "string"
           },
           "token": {
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           },
           "tokenAmount": {
@@ -2013,7 +2631,7 @@
             "type": "string"
           },
           "tokenDecimals": {
-            "example": 6,
+            "example": 7,
             "type": "number"
           },
           "tokenSymbol": {
@@ -2021,9 +2639,9 @@
             "type": "string"
           },
           "transactions": {
-            "description": "Empty except on a sale.",
+            "description": "Empty except on a sale or a QR payment still waiting for its signature.",
             "items": {
-              "$ref": "#/components/schemas/TransactionView"
+              "$ref": "#/components/schemas/P2pTransaction"
             },
             "type": "array"
           },
@@ -2042,7 +2660,6 @@
           "status",
           "tier",
           "network",
-          "chainId",
           "contract",
           "token",
           "tokenSymbol",
@@ -2073,6 +2690,7 @@
           "payoutBatchId",
           "externalReference",
           "paymentDetails",
+          "qr",
           "createdAt",
           "updatedAt",
           "transactions"
@@ -2210,7 +2828,15 @@
               "signature_invalid",
               "account_taken",
               "charge_closed",
-              "last_owner"
+              "last_owner",
+              "account_missing",
+              "restore_required",
+              "handle_taken",
+              "recipient_cannot_receive",
+              "insufficient_balance",
+              "qr_invalid",
+              "submission_refused",
+              "sponsor_budget_exhausted"
             ],
             "example": "validation_failed",
             "type": "string"
@@ -2302,8 +2928,8 @@
             "type": "array"
           },
           "matcher": {
-            "description": "The matcher: the address a seller authorises with `setMatcher` so purchases and payouts open on its balance. It can open orders within the cap the seller sets and act for a buyer it opened an order for; it can never withdraw or release a seller's tokens.",
-            "example": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+            "description": "The matcher account: what a seller authorises with `set_matcher` so purchases and payouts open on its balance. It can open orders within the cap the seller sets and act for a buyer it opened an order for; it can never withdraw or release a seller's tokens.",
+            "example": "GAXTHY6ASJEWI3OJGM7UZ2KSMBQD7VHCCH27PAL6ALSSSW7D33B5WMMI",
             "nullable": true,
             "type": "string"
           },
@@ -2317,6 +2943,9 @@
               "$ref": "#/components/schemas/NetworkView"
             },
             "type": "array"
+          },
+          "sponsor": {
+            "$ref": "#/components/schemas/SponsorView"
           },
           "tier": {
             "description": "The tier the API key's environment selects (`prod`: public).",
@@ -2335,6 +2964,7 @@
           "tier",
           "available",
           "matcher",
+          "sponsor",
           "bondBps",
           "maxIntegratorFeeBps",
           "windows",
@@ -2367,7 +2997,7 @@
         "description": "A wallet that signs in for an organization.",
         "properties": {
           "address": {
-            "example": "0x90F79bf6EB2c4f870365E785982E1f101E93b906",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "createdAt": {
@@ -2461,15 +3091,11 @@
             "type": "string"
           },
           "buyerAddress": {
-            "example": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+            "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
             "type": "string"
           },
-          "chainId": {
-            "example": 84532,
-            "type": "number"
-          },
           "contract": {
-            "example": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+            "example": "CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7",
             "type": "string"
           },
           "createdAt": {
@@ -2499,6 +3125,7 @@
             "enum": [
               "BUY",
               "SELL",
+              "QR_PAY",
               "CHARGE",
               "PAYOUT"
             ],
@@ -2511,7 +3138,7 @@
             "type": "string"
           },
           "merchantSide": {
-            "description": "The merchant’s side: seller on purchases and charges (it releases), buyer on sales and payouts (it accepts and pays).",
+            "description": "The merchant’s side: seller on purchases and charges (it releases), buyer on sales, QR payments and payouts (it accepts and pays).",
             "enum": [
               "seller",
               "buyer"
@@ -2524,7 +3151,7 @@
             "type": "string"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "onchainId": {
@@ -2562,12 +3189,22 @@
             "example": "1250.5",
             "type": "string"
           },
+          "qr": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MerchantQrView"
+              }
+            ],
+            "description": "A live QR payment’s QR: what the merchant pays. Null otherwise.",
+            "nullable": true,
+            "type": "object"
+          },
           "rail": {
             "example": "ar_bank_transfer",
             "type": "string"
           },
           "sellerAddress": {
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "settleDeadline": {
@@ -2611,7 +3248,7 @@
             "type": "string"
           },
           "token": {
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           },
           "tokenAmount": {
@@ -2619,7 +3256,7 @@
             "type": "string"
           },
           "tokenDecimals": {
-            "example": 6,
+            "example": 7,
             "type": "number"
           },
           "tokenSymbol": {
@@ -2641,7 +3278,6 @@
           "status",
           "tier",
           "network",
-          "chainId",
           "contract",
           "merchantAccountId",
           "merchantSide",
@@ -2668,8 +3304,62 @@
           "paidReference",
           "payer",
           "beneficiary",
+          "qr",
           "createdAt",
           "updatedAt"
+        ],
+        "type": "object"
+      },
+      "MerchantQrView": {
+        "description": "A QR payment’s scanned QR, for its merchant while the order is live: draw the QR from `payload` and pay it with your banking app, then mark the order paid.",
+        "properties": {
+          "amount": {
+            "example": "12500.00",
+            "nullable": true,
+            "type": "string"
+          },
+          "currency": {
+            "example": "ARS",
+            "nullable": true,
+            "type": "string"
+          },
+          "merchantCity": {
+            "example": "Salta",
+            "nullable": true,
+            "type": "string"
+          },
+          "merchantName": {
+            "example": "Panaderia La Salteña",
+            "nullable": true,
+            "type": "string"
+          },
+          "payload": {
+            "description": "The exact text scanned (EMV), CRC included.",
+            "example": "00020101021243650016com.mercadolibre...6304ABCD",
+            "type": "string"
+          },
+          "reference": {
+            "example": "TICKET-0042",
+            "nullable": true,
+            "type": "string"
+          },
+          "standard": {
+            "enum": [
+              "pix",
+              "ar-interoperable"
+            ],
+            "example": "ar-interoperable",
+            "type": "string"
+          }
+        },
+        "required": [
+          "payload",
+          "standard",
+          "merchantName",
+          "merchantCity",
+          "amount",
+          "currency",
+          "reference"
         ],
         "type": "object"
       },
@@ -2713,37 +3403,43 @@
         "type": "object"
       },
       "NetworkView": {
-        "description": "One network the P2P market runs on for this API key: where the contract is, and what it trades.",
+        "description": "One Stellar network the P2P market runs on: where the contract is, and what it trades.",
         "properties": {
-          "chainId": {
-            "description": "Its EIP-155 chain id.",
-            "example": 84532,
-            "type": "number"
-          },
           "contract": {
-            "description": "The P2P market contract: where balances are deposited and orders lock tokens. Verified against this service's build before it is listed.",
-            "example": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+            "description": "The P2P market contract (C...): where balances are deposited and orders lock tokens. Verified against this service's build (its wasm hash) before it is listed.",
+            "example": "CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7",
             "type": "string"
           },
           "explorerUrl": {
-            "description": "An Etherscan-style explorer of this network: append `/tx/<hash>` or `/address/<address>`. Null where none was checked.",
-            "example": "https://sepolia.basescan.org",
+            "description": "A stellar.expert-style explorer: append `/tx/<hash>`, `/account/<G...>` or `/contract/<C...>`. Null when there is none.",
+            "example": "https://stellar.expert/explorer/testnet",
+            "nullable": true,
+            "type": "string"
+          },
+          "horizonUrl": {
+            "description": "A public Horizon endpoint, or null.",
+            "example": "https://horizon-testnet.stellar.org",
             "nullable": true,
             "type": "string"
           },
           "id": {
             "description": "The network id requests use (`network`).",
-            "example": "base",
+            "enum": [
+              "local",
+              "testnet",
+              "mainnet"
+            ],
+            "example": "testnet",
             "type": "string"
           },
           "name": {
             "description": "Its name, for a picker.",
-            "example": "Base",
+            "example": "Stellar Testnet",
             "type": "string"
           },
-          "nativeSymbol": {
-            "description": "The chain’s own coin (gas), as wallets name it.",
-            "example": "ETH",
+          "networkPassphrase": {
+            "description": "Its network passphrase: what transactions are signed for.",
+            "example": "Test SDF Network ; September 2015",
             "type": "string"
           },
           "paused": {
@@ -2757,8 +3453,8 @@
             "type": "number"
           },
           "rpcUrl": {
-            "description": "A PUBLIC node for `wallet_addEthereumChain`, from the public endpoints this service lists; never the node it reads through. Null where no public one is listed.",
-            "example": "https://sepolia.base.org",
+            "description": "A PUBLIC Soroban RPC endpoint; never the node this service reads through.",
+            "example": "https://soroban-testnet.stellar.org",
             "nullable": true,
             "type": "string"
           },
@@ -2772,10 +3468,10 @@
         "required": [
           "id",
           "name",
-          "chainId",
-          "nativeSymbol",
-          "explorerUrl",
+          "networkPassphrase",
           "rpcUrl",
+          "horizonUrl",
+          "explorerUrl",
           "contract",
           "protocolFeeBps",
           "paused",
@@ -2849,7 +3545,7 @@
             "type": "string"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "price": {
@@ -2890,7 +3586,7 @@
             "type": "string"
           },
           "token": {
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           },
           "tokenSymbol": {
@@ -3023,7 +3719,7 @@
             "type": "string"
           },
           "open": {
-            "example": "0x6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f",
+            "example": "6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f",
             "nullable": true,
             "type": "string"
           },
@@ -3069,12 +3765,8 @@
             "type": "string"
           },
           "buyerAddress": {
-            "example": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+            "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
             "type": "string"
-          },
-          "chainId": {
-            "example": 84532,
-            "type": "number"
           },
           "chargeId": {
             "example": null,
@@ -3082,7 +3774,7 @@
             "type": "string"
           },
           "contract": {
-            "example": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+            "example": "CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7",
             "type": "string"
           },
           "createdAt": {
@@ -3125,10 +3817,11 @@
             "type": "number"
           },
           "kind": {
-            "description": "BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.",
+            "description": "BUY: a person buys tokens from a merchant. SELL: a person sells tokens to a merchant. QR_PAY: a person pays a shop’s local-money QR through a merchant that buys their tokens. CHARGE: a payer pays one of your charges. PAYOUT: a merchant pays a beneficiary from your balance.",
             "enum": [
               "BUY",
               "SELL",
+              "QR_PAY",
               "CHARGE",
               "PAYOUT"
             ],
@@ -3144,7 +3837,7 @@
             "type": "string"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "onchainId": {
@@ -3194,12 +3887,22 @@
             "example": 50,
             "type": "number"
           },
+          "qr": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QrSummaryView"
+              }
+            ],
+            "description": "A QR payment’s scanned QR, as its payer reads it (one order, not lists).",
+            "nullable": true,
+            "type": "object"
+          },
           "rail": {
             "example": "ar_bank_transfer",
             "type": "string"
           },
           "sellerAddress": {
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "settleDeadline": {
@@ -3243,7 +3946,7 @@
             "type": "string"
           },
           "token": {
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           },
           "tokenAmount": {
@@ -3252,7 +3955,7 @@
             "type": "string"
           },
           "tokenDecimals": {
-            "example": 6,
+            "example": 7,
             "type": "number"
           },
           "tokenSymbol": {
@@ -3274,7 +3977,6 @@
           "status",
           "tier",
           "network",
-          "chainId",
           "contract",
           "token",
           "tokenSymbol",
@@ -3305,6 +4007,7 @@
           "payoutBatchId",
           "externalReference",
           "paymentDetails",
+          "qr",
           "createdAt",
           "updatedAt"
         ],
@@ -3378,6 +4081,80 @@
         },
         "required": [
           "data"
+        ],
+        "type": "object"
+      },
+      "P2pTransaction": {
+        "description": "An unsigned Stellar transaction for a wallet (or a bot holding its own key) to sign: one operation, the wallet as source, time bounds at most 5 minutes ahead, already prepared (simulation, resource fee, footprint). Sign the envelope as it is and submit it with `POST /v1/app/submit` or `POST /v1/p2p/submit` (the sponsor pays the fee), or submit it yourself. This service never signs it.",
+        "properties": {
+          "action": {
+            "description": "What it does: a market function (`deposit`, `open_with_deposit`, `release`...), `transfer` (a token payment) or `activate`.",
+            "example": "release",
+            "type": "string"
+          },
+          "description": {
+            "description": "What signing it does, in one line, for a confirmation screen.",
+            "example": "Release order 7: pays its buyer 98.5 USDC",
+            "type": "string"
+          },
+          "expiresAt": {
+            "description": "Its upper time bound: sign and submit it before then.",
+            "example": "2026-11-19T12:05:00.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "hash": {
+            "description": "The hex hash of the transaction (the inner one when it is fee-bumped).",
+            "example": "6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f",
+            "type": "string"
+          },
+          "network": {
+            "description": "The network it is for.",
+            "enum": [
+              "local",
+              "testnet",
+              "mainnet"
+            ],
+            "example": "testnet",
+            "type": "string"
+          },
+          "xdr": {
+            "description": "The unsigned, prepared `TransactionEnvelope`, base64 XDR.",
+            "example": "AAAAAgAAAAA...",
+            "type": "string"
+          }
+        },
+        "required": [
+          "network",
+          "action",
+          "description",
+          "xdr",
+          "hash",
+          "expiresAt"
+        ],
+        "type": "object"
+      },
+      "PayCharge": {
+        "description": "Pay a charge with tokens from your balance.",
+        "properties": {
+          "network": {
+            "description": "The charge’s network.",
+            "enum": [
+              "local",
+              "testnet",
+              "mainnet"
+            ],
+            "example": "testnet",
+            "type": "string"
+          },
+          "token": {
+            "description": "The charge’s token.",
+            "example": "USDC",
+            "type": "string"
+          }
+        },
+        "required": [
+          "token"
         ],
         "type": "object"
       },
@@ -3620,7 +4397,7 @@
             "type": "number"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "orders": {
@@ -3650,7 +4427,7 @@
             "type": "string"
           },
           "token": {
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           }
         },
@@ -3704,7 +4481,9 @@
               "mx_spei",
               "co_bank_transfer",
               "pe_bank_transfer",
-              "cl_bank_transfer"
+              "cl_bank_transfer",
+              "ar_qr",
+              "br_pix_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -3715,6 +4494,48 @@
           "fiatAmount",
           "rail",
           "beneficiary"
+        ],
+        "type": "object"
+      },
+      "QrSummaryView": {
+        "description": "What a QR payment’s scanned QR reads, for the person who scanned it (never the payload itself).",
+        "properties": {
+          "amount": {
+            "description": "The amount a dynamic QR asks for; null for a static one.",
+            "example": "12500.00",
+            "nullable": true,
+            "type": "string"
+          },
+          "currency": {
+            "example": "ARS",
+            "nullable": true,
+            "type": "string"
+          },
+          "merchantCity": {
+            "example": "Salta",
+            "nullable": true,
+            "type": "string"
+          },
+          "merchantName": {
+            "example": "Panaderia La Salteña",
+            "nullable": true,
+            "type": "string"
+          },
+          "standard": {
+            "enum": [
+              "pix",
+              "ar-interoperable"
+            ],
+            "example": "ar-interoperable",
+            "type": "string"
+          }
+        },
+        "required": [
+          "standard",
+          "merchantName",
+          "merchantCity",
+          "amount",
+          "currency"
         ],
         "type": "object"
       },
@@ -3797,6 +4618,16 @@
             "example": 0,
             "type": "number"
           },
+          "kind": {
+            "description": "The order kind the quote is for: its side, or `QR_PAY` for a scanned QR.",
+            "enum": [
+              "BUY",
+              "SELL",
+              "QR_PAY"
+            ],
+            "example": "BUY",
+            "type": "string"
+          },
           "merchant": {
             "$ref": "#/components/schemas/QuoteMerchantView"
           },
@@ -3806,7 +4637,7 @@
             "type": "string"
           },
           "network": {
-            "example": "base",
+            "example": "testnet",
             "type": "string"
           },
           "price": {
@@ -3823,12 +4654,22 @@
             "example": 50,
             "type": "number"
           },
+          "qr": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/QrSummaryView"
+              }
+            ],
+            "description": "A QR payment’s scanned QR (merchant, city, amount); null otherwise.",
+            "nullable": true,
+            "type": "object"
+          },
           "rail": {
             "example": "ar_bank_transfer",
             "type": "string"
           },
           "side": {
-            "description": "The person’s side: BUY receives tokens for local money, SELL sends tokens for it.",
+            "description": "The person’s side: BUY receives tokens for local money, SELL sends tokens for it (a QR payment is a SELL).",
             "enum": [
               "BUY",
               "SELL"
@@ -3837,7 +4678,7 @@
             "type": "string"
           },
           "token": {
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           },
           "tokenAmount": {
@@ -3846,7 +4687,7 @@
             "type": "string"
           },
           "tokenDecimals": {
-            "example": 6,
+            "example": 7,
             "type": "number"
           },
           "tokenSymbol": {
@@ -3860,6 +4701,8 @@
         "required": [
           "id",
           "side",
+          "kind",
+          "qr",
           "network",
           "token",
           "tokenSymbol",
@@ -3932,6 +4775,15 @@
             "example": "ar_bank_transfer",
             "type": "string"
           },
+          "kind": {
+            "description": "`account`: the local money goes to an account (the fields below). `qr`: the rail pays a scanned merchant QR (`QR_PAY` orders); it takes no fields.",
+            "enum": [
+              "account",
+              "qr"
+            ],
+            "example": "account",
+            "type": "string"
+          },
           "name": {
             "description": "Its name, in English.",
             "example": "Bank transfer (CBU, CVU or alias)",
@@ -3941,17 +4793,14 @@
         "required": [
           "id",
           "name",
+          "kind",
           "fields"
         ],
         "type": "object"
       },
       "RegisterAccountDto": {
-        "description": "A wallet’s registration: the address, and its EIP-191 signature over the challenge’s message.",
+        "description": "A wallet’s registration: the registration challenge, signed by the account’s signers.",
         "properties": {
-          "address": {
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-            "type": "string"
-          },
           "displayName": {
             "description": "The name people see on quotes when this account is a merchant.",
             "example": "Pampa Cambio",
@@ -3964,15 +4813,22 @@
             "maxLength": 140,
             "type": "string"
           },
-          "signature": {
-            "description": "`personal_sign` of the challenge message by the wallet: 65 bytes, 0x-hex.",
-            "example": "0x1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b",
+          "network": {
+            "enum": [
+              "local",
+              "testnet",
+              "mainnet"
+            ],
+            "example": "testnet",
+            "type": "string"
+          },
+          "transaction": {
+            "description": "The challenge from `POST /v1/p2p/accounts/challenge`, signed (base64 XDR). It names the account, your organization and tier.",
             "type": "string"
           }
         },
         "required": [
-          "address",
-          "signature"
+          "transaction"
         ],
         "type": "object"
       },
@@ -3988,9 +4844,10 @@
         "type": "object"
       },
       "Session": {
-        "description": "The signed-in wallet.",
+        "description": "The signed-in account.",
         "properties": {
           "address": {
+            "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
             "type": "string"
           },
           "expiresAt": {
@@ -3998,7 +4855,7 @@
             "type": "string"
           },
           "isAdmin": {
-            "description": "Whether the wallet may use `/v1/admin/*`.",
+            "description": "Whether the account may use `/v1/admin/*`.",
             "type": "boolean"
           },
           "organizations": {
@@ -4043,82 +4900,145 @@
       "SessionToken": {
         "description": "A new session.",
         "properties": {
-          "address": {
-            "example": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
-            "type": "string"
-          },
-          "expiresAt": {
-            "format": "date-time",
-            "type": "string"
+          "session": {
+            "$ref": "#/components/schemas/Session"
           },
           "token": {
-            "description": "Shown once. Browsers use the HttpOnly cookie set with it; other clients send it as `Authorization: Bearer`.",
+            "description": "Shown once (SEP-10’s `token`). Browsers use the HttpOnly cookie set with it; other clients send it as `Authorization: Bearer`.",
             "example": "ps_sess_x2...",
             "type": "string"
           }
         },
         "required": [
           "token",
-          "address",
-          "expiresAt"
+          "session"
         ],
         "type": "object"
       },
       "SignIn": {
-        "description": "A signed EIP-4361 message.",
+        "description": "A signed SEP-10 challenge.",
         "properties": {
-          "message": {
-            "description": "The SIWE message, byte for byte as signed.",
-            "type": "string"
-          },
-          "signature": {
-            "description": "`personal_sign` of the message.",
-            "example": "0x1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b",
+          "transaction": {
+            "description": "The challenge transaction, signed by the account’s signers, base64 XDR.",
             "type": "string"
           }
         },
         "required": [
-          "message",
-          "signature"
+          "transaction"
         ],
         "type": "object"
       },
-      "SiweNonce": {
-        "description": "A single-use nonce for a SIWE message.",
+      "SponsorView": {
+        "description": "Whether the API pays network fees and reserves for wallets.",
         "properties": {
-          "domain": {
-            "description": "The `domain` the SIWE message must name (and its URI host).",
-            "example": "localhost:3000",
+          "enabled": {
+            "description": "True: `POST /v1/app/submit` and `/v1/p2p/submit` fee-bump signed transactions with the sponsor account, and activations are sponsored. False: transactions are submitted as signed (the wallet pays its fee).",
+            "example": true,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "type": "object"
+      },
+      "Submission": {
+        "description": "A signed transaction the API submitted (fee-bumped by its sponsor when gasless is on).",
+        "properties": {
+          "error": {
+            "description": "Why it failed.",
+            "nullable": true,
             "type": "string"
           },
-          "expiresAt": {
-            "format": "date-time",
+          "feeBumpHash": {
+            "description": "The sponsor’s fee-bump hash.",
+            "nullable": true,
             "type": "string"
           },
-          "nonce": {
-            "example": "9f2c4e1ab37d5c08e6a1b2c3d4e5f607",
+          "hash": {
+            "description": "The inner transaction’s hash.",
+            "example": "6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f",
+            "type": "string"
+          },
+          "ledger": {
+            "description": "The ledger it was applied in.",
+            "nullable": true,
+            "type": "number"
+          },
+          "network": {
+            "example": "testnet",
+            "type": "string"
+          },
+          "sponsored": {
+            "description": "Whether the sponsor paid its fee.",
+            "type": "boolean"
+          },
+          "status": {
+            "enum": [
+              "PENDING",
+              "SUCCESS",
+              "FAILED"
+            ],
+            "example": "SUCCESS",
             "type": "string"
           }
         },
         "required": [
-          "nonce",
-          "expiresAt",
-          "domain"
+          "hash",
+          "network",
+          "status",
+          "error",
+          "feeBumpHash",
+          "ledger",
+          "sponsored"
+        ],
+        "type": "object"
+      },
+      "Submit": {
+        "description": "A transaction your wallet signed, to submit.",
+        "properties": {
+          "network": {
+            "description": "Default: the tier’s only network.",
+            "enum": [
+              "local",
+              "testnet",
+              "mainnet"
+            ],
+            "example": "testnet",
+            "type": "string"
+          },
+          "xdr": {
+            "description": "The signed inner `TransactionEnvelope` (base64 XDR), exactly as built by this API and signed. Never a fee-bump.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "xdr"
         ],
         "type": "object"
       },
       "TokenView": {
-        "description": "A stablecoin the P2P market trades on one network.",
+        "description": "A stablecoin the P2P market trades on one network: a classic Stellar asset, used on-chain through its Stellar Asset Contract.",
         "properties": {
-          "address": {
-            "description": "Its contract address (EIP-55): what requests name it by.",
-            "example": "0x036CbD53842c5426634e7929541eC2318f3dCF7e",
+          "code": {
+            "description": "The asset code.",
+            "example": "USDC",
+            "type": "string"
+          },
+          "contract": {
+            "description": "Its Stellar Asset Contract (C...): what orders and balances name it by.",
+            "example": "CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA",
             "type": "string"
           },
           "decimals": {
-            "description": "Decimal places of its base units.",
-            "example": 6,
+            "description": "Decimal places of its base units (always 7).",
+            "example": 7,
             "type": "number"
+          },
+          "issuer": {
+            "description": "The issuing account (G...).",
+            "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+            "type": "string"
           },
           "symbol": {
             "description": "Its symbol.",
@@ -4128,46 +5048,10 @@
         },
         "required": [
           "symbol",
-          "address",
+          "code",
+          "issuer",
+          "contract",
           "decimals"
-        ],
-        "type": "object"
-      },
-      "TransactionView": {
-        "description": "An unsigned EVM transaction for a wallet (or a bot holding its own key) to sign and send: `eth_sendTransaction` takes `to`, `data` and `value` as they are, on the chain `chainId` names. This service never signs it.",
-        "properties": {
-          "chainId": {
-            "description": "The EIP-155 chain id the wallet must be on.",
-            "example": 84532,
-            "type": "number"
-          },
-          "data": {
-            "description": "The calldata, 0x-hex.",
-            "example": "0xa7b0e3b50000000000000000000000000000000000000000000000000000000000000007",
-            "type": "string"
-          },
-          "description": {
-            "description": "What signing it does, in one line, for a confirmation screen.",
-            "example": "Release order 7: pays its buyer 98.5 USDC",
-            "type": "string"
-          },
-          "to": {
-            "description": "The contract to call: the P2P market, or the token for an approval.",
-            "example": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
-            "type": "string"
-          },
-          "value": {
-            "description": "Native coin to send with it: always 0.",
-            "example": "0",
-            "type": "string"
-          }
-        },
-        "required": [
-          "chainId",
-          "to",
-          "data",
-          "value",
-          "description"
         ],
         "type": "object"
       },
@@ -4211,10 +5095,10 @@
           "transaction": {
             "allOf": [
               {
-                "$ref": "#/components/schemas/TransactionView"
+                "$ref": "#/components/schemas/P2pTransaction"
               }
             ],
-            "description": "`release` for the order, for the merchant’s wallet or its bot (PERM_RELEASE) to sign."
+            "description": "`release` for the order, prepared with the merchant account as source and acting address: the merchant’s key (or its bot holding it) signs it and submits it (`POST /v1/p2p/submit`)."
           }
         },
         "required": [
@@ -4350,7 +5234,9 @@
                 "mx_spei",
                 "co_bank_transfer",
                 "pe_bank_transfer",
-                "cl_bank_transfer"
+                "cl_bank_transfer",
+                "ar_qr",
+                "br_pix_qr"
               ],
               "type": "string"
             },
@@ -4403,6 +5289,20 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "UpdateProfile": {
+        "description": "Claim or change your @handle.",
+        "properties": {
+          "handle": {
+            "description": "3 to 20 of a-z, 0-9 and underscore (a leading @ and upper case are accepted and normalised). Unique, case-insensitive; reserved words are refused.",
+            "example": "maria_salta",
+            "type": "string"
+          }
+        },
+        "required": [
+          "handle"
+        ],
         "type": "object"
       },
       "UpdateWebhookEndpoint": {
@@ -4626,6 +5526,21 @@
             "example": 1800,
             "type": "number"
           },
+          "qrAcceptWindow": {
+            "description": "A QR payment: seconds the merchant has to accept it.",
+            "example": 120,
+            "type": "number"
+          },
+          "qrPaymentWindow": {
+            "description": "A QR payment: seconds the merchant then has to pay the scanned QR.",
+            "example": 600,
+            "type": "number"
+          },
+          "qrSettleWindow": {
+            "description": "A QR payment: seconds after the merchant marked it paid with no dispute before anyone may release it.",
+            "example": 3600,
+            "type": "number"
+          },
           "sellAcceptWindow": {
             "description": "A sale or a payout: seconds the merchant has to accept it (locking its bond).",
             "example": 300,
@@ -4646,7 +5561,10 @@
           "buyPaymentWindow",
           "sellAcceptWindow",
           "sellPaymentWindow",
-          "sellSettleWindow"
+          "sellSettleWindow",
+          "qrAcceptWindow",
+          "qrPaymentWindow",
+          "qrSettleWindow"
         ],
         "type": "object"
       }
@@ -4673,6 +5591,29 @@
   },
   "openapi": "3.0.0",
   "paths": {
+    "/.well-known/stellar.toml": {
+      "get": {
+        "description": "Names the SEP-10 endpoint (`WEB_AUTH_ENDPOINT`), the key that signs challenges (`SIGNING_KEY`) and the network (`NETWORK_PASSPHRASE`). Served at the web host, which proxies `/.well-known` here.",
+        "operationId": "wellKnownStellarToml",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": ""
+          }
+        },
+        "summary": "stellar.toml (SEP-1)",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/health": {
       "get": {
         "operationId": "healthHealth",
@@ -5032,6 +5973,592 @@
         ]
       }
     },
+    "/v1/app/activate": {
+      "post": {
+        "description": "Creates the account when it is missing and opens the token’s trustline, the sponsor paying the reserves (CAP-33: begin_sponsoring_future_reserves, create_account with 0 XLM, change_trust, end_sponsoring_future_reserves). `transaction: null` when there is nothing to do. Submit it with `POST /v1/app/submit`, which adds the sponsor’s signature; limited per account and per IP, within the sponsor’s budget.",
+        "operationId": "appWalletActivate",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Activate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppActivation"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Sponsored activation",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/activity": {
+      "get": {
+        "description": "Orders and transfers, newest first, paged by `cursor`. Payments that reached you from outside the app appear as transfers with `fromHandle: null`; they are read from the token contracts’ `transfer` events (CAP-67) as far back as the RPC keeps them (about 7 days on SDF’s RPC).",
+        "operationId": "appWalletActivity",
+        "parameters": [
+          {
+            "description": "Default: the app’s only network.",
+            "in": "query",
+            "name": "network",
+            "required": false,
+            "schema": {
+              "enum": [
+                "local",
+                "testnet",
+                "mainnet"
+              ],
+              "example": "testnet",
+              "type": "string"
+            }
+          },
+          {
+            "description": "The `nextCursor` of the previous page.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "example": 20,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppActivity"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Your activity",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/balances": {
+      "get": {
+        "description": "Whether the account exists, its lumens, and each listed token with its trustline state.",
+        "operationId": "appWalletBalances",
+        "parameters": [
+          {
+            "description": "Default: the app’s only network.",
+            "in": "query",
+            "name": "network",
+            "required": false,
+            "schema": {
+              "enum": [
+                "local",
+                "testnet",
+                "mainnet"
+              ],
+              "example": "testnet",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppBalances"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Your balances",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/charges/{id}": {
+      "get": {
+        "description": "With `payWithBalance`: the token amount the business would receive through the market now (the best quote), held for 60 s.",
+        "operationId": "appWalletCharge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppCharge"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A charge, as its payer sees it",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/charges/{id}/payments": {
+      "post": {
+        "description": "A token transfer to the charge’s receiving account, priced now and valid for 60 s. The charge is paid once the submitted transfer succeeds on-chain (`P2P_CHARGE_SUCCEEDED`, `paidWith: TOKEN`).",
+        "operationId": "appWalletPay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PayCharge"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppCreatedChargePayment"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Pay a charge from your balance",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/handles/{handle}": {
+      "get": {
+        "description": "One handle at a time (there is no listing route). Rate-limited.",
+        "operationId": "appWalletHandle",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "handle",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppHandle"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Who an @handle is",
+        "tags": [
+          "App"
+        ]
+      }
+    },
     "/v1/app/orders": {
       "get": {
         "operationId": "appList",
@@ -5087,6 +6614,7 @@
               "enum": [
                 "BUY",
                 "SELL",
+                "QR_PAY",
                 "CHARGE",
                 "PAYOUT"
               ],
@@ -5094,12 +6622,12 @@
             }
           },
           {
-            "description": "Only orders where this wallet is the buyer or the seller (any case).",
+            "description": "Only orders where this account is the buyer or the seller.",
             "in": "query",
             "name": "address",
             "required": false,
             "schema": {
-              "example": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+              "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
               "type": "string"
             }
           }
@@ -5646,7 +7174,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TransactionView"
+                  "$ref": "#/components/schemas/P2pTransaction"
                 }
               }
             },
@@ -5702,6 +7230,145 @@
           }
         ],
         "summary": "Build a transaction for your wallet on your order",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/profile": {
+      "get": {
+        "operationId": "appWalletProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppProfile"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Your account and @handle",
+        "tags": [
+          "App"
+        ]
+      },
+      "put": {
+        "description": "Normalised to lower case; unique; reserved words refused. `409 handle_taken` when someone has it.",
+        "operationId": "appWalletSetProfile",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfile"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppProfile"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Claim or change your @handle",
         "tags": [
           "App"
         ]
@@ -5808,6 +7475,400 @@
         ]
       }
     },
+    "/v1/app/submissions/{hash}": {
+      "get": {
+        "operationId": "appWalletSubmission",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hash",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One of your submissions, by its hash",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/submit": {
+      "post": {
+        "description": "The signed inner envelope this API built for your account: checked (network, source = your account, one allowed operation or the sponsored activation, time bounds, fee cap, rate limits, budget), fee-bumped by the sponsor when gasless is on, recorded, broadcast; waits up to about 15 s.",
+        "operationId": "appWalletSubmit",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Submit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Submit a signed transaction (gasless)",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/transfers": {
+      "post": {
+        "description": "To a G, M or C address or an @handle. A G or M recipient gets a classic `payment`, a C recipient a SAC `transfer`; the note becomes a text memo (classic payments only). Refused: a recipient that cannot receive (`recipient_cannot_receive`), yourself, more than your balance (`insufficient_balance`).",
+        "operationId": "appWalletTransfer",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTransfer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppCreatedTransfer"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send tokens",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/transfers/{id}": {
+      "get": {
+        "operationId": "appWalletGetTransfer",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppTransfer"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "One of your transfers (sent or received)",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/auth/challenge": {
+      "get": {
+        "description": "A SEP-10 challenge for the account: signed by this service’s SEP-10 key, with a single-use nonce, the `web_auth_domain` entry and 5-minute time bounds.",
+        "operationId": "authChallenge",
+        "parameters": [
+          {
+            "description": "The account (G...) that signs in.",
+            "in": "query",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthChallenge"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "summary": "Get a sign-in challenge",
+        "tags": [
+          "Auth"
+        ]
+      }
+    },
     "/v1/auth/logout": {
       "post": {
         "description": "Ends this session and clears its cookie.",
@@ -5852,21 +7913,42 @@
         ]
       }
     },
-    "/v1/auth/nonce": {
-      "post": {
-        "description": "A single-use nonce, valid for minutes, to put in an EIP-4361 (SIWE) message.",
-        "operationId": "authNonce",
-        "parameters": [],
+    "/v1/auth/sep10": {
+      "get": {
+        "description": "The `WEB_AUTH_ENDPOINT` of `/.well-known/stellar.toml`, for SEP-10 clients: the same as `GET /v1/auth/challenge`.",
+        "operationId": "authSep10Challenge",
+        "parameters": [
+          {
+            "description": "The account (G...) that signs in.",
+            "in": "query",
+            "name": "account",
+            "required": true,
+            "schema": {
+              "example": "GBZXN7PIRZGNMHGA7MUUUF4GWPY5AYPV6LY4UV2GL6VJGIQRXFDNMADI",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SiweNonce"
+                  "$ref": "#/components/schemas/AuthChallenge"
                 }
               }
             },
             "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
           },
           "429": {
             "content": {
@@ -5877,9 +7959,80 @@
               }
             },
             "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
           }
         },
-        "summary": "Get a sign-in nonce",
+        "summary": "SEP-10 endpoint: get a challenge",
+        "tags": [
+          "Auth"
+        ]
+      },
+      "post": {
+        "description": "The `WEB_AUTH_ENDPOINT` of `/.well-known/stellar.toml`, for SEP-10 clients: the same as `POST /v1/auth/verify`.",
+        "operationId": "authSep10Verify",
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SignIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SessionToken"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "summary": "SEP-10 endpoint: verify a signed challenge",
         "tags": [
           "Auth"
         ]
@@ -5930,7 +8083,7 @@
             "bearer": []
           }
         ],
-        "summary": "The signed-in wallet",
+        "summary": "The signed-in account",
         "tags": [
           "Auth"
         ]
@@ -5938,7 +8091,7 @@
     },
     "/v1/auth/verify": {
       "post": {
-        "description": "Verifies the message (domain, URI, nonce, times) and the wallet signature, spends the nonce and opens a session: an HttpOnly cookie, and the token in the body for non-browser clients.",
+        "description": "Verifies the challenge (server signature, time bounds, domains, nonce) and the account’s signatures (its medium threshold, or the master key of an account not created yet), spends the nonce and opens a session: an HttpOnly cookie, and the token in the body for other clients.",
         "operationId": "authVerify",
         "parameters": [],
         "requestBody": {
@@ -5981,9 +8134,19 @@
               }
             },
             "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
           }
         },
-        "summary": "Sign in with a signed SIWE message",
+        "summary": "Sign in with a signed challenge",
         "tags": [
           "Auth"
         ]
@@ -8384,6 +10547,7 @@
               "enum": [
                 "BUY",
                 "SELL",
+                "QR_PAY",
                 "CHARGE",
                 "PAYOUT"
               ],
@@ -8391,12 +10555,12 @@
             }
           },
           {
-            "description": "Only orders where this wallet is the buyer or the seller (any case).",
+            "description": "Only orders where this account is the buyer or the seller.",
             "in": "query",
             "name": "address",
             "required": false,
             "schema": {
-              "example": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+              "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
               "type": "string"
             }
           },
@@ -9161,6 +11325,7 @@
               "enum": [
                 "BUY",
                 "SELL",
+                "QR_PAY",
                 "CHARGE",
                 "PAYOUT"
               ],
@@ -9168,12 +11333,12 @@
             }
           },
           {
-            "description": "Only orders where this wallet is the buyer or the seller (any case).",
+            "description": "Only orders where this account is the buyer or the seller.",
             "in": "query",
             "name": "address",
             "required": false,
             "schema": {
-              "example": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+              "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
               "type": "string"
             }
           },
@@ -10720,6 +12885,221 @@
         ]
       }
     },
+    "/v1/p2p/submissions/{hash}": {
+      "get": {
+        "operationId": "submitSubmission",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "hash",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the organization to act for (API keys carry theirs).",
+            "in": "header",
+            "name": "Pedospe-Organization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the tier to act on (default `test`).",
+            "in": "header",
+            "name": "Pedospe-Tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "live",
+                "test"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "summary": "One of your organization’s submissions, by its hash",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/v1/p2p/submit": {
+      "post": {
+        "description": "A transaction this API built for one of your registered accounts (`POST /v1/p2p/transactions`, a sale’s `open_with_deposit`, a transfer match’s `release`), signed: checked as `POST /v1/app/submit` (source = an account of yours on this tier), fee-bumped when gasless is on, recorded, broadcast.",
+        "operationId": "submitSubmit",
+        "parameters": [
+          {
+            "description": "Wallet sessions only: the organization to act for (API keys carry theirs).",
+            "in": "header",
+            "name": "Pedospe-Organization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the tier to act on (default `test`).",
+            "in": "header",
+            "name": "Pedospe-Tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "live",
+                "test"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Submit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Submission"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`service_unavailable`: the market is not available on that network right now."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "summary": "Submit a signed transaction (gasless)",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
     "/v1/p2p/transactions": {
       "post": {
         "description": "Unsigned calldata for one of your accounts (or a sale’s seller): approve, deposit, withdraw, setOperator, setMatcher, accept, markPaid, release, cancel, dispute. Each is checked against the order or account it names; the contract still decides.",
@@ -10763,7 +13143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/TransactionView"
+                  "$ref": "#/components/schemas/P2pTransaction"
                 }
               }
             },

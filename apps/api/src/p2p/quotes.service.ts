@@ -12,6 +12,9 @@ import {
   P2P_CURRENCIES,
   P2P_MATCH_MAX_CANDIDATES,
   P2P_PRICE_DECIMALS,
+  P2P_QR_ACCEPT_WINDOW_SECONDS,
+  P2P_QR_PAYMENT_WINDOW_SECONDS,
+  P2P_QR_SETTLE_WINDOW_SECONDS,
   P2P_QUOTE_TTL_SECONDS,
   P2P_SELL_ACCEPT_WINDOW_SECONDS,
   P2P_SELL_BOND_BPS,
@@ -38,6 +41,7 @@ import {
 import { isP2pRailId, P2P_RAILS } from '@/p2p/domain/rails';
 import type { CreateQuoteDto } from '@/p2p/dto/order.dto';
 import type { QuoteView } from '@/p2p/entities/offer.entity';
+import type { QrSummaryView } from '@/p2p/entities/order.entity';
 import { PaymentMethodsService } from '@/p2p/payment-methods.service';
 import { tierOf } from '@/p2p/tier';
 import { merchantStats } from '@/p2p/views';
@@ -82,19 +86,27 @@ export interface P2pMatch {
   paymentMethodId: string | null;
 }
 
-/** The windows an order of each side gets. */
-export function windowsFor(side: P2pTradeSide) {
-  return side === 'BUY'
-    ? {
-        acceptWindow: 0,
-        paymentWindow: P2P_BUY_PAYMENT_WINDOW_SECONDS,
-        settleWindow: 0,
-      }
-    : {
+/** The order kinds a quote is for. */
+export type P2pQuoteKind = P2pTradeSide | 'QR_PAY';
+
+/** The windows an order of each kind gets. */
+export function windowsFor(kind: P2pQuoteKind) {
+  switch (kind) {
+    case 'BUY':
+      return { acceptWindow: 0, paymentWindow: P2P_BUY_PAYMENT_WINDOW_SECONDS, settleWindow: 0 };
+    case 'QR_PAY':
+      return {
+        acceptWindow: P2P_QR_ACCEPT_WINDOW_SECONDS,
+        paymentWindow: P2P_QR_PAYMENT_WINDOW_SECONDS,
+        settleWindow: P2P_QR_SETTLE_WINDOW_SECONDS,
+      };
+    default:
+      return {
         acceptWindow: P2P_SELL_ACCEPT_WINDOW_SECONDS,
         paymentWindow: P2P_SELL_PAYMENT_WINDOW_SECONDS,
         settleWindow: P2P_SELL_SETTLE_WINDOW_SECONDS,
       };
+  }
 }
 
 /** Local money in a currency's minor units, or a 400. */
@@ -109,10 +121,17 @@ export function fiatUnitsOf(currency: string, value: string): bigint {
   return units;
 }
 
-/** A rail that pays in the currency, or a 400. */
-export function checkRail(rail: string, currency: string): void {
+/** A rail that pays in the currency, or a 400. QR rails serve only QR payments. */
+export function checkRail(rail: string, currency: string, qr = false): void {
   if (!isP2pRailId(rail) || P2P_RAILS[rail].currency !== currency) {
     throw ApiError.validation([`rail ${rail} does not pay in ${currency}`]);
+  }
+  if (Boolean(P2P_RAILS[rail].qr) !== qr) {
+    throw ApiError.validation([
+      qr
+        ? `rail ${rail} does not pay a scanned QR`
+        : `rail ${rail} pays scanned QRs only: quote it as kind QR_PAY`,
+    ]);
   }
 }
 
@@ -169,12 +188,15 @@ export class QuotesService {
     integratorFeeBps: number;
     integratorAddress: string | null;
     endUserAddress: string | null;
+    /** QR_PAY: the scanned QR's hash (the order repeats the QR) and what it reads. */
+    qr?: { hash: string; summary: QrSummaryView };
   }): Promise<QuoteView> {
     const { organizationId, tier, dto, integratorFeeBps, integratorAddress } = input;
+    const kind: P2pQuoteKind = input.qr ? 'QR_PAY' : dto.side;
     if ((dto.fiatAmount === undefined) === (dto.tokenAmount === undefined)) {
       throw ApiError.validation(['give exactly one of fiatAmount or tokenAmount']);
     }
-    checkRail(dto.rail, dto.currency);
+    checkRail(dto.rail, dto.currency, kind === 'QR_PAY');
     const deployment = await this.reader.requireLive(tier, dto.network);
     const token = this.deployments.token(deployment, dto.token);
     const protocol = await this.openProtocol(deployment);
@@ -199,8 +221,10 @@ export class QuotesService {
         tier,
         endUserAddress: input.endUserAddress,
         side: dto.side,
+        kind,
+        qrHash: input.qr?.hash ?? null,
         network: deployment.network,
-        token: token.address,
+        token: token.contract,
         currency: dto.currency,
         rail: dto.rail,
         offerId: match.offerId,
@@ -221,6 +245,8 @@ export class QuotesService {
     return {
       id: row.id,
       side: row.side,
+      kind,
+      qr: input.qr?.summary ?? null,
       network: row.network,
       token: row.token,
       tokenSymbol: token.symbol,
@@ -236,7 +262,7 @@ export class QuotesService {
       integratorFeeBps: row.integratorFeeBps,
       integratorFee: row.integratorFee,
       bond: row.bond,
-      windows: windowsFor(dto.side),
+      windows: windowsFor(kind),
       merchant: {
         displayName: match.account.displayName,
         ...merchantStats(match.account),
@@ -270,7 +296,7 @@ export class QuotesService {
       where: {
         tier,
         network: deployment.network,
-        token: token.address,
+        token: token.contract,
         currency: input.currency,
         side: side === 'BUY' ? 'SELL_TOKEN' : 'BUY_TOKEN',
         active: true,
@@ -380,7 +406,7 @@ export class QuotesService {
       const bond = side === 'SELL' ? bondFor(candidate.amounts.grossTokens, P2P_SELL_BOND_BPS) : 0n;
       try {
         const [freeBalance, terms] = await Promise.all([
-          this.reader.balanceOf(deployment, candidate.row.account.address, token.address),
+          this.reader.balanceOf(deployment, candidate.row.account.address, token.contract),
           side === 'BUY' && matcher
             ? this.reader.matcherTerms(deployment, candidate.row.account.address, matcher)
             : Promise.resolve({ maxPerOrder: 0n, autoSettle: false }),

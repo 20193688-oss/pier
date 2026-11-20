@@ -1,26 +1,35 @@
-import type { Hex } from 'viem';
-import { privateKeyToAccount } from 'viem/accounts';
-import { createSiweMessage } from 'viem/siwe';
-import { DEV_CHAIN_ID } from '@/chain/networks';
-import { devSend, devWallet, type DevWallet, type LocalDeployment } from '@/dev/local-chain';
+import { Keypair, TransactionBuilder, type Transaction } from '@stellar/stellar-sdk';
+import { rpcFor } from '@/chain/market-deploy';
+import {
+  DEV_TOKEN_CODE,
+  keypair,
+  mintTusd,
+  type DevAccounts,
+  type DevChain,
+  type DevMarket,
+} from '@/dev/stellar-dev';
 
 /**
- * Seeds a local market THROUGH THE API, the way a real merchant and a real
- * business would set themselves up: SIWE sign-in, an organization each, a
- * test API key, wallets registered with their signature, payment methods,
- * offers, liquidity deposited and the matcher authorised with transactions
- * the API built and the dev wallets signed, and a charge.
+ * Seeds a dev market THROUGH THE API, the way a real merchant, business and
+ * person would set themselves up: SEP-10 sign-in, an organization each, a
+ * test API key, accounts registered with SEP-10 proofs, payment methods,
+ * offers (QR payments included), liquidity deposited and the matcher
+ * authorised with transactions the API built, the dev keys signed and the API
+ * submitted (sponsored), a charge, and the user's account activated by the
+ * sponsor. Only minting TUSD to the user is the issuer's own payment.
  */
 
 export interface SeedResult {
   merchant: { organizationId: string; apiKey: string; accountId: string; address: string };
   business: { organizationId: string; apiKey: string; accountId: string; address: string };
+  user: { address: string };
   charge: { id: string; url: string };
 }
 
-class Api {
+/** A minimal client of the API for dev scripts and tests. */
+export class DevApi {
   constructor(
-    private readonly base: string,
+    readonly base: string,
     private readonly origin: string,
   ) {}
 
@@ -47,93 +56,113 @@ class Api {
   }
 }
 
-/** Signs in a wallet with SIWE; answers its session token. */
-export async function signIn(api: Api, wallet: DevWallet, domain: string): Promise<string> {
-  const { nonce } = await api.call<{ nonce: string }>('POST', '/v1/auth/nonce', null);
-  const message = createSiweMessage({
-    domain,
-    address: wallet.address,
-    statement: 'Sign in to pedospe.',
-    uri: `http://${domain}`,
-    version: '1',
-    chainId: DEV_CHAIN_ID,
-    nonce,
-    issuedAt: new Date(),
-  });
-  const signature = await privateKeyToAccount(wallet.privateKey).signMessage({ message });
+/** Signs an XDR envelope with `signer` for `passphrase`. */
+export function signXdr(xdr: string, passphrase: string, signer: Keypair): string {
+  const tx = TransactionBuilder.fromXDR(xdr, passphrase) as Transaction;
+  tx.sign(signer);
+  return tx.toXDR();
+}
+
+/** Signs an account in with SEP-10; answers its session token. */
+export async function signIn(api: DevApi, signer: Keypair): Promise<string> {
+  const challenge = await api.call<{ transaction: string; network_passphrase: string }>(
+    'GET',
+    `/v1/auth/challenge?account=${signer.publicKey()}`,
+    null,
+  );
   const session = await api.call<{ token: string }>('POST', '/v1/auth/verify', null, {
-    message,
-    signature,
+    transaction: signXdr(challenge.transaction, challenge.network_passphrase, signer),
   });
   return session.token;
 }
 
-async function registerWallet(api: Api, key: string, wallet: DevWallet, displayName: string) {
-  const { message } = await api.call<{ message: string }>(
+/** Registers an account for an organization with its SEP-10-shaped proof. */
+export async function registerAccount(
+  api: DevApi,
+  key: string,
+  signer: Keypair,
+  displayName: string,
+): Promise<{ id: string; address: string }> {
+  const challenge = await api.call<{ transaction: string; network_passphrase: string }>(
     'POST',
     '/v1/p2p/accounts/challenge',
     key,
-    {
-      address: wallet.address,
-    },
+    { address: signer.publicKey() },
   );
-  const signature = await privateKeyToAccount(wallet.privateKey).signMessage({ message });
   return api.call<{ id: string; address: string }>('POST', '/v1/p2p/accounts', key, {
-    address: wallet.address,
-    signature,
+    transaction: signXdr(challenge.transaction, challenge.network_passphrase, signer),
     displayName,
-    label: `${displayName} dev wallet`,
+    label: `${displayName} dev account`,
   });
 }
 
-async function organizationWithKey(api: Api, session: string, name: string) {
+export interface Submission {
+  hash: string;
+  status: 'PENDING' | 'SUCCESS' | 'FAILED';
+  error: string | null;
+}
+
+/**
+ * Signs a transaction the API built and submits it through the API (`app`:
+ * a session's `/v1/app/submit`; `org`: an API key's `/v1/p2p/submit`), then
+ * waits until it is applied; throws unless it succeeded.
+ */
+export async function signAndSubmit(
+  api: DevApi,
+  token: string,
+  channel: 'app' | 'org',
+  built: { xdr: string; network: string },
+  signer: Keypair,
+  passphrase: string,
+): Promise<Submission> {
+  const base = channel === 'app' ? '/v1/app' : '/v1/p2p';
+  let sub = await api.call<Submission>('POST', `${base}/submit`, token, {
+    xdr: signXdr(built.xdr, passphrase, signer),
+    network: built.network,
+  });
+  for (let i = 0; i < 60 && sub.status === 'PENDING'; i++) {
+    await new Promise((r) => setTimeout(r, 1_000));
+    sub = await api.call<Submission>('GET', `${base}/submissions/${sub.hash}`, token);
+  }
+  if (sub.status !== 'SUCCESS') {
+    throw new Error(`submission ${sub.hash} ${sub.status}: ${sub.error ?? 'no result'}`);
+  }
+  return sub;
+}
+
+async function organizationWithKey(api: DevApi, session: string, name: string) {
   const org = await api.call<{ id: string }>('POST', '/v1/organizations', session, { name });
   const key = await api.call<{ key: string }>(
     'POST',
     `/v1/organizations/${org.id}/api-keys`,
     session,
-    {
-      name: `${name} dev key`,
-      tier: 'test',
-      scopes: ['p2p:read', 'p2p:write'],
-    },
+    { name: `${name} dev key`, tier: 'test', scopes: ['p2p:read', 'p2p:write'] },
   );
   return { organizationId: org.id, apiKey: key.key };
 }
 
-async function signBuilt(
-  api: Api,
-  rpcUrl: string,
-  key: string,
-  wallet: DevWallet,
-  body: unknown,
-): Promise<void> {
-  const tx = await api.call<{ to: Hex; data: Hex }>('POST', '/v1/p2p/transactions', key, body);
-  await devSend(rpcUrl, wallet.privateKey, tx);
-}
+/** Units of one TUSD (7 decimals). */
+const U = 10_000_000n;
 
 export async function seedDevMarket(input: {
   apiUrl: string;
-  rpcUrl: string;
-  siweDomain: string;
   webOrigin: string;
-  checkoutUrl: string;
-  deployment: LocalDeployment;
+  chain: DevChain;
+  market: DevMarket;
+  accounts: DevAccounts;
+  log?: (m: string) => void;
 }): Promise<SeedResult> {
-  const api = new Api(input.apiUrl, input.webOrigin);
-  const token = input.deployment.tokenSymbol;
-  const U = 10n ** BigInt(input.deployment.tokenDecimals);
+  const log = input.log ?? (() => undefined);
+  const { chain, accounts } = input;
+  const api = new DevApi(input.apiUrl, input.webOrigin);
+  const network = chain.network;
+  const token = DEV_TOKEN_CODE;
 
-  // --- the merchant: sells and buys tokens against ARS and BRL ---------------
-  const merchantWallet = devWallet('merchant');
-  const merchantSession = await signIn(api, merchantWallet, input.siweDomain);
+  // --- the merchant: sells and buys tokens against ARS and BRL, and pays QRs --
+  const merchantKey = keypair(accounts.merchant);
+  const merchantSession = await signIn(api, merchantKey);
   const merchant = await organizationWithKey(api, merchantSession, 'Dev Merchant');
-  const merchantAccount = await registerWallet(
-    api,
-    merchant.apiKey,
-    merchantWallet,
-    'Pampa Cambio',
-  );
+  const merchantAccount = await registerAccount(api, merchant.apiKey, merchantKey, 'Pampa Cambio');
   await api.call('POST', '/v1/p2p/payment-methods', merchant.apiKey, {
     accountId: merchantAccount.id,
     currency: 'ARS',
@@ -168,6 +197,14 @@ export async function seedDevMarket(input: {
       maxFiat: '2000000',
     },
     {
+      side: 'BUY_TOKEN',
+      currency: 'ARS',
+      rails: ['ar_qr'],
+      price: '1190',
+      minFiat: '100',
+      maxFiat: '500000',
+    },
+    {
       side: 'SELL_TOKEN',
       currency: 'BRL',
       rails: ['br_pix'],
@@ -183,50 +220,49 @@ export async function seedDevMarket(input: {
       minFiat: '10',
       maxFiat: '10000',
     },
+    {
+      side: 'BUY_TOKEN',
+      currency: 'BRL',
+      rails: ['br_pix_qr'],
+      price: '5.35',
+      minFiat: '1',
+      maxFiat: '5000',
+    },
   ];
   for (const offer of offers) {
     await api.call('POST', '/v1/p2p/offers', merchant.apiKey, {
       accountId: merchantAccount.id,
-      network: 'local',
+      network,
       token,
       priceTtlSeconds: 24 * 60 * 60,
       ...offer,
     });
   }
-  const liquidity = 100_000n * U;
-  const base = { network: 'local', from: merchantAccount.id };
-  await signBuilt(api, input.rpcUrl, merchant.apiKey, merchantWallet, {
-    ...base,
-    action: 'approve',
-    args: { token, amount: liquidity.toString() },
-  });
-  await signBuilt(api, input.rpcUrl, merchant.apiKey, merchantWallet, {
-    ...base,
-    action: 'deposit',
-    args: { token, amount: liquidity.toString() },
-  });
-  await signBuilt(api, input.rpcUrl, merchant.apiKey, merchantWallet, {
-    ...base,
-    action: 'setMatcher',
-    args: { maxPerOrder: (5_000n * U).toString(), autoSettle: false },
-  });
+  for (const [action, args] of [
+    ['deposit', { token, amount: (100_000n * U).toString() }],
+    ['setMatcher', { maxPerOrder: (5_000n * U).toString(), autoSettle: false }],
+  ] as const) {
+    const built = await api.call<{ xdr: string; network: string }>(
+      'POST',
+      '/v1/p2p/transactions',
+      merchant.apiKey,
+      { network, from: merchantAccount.id, action, args },
+    );
+    await signAndSubmit(api, merchant.apiKey, 'org', built, merchantKey, chain.passphrase);
+  }
+  log('merchant seeded: offers (ARS, BRL, QR), 100 000 TUSD deposited, matcher authorised');
 
   // --- the business: integrates buy/sell and collects with charges -----------
-  const businessWallet = devWallet('business');
-  const businessSession = await signIn(api, businessWallet, input.siweDomain);
+  const businessKey = keypair(accounts.business);
+  const businessSession = await signIn(api, businessKey);
   const business = await organizationWithKey(api, businessSession, 'Dev Business');
-  const businessAccount = await registerWallet(
-    api,
-    business.apiKey,
-    businessWallet,
-    'Dev Business',
-  );
+  const businessAccount = await registerAccount(api, business.apiKey, businessKey, 'Dev Business');
   const charge = await api.call<{ id: string; url: string }>(
     'POST',
     '/v1/p2p/charges',
     business.apiKey,
     {
-      network: 'local',
+      network,
       token,
       currency: 'ARS',
       fiatAmount: '25000',
@@ -237,10 +273,28 @@ export async function seedDevMarket(input: {
       expiresAt: new Date(Date.now() + 29 * 24 * 3600 * 1000).toISOString(),
     },
   );
+  log('business seeded with a charge');
+
+  // --- the user: an account the sponsor creates, then dev dollars -------------
+  const userKey = keypair(accounts.user);
+  const userSession = await signIn(api, userKey);
+  const activation = await api.call<{ transaction: { xdr: string; network: string } | null }>(
+    'POST',
+    '/v1/app/activate',
+    userSession,
+    { network, token },
+  );
+  if (activation.transaction) {
+    await signAndSubmit(api, userSession, 'app', activation.transaction, userKey, chain.passphrase);
+  }
+  const server = await rpcFor(chain.rpcUrl, chain.passphrase);
+  await mintTusd(server, chain, accounts.issuer, accounts.user.publicKey, 5_000n * U);
+  log('user activated by the sponsor and given 5 000 TUSD');
 
   return {
-    merchant: { ...merchant, accountId: merchantAccount.id, address: merchantWallet.address },
-    business: { ...business, accountId: businessAccount.id, address: businessWallet.address },
+    merchant: { ...merchant, accountId: merchantAccount.id, address: merchantKey.publicKey() },
+    business: { ...business, accountId: businessAccount.id, address: businessKey.publicKey() },
+    user: { address: userKey.publicKey() },
     charge: { id: charge.id, url: charge.url },
   };
 }
@@ -251,7 +305,7 @@ export async function refreshDevPrices(
   webOrigin: string,
   merchantKey: string,
 ): Promise<number> {
-  const api = new Api(apiUrl, webOrigin);
+  const api = new DevApi(apiUrl, webOrigin);
   const list = await api.call<{ data: { id: string; price: string }[] }>(
     'GET',
     '/v1/p2p/offers?take=100',
@@ -262,5 +316,3 @@ export async function refreshDevPrices(
   }
   return list.data.length;
 }
-
-export { Api as DevApi };

@@ -1,40 +1,44 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { NETWORK_IDS } from '@/chain/networks';
 
-/** An unsigned EVM transaction this service built for a wallet to sign. */
+/** An unsigned, prepared Stellar transaction this service built for a wallet to sign. */
 @ApiSchema({
+  name: 'P2pTransaction',
   description:
-    'An unsigned EVM transaction for a wallet (or a bot holding its own key) ' +
-    'to sign and send: `eth_sendTransaction` takes `to`, `data` and `value` ' +
-    'as they are, on the chain `chainId` names. This service never signs it.',
+    'An unsigned Stellar transaction for a wallet (or a bot holding its own key) to sign: one operation, the wallet as source, time bounds at most 5 minutes ahead, already prepared (simulation, resource fee, footprint). Sign the envelope as it is and submit it with `POST /v1/app/submit` or `POST /v1/p2p/submit` (the sponsor pays the fee), or submit it yourself. This service never signs it.',
 })
 export class TransactionView {
-  @ApiProperty({
-    example: 84532,
-    description: 'The EIP-155 chain id the wallet must be on.',
-  })
-  chainId!: number;
+  @ApiProperty({ enum: NETWORK_IDS, example: 'testnet', description: 'The network it is for.' })
+  network!: string;
 
   @ApiProperty({
-    example: '0x5FbDB2315678afecb367f032d93F642f64180aa3',
-    description: 'The contract to call: the P2P market, or the token for an approval.',
+    example: 'release',
+    description:
+      'What it does: a market function (`deposit`, `open_with_deposit`, `release`...), `transfer` (a token payment) or `activate`.',
   })
-  to!: string;
-
-  @ApiProperty({
-    example: '0xa7b0e3b50000000000000000000000000000000000000000000000000000000000000007',
-    description: 'The calldata, 0x-hex.',
-  })
-  data!: string;
-
-  @ApiProperty({
-    example: '0',
-    description: 'Native coin to send with it: always 0.',
-  })
-  value!: string;
+  action!: string;
 
   @ApiProperty({
     example: 'Release order 7: pays its buyer 98.5 USDC',
     description: 'What signing it does, in one line, for a confirmation screen.',
   })
   description!: string;
+
+  @ApiProperty({
+    example: 'AAAAAgAAAAA...',
+    description: 'The unsigned, prepared `TransactionEnvelope`, base64 XDR.',
+  })
+  xdr!: string;
+
+  @ApiProperty({
+    example: '6b1f8c3e2d7a4b5c9e0f1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d5e6f',
+    description: 'The hex hash of the transaction (the inner one when it is fee-bumped).',
+  })
+  hash!: string;
+
+  @ApiProperty({
+    example: '2026-11-19T12:05:00.000Z',
+    description: 'Its upper time bound: sign and submit it before then.',
+  })
+  expiresAt!: Date;
 }

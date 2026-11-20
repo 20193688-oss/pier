@@ -10,6 +10,7 @@ export const JOB_LOCK_KEYS = {
   expiry: 2,
   matcherFollower: 3,
   webhookSender: 4,
+  submissionFollower: 5,
 } as const;
 
 /**

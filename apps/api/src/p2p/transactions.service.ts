@@ -1,32 +1,47 @@
 import { Injectable } from '@nestjs/common';
-import { getAddress } from 'viem';
 import type { OrgPrincipal } from '@/auth/auth.types';
-import { DeploymentsService } from '@/chain/deployments.service';
+import { ChainCallReverted } from '@/chain/chain-client.service';
+import { DeploymentsService, type Deployment } from '@/chain/deployments.service';
 import { MarketReader } from '@/chain/market-reader.service';
 import type { Tier } from '@/chain/networks';
+import { TxBuilder, type BuiltTransaction } from '@/chain/tx-builder.service';
 import { ApiError, ErrorCode } from '@/common/api-error';
+import { isAccountAddress } from '@/common/stellar';
 import { AccountsService } from '@/p2p/accounts.service';
 import { isUuid } from '@/p2p/domain/order-ref';
+import { isSelfOpened } from '@/p2p/domain/order-status';
 import {
   buildBalanceAction,
   buildOrderAction,
   isBalanceAction,
+  type P2pBuiltCall,
   type P2pTransactionAction,
 } from '@/p2p/domain/transaction-actions';
 import type { BuildTransactionDto } from '@/p2p/dto/transaction.dto';
-import type { TransactionView } from '@/p2p/entities/transaction.entity';
 import { OffersService } from '@/p2p/offers.service';
 import { tierOf } from '@/p2p/tier';
 import { P2P_ORDER_SELECT, type P2pOrderRow } from '@/p2p/views';
 import { PrismaService } from '@/prisma/prisma.service';
 
+/** A contract refusal while preparing a transaction, as the 400 a caller reads. */
+export function refusedByContract(err: unknown): never {
+  if (err instanceof ChainCallReverted) {
+    throw ApiError.badRequest(
+      ErrorCode.InvalidState,
+      `The contract would refuse it (${err.contractError ?? 'refused'}).`,
+      [err.detail.slice(0, 300)],
+    );
+  }
+  throw err;
+}
+
 /**
  * Builds the transactions clients and their bots sign: one action table
- * (`p2p-transaction-actions.ts`) and the facts each action reads. `from` is
- * one of the caller's accounts, or the seller's address of one of the
- * caller's sales (a person's wallet is not an account). An order action names
- * an order the caller is a party to: its client (it created it) or its
- * merchant (its account is the merchant). Nothing is signed here.
+ * (`transaction-actions.ts`) and the facts each action reads, prepared
+ * through simulation (`TxBuilder`). `from` is one of the caller's accounts, or
+ * the seller of one of the caller's sales (a person's wallet is not an
+ * account). An order action names an order the caller is a party to: its
+ * client (it created it) or its merchant. Nothing is signed here.
  */
 @Injectable()
 export class TransactionsService {
@@ -36,9 +51,19 @@ export class TransactionsService {
     private readonly offers: OffersService,
     private readonly deployments: DeploymentsService,
     private readonly reader: MarketReader,
+    private readonly builder: TxBuilder,
   ) {}
 
-  async build(org: OrgPrincipal, dto: BuildTransactionDto): Promise<TransactionView> {
+  /** A built call as the prepared transaction `from` signs. */
+  async prepared(d: Deployment, from: string, call: P2pBuiltCall): Promise<BuiltTransaction> {
+    try {
+      return await this.builder.invoke(d, from, call.operation, call.fn, call.description);
+    } catch (err) {
+      refusedByContract(err);
+    }
+  }
+
+  async build(org: OrgPrincipal, dto: BuildTransactionDto): Promise<BuiltTransaction> {
     const tier = tierOf(org, this.deployments);
     const organizationId = org.organizationId;
     const deployment = await this.reader.requireLive(tier, dto.network);
@@ -51,20 +76,12 @@ export class TransactionsService {
         contract: deployment.contract,
         from: account.address,
         matcher: this.deployments.matcherAddress(),
-        token: (value) => {
-          try {
-            return this.deployments.token(deployment, value);
-          } catch {
-            return null;
-          }
-        },
+        token: (value) => this.deployments.findToken(deployment, value),
         sellsLiquidity:
           action === 'setMatcher' ? await this.offers.sellsLiquidity(account.id) : false,
       });
-      if (!built.ok) {
-        throw ApiError.validation([built.error]);
-      }
-      return { chainId: deployment.chainId, value: '0', ...built.value };
+      if (!built.ok) throw ApiError.validation([built.error]);
+      return this.prepared(deployment, account.address, built.value);
     }
 
     const orderId = args.orderId;
@@ -82,10 +99,8 @@ export class TransactionsService {
       order,
       now: new Date(),
     });
-    if (!built.ok) {
-      throw ApiError.badRequest(ErrorCode.InvalidState, built.error);
-    }
-    return { chainId: deployment.chainId, value: '0', ...built.value };
+    if (!built.ok) throw ApiError.badRequest(ErrorCode.InvalidState, built.error);
+    return this.prepared(deployment, from, built.value);
   }
 
   /** An order the caller created or is the merchant of, on its tier; else a 404. */
@@ -103,8 +118,8 @@ export class TransactionsService {
   }
 
   /**
-   * The wallet that signs: an account of the caller (by id or address), or
-   * the seller's address of a sale the caller created, for that order only.
+   * The account that signs: an account of the caller (by id or address), or
+   * the seller of a sale the caller created, for that order only.
    */
   private async signer(
     organizationId: string,
@@ -113,10 +128,10 @@ export class TransactionsService {
     order: P2pOrderRow,
   ): Promise<string> {
     if (
-      order.kind === 'SELL' &&
+      isSelfOpened(order.kind) &&
       order.organizationId === organizationId &&
-      /^0x[0-9a-fA-F]{40}$/.test(from) &&
-      getAddress(from) === order.sellerAddress
+      isAccountAddress(from) &&
+      from === order.sellerAddress
     ) {
       return order.sellerAddress;
     }

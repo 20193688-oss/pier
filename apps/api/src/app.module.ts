@@ -1,12 +1,14 @@
-import { Global, Module, type DynamicModule } from '@nestjs/common';
+import { Global, Module, type DynamicModule, type Provider } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ApiKeysService } from '@/auth/api-keys.service';
-import { AuthController } from '@/auth/auth.controller';
+import { AuthController, WellKnownController } from '@/auth/auth.controller';
 import { AuthGuard } from '@/auth/auth.guard';
+import { Sep10Service } from '@/auth/sep10.service';
 import { SessionsService } from '@/auth/sessions.service';
 import { ChainClient } from '@/chain/chain-client.service';
 import { DeploymentsService } from '@/chain/deployments.service';
 import { MarketReader } from '@/chain/market-reader.service';
+import { TxBuilder } from '@/chain/tx-builder.service';
 import { DataCipher } from '@/common/data-cipher';
 import { ErrorFilter } from '@/common/error.filter';
 import { RateLimitGuard, RateLimiter } from '@/common/rate-limit';
@@ -21,42 +23,55 @@ import { WebhookSenderJob } from '@/webhooks/webhook-sender.job';
 import { WebhooksController } from '@/webhooks/webhooks.controller';
 import { WebhooksService } from '@/webhooks/webhooks.service';
 
+const CORE = [
+  DeploymentsService,
+  ChainClient,
+  MarketReader,
+  TxBuilder,
+  DataCipher,
+  Sep10Service,
+  SessionsService,
+  ApiKeysService,
+  RateLimiter,
+];
+
 /** What every feature module shares: the chain layer, the cipher, auth. */
 @Global()
-@Module({
-  providers: [
-    DeploymentsService,
-    ChainClient,
-    MarketReader,
-    DataCipher,
-    SessionsService,
-    ApiKeysService,
-    RateLimiter,
-  ],
-  exports: [
-    DeploymentsService,
-    ChainClient,
-    MarketReader,
-    DataCipher,
-    SessionsService,
-    ApiKeysService,
-    RateLimiter,
-  ],
-})
-class CoreModule {}
+@Module({})
+class CoreModule {
+  static register(chain?: unknown): DynamicModule {
+    // Tests replace the chain client (no network) with a fake.
+    const providers: Provider[] = chain
+      ? [...CORE.filter((p) => p !== ChainClient), { provide: ChainClient, useValue: chain }]
+      : CORE;
+    return { module: CoreModule, providers, exports: CORE };
+  }
+}
+
+/** What a test may replace. */
+export interface AppOverrides {
+  /** A stand-in for `ChainClient`. */
+  chain?: unknown;
+}
 
 @Module({})
 export class AppModule {
-  static register(config: AppConfig): DynamicModule {
+  static register(config: AppConfig, overrides: AppOverrides = {}): DynamicModule {
     return {
       module: AppModule,
       imports: [
         ConfigModule.forRoot(config),
         PrismaModule,
-        CoreModule,
+        CoreModule.register(overrides.chain),
         P2pModule.register({ devTools: config.dev.tools }),
       ],
-      controllers: [HealthController, AuthController, OrganizationsController, WebhooksController],
+      controllers: [
+        HealthController,
+        AuthController,
+        WellKnownController,
+        OrganizationsController,
+        WebhooksController,
+      ],
       providers: [
         OrganizationsService,
         WebhooksService,

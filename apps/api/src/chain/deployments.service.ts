@@ -1,96 +1,98 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { getAddress, type Hex } from 'viem';
-import { privateKeyToAddress } from 'viem/accounts';
+import { Keypair } from '@stellar/stellar-sdk';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { APP_CONFIG } from '@/config/config.module';
 import type { AppConfig } from '@/config/env';
 import {
-  isNetworkId,
   NETWORK_IDS,
   NETWORKS,
-  TIERS,
+  isNetworkId,
   type NetworkId,
   type Tier,
   type Token,
 } from '@/chain/networks';
 
-/** One configured deployment: a network on a tier, with its contract and node. */
-export interface Deployment {
-  tier: Tier;
+/** A Stellar network this service can reach (whether or not the market runs on it). */
+export interface StellarNetwork {
   network: NetworkId;
+  tier: Tier;
   name: string;
-  chainId: number;
-  contract: string;
-  deployBlock: bigint;
+  passphrase: string;
+  /** The node this service reads and submits through (may carry a key: never published). */
   rpcUrl: string;
+  horizonUrl: string | null;
+  /** The table's public endpoints, safe to publish. */
+  publicRpcUrl: string | null;
+  publicHorizonUrl: string | null;
+  explorerUrl: string | null;
+  friendbotUrl: string | null;
+}
+
+/** One configured market deployment: a network with its contract and tokens. */
+export interface Deployment extends StellarNetwork {
+  contract: string;
   tokens: readonly Token[];
-  confirmations: number;
-  logBlockRange: number;
-  explorerTxUrl: string | null;
+  /** Where the indexer starts without a cursor; null: the RPC's oldest retained ledger. */
+  startLedger: number | null;
 }
 
 /**
- * The one reader of the deployment configuration: which networks run the
- * market on each tier, at which contract and through which node, with which
- * tokens, and the matcher's address. Whether a deployment is VERIFIED
- * on-chain is `MarketReader`'s job; this only says what was configured.
+ * The one reader of the network configuration: which networks run the market,
+ * at which contract and through which node, with which tokens, and the
+ * server's three keys (matcher, sponsor, SEP-10). Whether a deployment is
+ * VERIFIED on-chain is `MarketReader`'s job; this only says what was configured.
  */
 @Injectable()
 export class DeploymentsService {
-  private readonly byTier: Record<Tier, Deployment[]>;
-  private readonly matcher: string | null;
+  private readonly all: Deployment[];
+  private readonly matcher: Keypair | null;
+  private readonly sponsor: Keypair | null;
+  private readonly sep10: Keypair | null;
 
   constructor(@Inject(APP_CONFIG) private readonly config: AppConfig) {
-    this.byTier = {
-      live: this.build('live'),
-      test: this.build('test'),
-    };
-    const key = config.p2p.matcherPrivateKey;
-    this.matcher = key ? privateKeyToAddress(key) : null;
-  }
-
-  private build(tier: Tier): Deployment[] {
-    const set = this.config.p2p.tiers[tier];
-    return NETWORK_IDS.flatMap((id) => {
-      const contract = set.contracts[id];
-      const entry = NETWORKS[id].tiers[tier];
-      if (!contract || !entry) return [];
-      return [
-        {
-          tier,
-          network: id,
-          name: NETWORKS[id].name,
-          chainId: entry.chainId,
-          contract: getAddress(contract),
-          deployBlock: BigInt(set.deployBlocks[id] ?? 0),
-          rpcUrl: set.rpcUrls[id] ?? entry.defaultRpcUrl ?? '',
-          tokens: id === 'local' ? this.config.p2p.localTokens : entry.tokens,
-          confirmations: entry.confirmations,
-          logBlockRange: entry.logBlockRange,
-          explorerTxUrl: entry.explorerTxUrl,
-        },
-      ];
+    this.all = NETWORK_IDS.flatMap((id) => {
+      const net = this.network(id);
+      const c = config.networks[id];
+      return net && c.contract
+        ? [{ ...net, contract: c.contract, tokens: c.tokens, startLedger: c.startLedger }]
+        : [];
     });
+    this.matcher = config.p2p.matcherSecret ? Keypair.fromSecret(config.p2p.matcherSecret) : null;
+    this.sponsor = config.sponsor.secret ? Keypair.fromSecret(config.sponsor.secret) : null;
+    this.sep10 = config.sep10.signingSecret ? Keypair.fromSecret(config.sep10.signingSecret) : null;
   }
 
-  /** Whether any tier has a deployment: the chain jobs run only then. */
+  /** A network this service has a node for, or null. */
+  network(id: NetworkId): StellarNetwork | null {
+    const c = this.config.networks[id];
+    const t = NETWORKS[id];
+    if (!c.rpcUrl) return null;
+    return {
+      network: id,
+      tier: t.tier,
+      name: t.name,
+      passphrase: t.passphrase,
+      rpcUrl: c.rpcUrl,
+      horizonUrl: c.horizonUrl,
+      publicRpcUrl: t.devOnly ? c.rpcUrl : t.defaultRpcUrl,
+      publicHorizonUrl: t.devOnly ? c.horizonUrl : t.defaultHorizonUrl,
+      explorerUrl: t.explorerUrl,
+      friendbotUrl: t.friendbotUrl,
+    };
+  }
+
+  /** Whether any network has a market: the chain jobs run only then. */
   anyConfigured(): boolean {
-    return TIERS.some((t) => this.byTier[t].length > 0);
+    return this.all.length > 0;
   }
 
   deployments(tier: Tier): Deployment[] {
-    return this.byTier[tier];
+    return this.all.filter((d) => d.tier === tier);
   }
 
   find(tier: Tier, network: string): Deployment | null {
     if (!isNetworkId(network)) return null;
-    return this.byTier[tier].find((d) => d.network === network) ?? null;
-  }
-
-  /** The chain id a stored row's network has on its tier, from the table (no RPC). */
-  chainIdOf(row: { tier: string; network: string }): number {
-    if (!isNetworkId(row.network) || (row.tier !== 'live' && row.tier !== 'test')) return 0;
-    return NETWORKS[row.network].tiers[row.tier]?.chainId ?? 0;
+    return this.all.find((d) => d.tier === tier && d.network === network) ?? null;
   }
 
   /**
@@ -100,21 +102,30 @@ export class DeploymentsService {
   require(tier: Tier, network: string): Deployment {
     const found = this.find(tier, network);
     if (found) return found;
-    const served = this.byTier[tier].map((d) => d.network);
+    const served = this.deployments(tier).map((d) => d.network);
     throw ApiError.badRequest(
       ErrorCode.NetworkUnsupported,
       served.length === 0
         ? `The market is not available on the ${tier} tier yet.`
-        : `The market does not run on ${network} on the ${tier} tier. It runs on ${served.length} network${served.length === 1 ? '' : 's'} there: ${served.join(', ')}.`,
+        : `The market does not run on ${network} on the ${tier} tier. It runs on ${served.join(', ')} there.`,
     );
   }
 
-  /** A token of a deployment by address or symbol (any case), or `400 asset_unsupported`. */
+  /** The tier's only deployment when `network` is omitted, or the one it names. */
+  pick(tier: Tier, network: string | undefined): Deployment {
+    if (network) return this.require(tier, network);
+    const all = this.deployments(tier);
+    if (all.length === 1) return all[0];
+    throw ApiError.validation([
+      all.length === 0
+        ? `the market is not available on the ${tier} tier yet`
+        : `name the network: ${all.map((d) => d.network).join(' or ')}`,
+    ]);
+  }
+
+  /** A token of a deployment by contract, symbol or `CODE:ISSUER` (any case), or `400 asset_unsupported`. */
   token(deployment: Deployment, ref: string): Token {
-    const wanted = ref.trim().toLowerCase();
-    const found = deployment.tokens.find(
-      (t) => t.address.toLowerCase() === wanted || t.symbol.toLowerCase() === wanted,
-    );
+    const found = this.findToken(deployment, ref);
     if (found) return found;
     throw ApiError.badRequest(
       ErrorCode.AssetUnsupported,
@@ -122,30 +133,64 @@ export class DeploymentsService {
     );
   }
 
-  /** The token a stored row names, or its address when it is no longer listed. */
-  symbolOf(row: { tier: string; network: string; token: string }): string {
-    const d = this.find(row.tier as Tier, row.network);
+  findToken(deployment: { tokens: readonly Token[] }, ref: string): Token | null {
+    const wanted = ref.trim();
+    const upper = wanted.toUpperCase();
     return (
-      d?.tokens.find((t) => t.address.toLowerCase() === row.token.toLowerCase())?.symbol ??
-      row.token
+      deployment.tokens.find(
+        (t) =>
+          t.contract === wanted ||
+          t.symbol.toUpperCase() === upper ||
+          `${t.code}:${t.issuer}`.toUpperCase() === upper,
+      ) ?? null
     );
   }
 
-  /** The matcher's address, EIP-55; null when no key is configured. */
+  /** The token a stored row names (its SAC contract), or the contract when it is no longer listed. */
+  symbolOf(row: { tier: string; network: string; token: string }): string {
+    const d = this.find(row.tier as Tier, row.network);
+    return d?.tokens.find((t) => t.contract === row.token)?.symbol ?? row.token;
+  }
+
+  /** The matcher's account (G...); null when no key is configured. */
   matcherAddress(): string | null {
-    return this.matcher;
+    return this.matcher?.publicKey() ?? null;
   }
 
   /** The matcher's key; only `MatcherService` signs with it. */
-  matcherKey(): Hex {
-    const key = this.config.p2p.matcherPrivateKey;
-    if (!key) {
+  matcherKey(): Keypair {
+    if (!this.matcher) {
       throw ApiError.unavailable(
         'The market cannot open orders on this deployment right now.',
-        'P2P_MATCHER_PRIVATE_KEY is not set.',
+        'P2P_MATCHER_SECRET is not set.',
       );
     }
-    return key;
+    return this.matcher;
+  }
+
+  /** The sponsor's account (G...); null when gasless is off. */
+  sponsorAddress(): string | null {
+    return this.sponsor?.publicKey() ?? null;
+  }
+
+  /** The sponsor's key; only the submission and activation paths sign with it. */
+  sponsorKey(): Keypair | null {
+    return this.sponsor;
+  }
+
+  /** The SEP-10 signing key; it never holds funds and never signs a transaction that is submitted. */
+  sep10Key(): Keypair {
+    if (!this.sep10) {
+      throw ApiError.unavailable(
+        'Sign-in is not available right now.',
+        'SEP10_SIGNING_SECRET is not set.',
+      );
+    }
+    return this.sep10;
+  }
+
+  sep10Address(): string | null {
+    return this.sep10?.publicKey() ?? null;
   }
 
   timeoutMs(): number {

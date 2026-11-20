@@ -44,10 +44,7 @@ export class ChargesService {
 
   private symbolOf(row: { tier: string; network: string; token: string }): string {
     const d = this.deployments.find(row.tier as Tier, row.network);
-    return (
-      d?.tokens.find((t) => t.address.toLowerCase() === row.token.toLowerCase())?.symbol ??
-      row.token
-    );
+    return d?.tokens.find((t) => t.contract === row.token)?.symbol ?? row.token;
   }
 
   /** A charge as its creator reads it, with its payer page's URL. */
@@ -75,7 +72,7 @@ export class ChargesService {
         organizationId,
         tier,
         network: deployment.network,
-        token: token.address,
+        token: token.contract,
         currency: dto.currency,
         fiatAmount: formatUnits(units, P2P_CURRENCIES[dto.currency as P2pCurrency].decimals),
         recipientAccountId: recipient.id,
@@ -156,8 +153,28 @@ export class ChargesService {
    */
   async onOrderCompleted(tx: Tx, order: P2pOrderRow): Promise<void> {
     if (!order.chargeId) return;
+    await this.paid(tx, order.chargeId, { paidWith: 'ORDER', orderId: order.id });
+  }
+
+  /**
+   * A payment of the charge from a wallet's balance succeeded on-chain: the
+   * same bookkeeping, with `paidWith: 'TOKEN'`.
+   */
+  async onTokenPayment(
+    tx: Tx,
+    payment: { id: string; chargeId: string; hash: string; amount: string },
+  ): Promise<void> {
+    await this.paid(tx, payment.chargeId, {
+      paidWith: 'TOKEN',
+      paymentId: payment.id,
+      hash: payment.hash,
+      tokenAmount: payment.amount,
+    });
+  }
+
+  private async paid(tx: Tx, chargeId: string, extra: Record<string, string>): Promise<void> {
     const charge = await tx.p2pCharge.update({
-      where: { id: order.chargeId },
+      where: { id: chargeId },
       data: { paidCount: { increment: 1 }, paidAt: new Date() },
       select: { ...P2P_CHARGE_SELECT, organizationId: true },
     });
@@ -176,7 +193,7 @@ export class ChargesService {
         organizationId: charge.organizationId,
         tier: charge.tier,
         type: 'P2P_CHARGE_SUCCEEDED',
-        data: { ...this.view(now), orderId: order.id },
+        data: { ...this.view(now), ...extra },
       },
     ]);
   }

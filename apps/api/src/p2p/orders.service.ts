@@ -1,18 +1,18 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { getAddress } from 'viem';
 import type { OrgPrincipal } from '@/auth/auth.types';
 import { ChainCallReverted } from '@/chain/chain-client.service';
-import { DeploymentsService } from '@/chain/deployments.service';
-import { approveCalldata, p2pCalldata, type P2pOrderAction } from '@/chain/market-codec';
+import { DeploymentsService, type Deployment } from '@/chain/deployments.service';
+import { p2pCall, type P2pOrderAction } from '@/chain/market-codec';
 import { MarketReader } from '@/chain/market-reader.service';
 import type { Tier } from '@/chain/networks';
+import { TxBuilder, humanAmount, type BuiltTransaction } from '@/chain/tx-builder.service';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { DataCipher } from '@/common/data-cipher';
 import { page, type Page } from '@/common/pagination';
-import { isUuid, openParamsOf } from '@/p2p/domain/order-ref';
-import type { P2pOrderKind } from '@/p2p/domain/order-status';
-import { formatUnits } from '@/p2p/domain/pricing';
+import { isUuid, openParamsOf, type P2pOrderTerms } from '@/p2p/domain/order-ref';
+import { isSelfOpened, type P2pOrderKind } from '@/p2p/domain/order-status';
+import { qrHash, readQrPayment, type QrSummary, type SealedQr } from '@/p2p/domain/qr-pay';
 import {
   isDocumentNumber,
   isP2pRailId,
@@ -33,7 +33,6 @@ import type {
   OrderView,
   PayerView,
 } from '@/p2p/entities/order.entity';
-import type { TransactionView } from '@/p2p/entities/transaction.entity';
 import { MatcherService } from '@/p2p/matcher.service';
 import { OrderOpener } from '@/p2p/order-opener.service';
 import { PaymentMethodsService } from '@/p2p/payment-methods.service';
@@ -59,11 +58,15 @@ export interface OrderOwner {
 /** The matcher acts for the buyer only on the orders it opened for a person or a payer. */
 const MATCHER_BUYER_KINDS: readonly P2pOrderKind[] = ['BUY', 'CHARGE'];
 
-/** Orders where `address` is the buyer or the seller, EIP-55 like every stored address. */
+/** Orders where `address` is the buyer or the seller. */
 function addressFilter(address: string | undefined) {
   if (!address) return {};
-  const wallet = getAddress(address);
-  return { OR: [{ buyerAddress: wallet }, { sellerAddress: wallet }] };
+  return { OR: [{ buyerAddress: address }, { sellerAddress: address }] };
+}
+
+/** What creating an order may also carry: the scanned QR of a QR payment. */
+export interface OrderExtras {
+  qr?: string;
 }
 
 /** A sealed payer identity, as the merchant reads it. */
@@ -90,27 +93,50 @@ export class OrdersService {
     private readonly matcher: MatcherService,
     private readonly paymentMethods: PaymentMethodsService,
     private readonly cipher: DataCipher,
+    private readonly builder: TxBuilder,
   ) {}
 
-  /** The chain id an order's network has on its tier, from the table (no RPC). */
-  chainIdOf(row: { network: string; tier: string }): number {
-    return this.deployments.chainIdOf(row);
+  /** A QR payment's sealed QR, opened, or null. */
+  private async sealedQr(row: P2pOrderRow): Promise<SealedQr | null> {
+    if (row.kind !== 'QR_PAY') return null;
+    const sealed = await this.prisma.p2pOrder.findUnique({
+      where: { id: row.id },
+      select: { qrPayload: true },
+    });
+    return sealed?.qrPayload
+      ? this.cipher.open<SealedQr>('order.qr', row.id, sealed.qrPayload)
+      : null;
   }
 
-  /** The client's view; the merchant's payment details only on a live purchase or charge. */
+  /**
+   * The client's view; the merchant's payment details only on a live purchase
+   * or charge, and a QR payment's QR (never its payload) on a single read.
+   */
   async clientView(row: P2pOrderRow, withDetails: boolean): Promise<OrderView> {
     const details =
       withDetails && MATCHER_BUYER_KINDS.includes(row.kind as P2pOrderKind) && isLive(row.status)
         ? await this.paymentMethods.paymentDetailsOf(row.merchantPaymentMethodId)
         : null;
-    return toOrderView(row, this.chainIdOf(row), details);
+    const qr = withDetails ? await this.sealedQr(row) : null;
+    const summary: QrSummary | null = qr
+      ? {
+          standard: qr.standard,
+          merchantName: qr.merchantName,
+          merchantCity: qr.merchantCity,
+          amount: qr.amount,
+          currency: qr.currency,
+        }
+      : null;
+    return toOrderView(row, details, summary);
   }
 
   /** The merchant's view; the other party's details only while the order is live. */
   async merchantView(row: P2pOrderRow): Promise<MerchantOrderView> {
     let payer: PayerView | null = null;
     let beneficiary: BeneficiaryView | null = null;
+    let qr: SealedQr | null = null;
     if (isLive(row.status)) {
+      qr = await this.sealedQr(row);
       const sealed = await this.prisma.p2pOrder.findUnique({
         where: { id: row.id },
         select: { payerInfo: true, beneficiary: true },
@@ -127,10 +153,7 @@ export class OrdersService {
         );
       }
     }
-    return toMerchantOrderView(row, this.chainIdOf(row), {
-      payer,
-      beneficiary,
-    });
+    return toMerchantOrderView(row, { payer, beneficiary, qr });
   }
 
   private checkPayer(payer: PayerDto | undefined) {
@@ -179,9 +202,10 @@ export class OrdersService {
 
   /**
    * An order from a quote. A purchase is opened by the matcher on the
-   * merchant's balance; a sale answers the two transactions the seller's wallet
-   * signs. One order per quote: a retry with the same quote and the same
-   * wallet answers the order it made, another wallet is `409`.
+   * merchant's balance; a sale (and a QR payment) answers the transaction the
+   * seller's wallet signs (`open_with_deposit`). One order per quote: a retry
+   * with the same quote and the same wallet answers the order it made (with a
+   * fresh transaction while it waits for its signature), another wallet is `409`.
    */
   async create(org: OrgPrincipal, dto: CreateOrderDto): Promise<CreatedOrderView> {
     const tier = tierOf(org, this.deployments);
@@ -189,7 +213,11 @@ export class OrdersService {
   }
 
   /** An order from one of the owner's quotes (shared with the public app). */
-  async createFor(owner: OrderOwner, dto: CreateOrderDto): Promise<CreatedOrderView> {
+  async createFor(
+    owner: OrderOwner,
+    dto: CreateOrderDto,
+    extras: OrderExtras = {},
+  ): Promise<CreatedOrderView> {
     const { organizationId, tier } = owner;
     const quote = await this.prisma.p2pQuote.findFirst({
       where: { id: dto.quoteId, organizationId, tier, endUserAddress: owner.endUserAddress },
@@ -197,7 +225,18 @@ export class OrdersService {
     if (!quote) {
       throw ApiError.notFound(`P2P quote ${dto.quoteId} not found`, ErrorCode.QuoteNotFound);
     }
-    if (dto.kind && dto.kind !== quote.side) {
+    const qrPay = quote.kind === 'QR_PAY';
+    if (qrPay !== (extras.qr !== undefined)) {
+      throw ApiError.validation([
+        qrPay
+          ? 'qr is required: the QR this quote was made for'
+          : 'qr is only for a QR payment quote',
+      ]);
+    }
+    if (qrPay && qrHash(extras.qr as string) !== quote.qrHash) {
+      throw ApiError.validation(['qr must be the QR this quote was made for']);
+    }
+    if (!qrPay && dto.kind && dto.kind !== quote.side) {
       throw ApiError.validation([`kind must be the quote's side (${quote.side})`]);
     }
     const wallet = quote.side === 'BUY' ? dto.recipient : dto.seller;
@@ -208,7 +247,7 @@ export class OrdersService {
           : 'seller is required on a sale: the wallet that sends the tokens',
       ]);
     }
-    const address = getAddress(wallet);
+    const address = wallet;
 
     const replay = await this.prisma.p2pOrder.findFirst({
       where: { quoteId: quote.id, organizationId, tier },
@@ -222,10 +261,17 @@ export class OrdersService {
           'An order already exists for this quote with another wallet. Quote again for a new order.',
         );
       }
+      const pendingSale = isSelfOpened(replay.kind) && replay.status === 'pending';
       return {
         ...(await this.clientView(replay, true)),
-        transactions:
-          quote.side === 'SELL' && replay.status === 'pending' ? this.sellTransactions(replay) : [],
+        transactions: pendingSale
+          ? [
+              await this.sellTransaction(
+                await this.reader.requireLive(tier, replay.network),
+                replay,
+              ),
+            ]
+          : [],
       };
     }
 
@@ -257,30 +303,62 @@ export class OrdersService {
     if (!merchant?.displayName || merchant.address === address) throw noMatch();
 
     const side = quote.side as 'BUY' | 'SELL';
+    const kind: P2pOrderKind = qrPay ? 'QR_PAY' : side;
     const payer = side === 'BUY' ? this.checkPayer(dto.payer) : undefined;
     const beneficiary =
-      side === 'SELL'
+      kind === 'SELL'
         ? this.checkBeneficiary(dto.beneficiary, quote.rail, quote.currency)
         : undefined;
+    let qr: SealedQr | undefined;
+    if (qrPay) {
+      const read = readQrPayment(extras.qr as string, quote.fiatAmount);
+      if (!read.ok) throw ApiError.badRequest(ErrorCode.QrInvalid, read.error);
+      qr = read.sealed;
+    }
     const paymentMethod =
       side === 'BUY'
         ? await this.paymentMethods.activeFor(merchant.id, quote.rail, quote.currency)
         : null;
     if (side === 'BUY' && !paymentMethod) throw noMatch();
 
-    const windows = windowsFor(side);
+    const windows = windowsFor(kind);
     const matcherAddress = this.deployments.matcherAddress();
     if (side === 'BUY' && !matcherAddress) {
       throw ApiError.unavailable(
         'The P2P market cannot open orders on this deployment right now.',
-        'P2P_MATCHER_PRIVATE_KEY is not set.',
+        'P2P_MATCHER_SECRET is not set.',
       );
     }
+    const id = randomUUID();
+    const terms: P2pOrderTerms = {
+      id,
+      sellerAddress: side === 'BUY' ? merchant.address : address,
+      buyerAddress: side === 'BUY' ? address : merchant.address,
+      token: quote.token,
+      tokenAmount: quote.tokenAmount,
+      bond: quote.bond,
+      ...windows,
+      integratorAddress: quote.integratorAddress,
+      integratorFeeBps: quote.integratorFeeBps,
+    };
+    // A sale is prepared BEFORE anything is written: a seller who cannot fund
+    // it (balance, trustline, missing account) is a 400, not a dead order.
+    const transaction =
+      side === 'SELL'
+        ? await this.sellTransaction(deployment, {
+            ...terms,
+            contract: deployment.contract,
+            network: deployment.network,
+            tokenSymbol: token.symbol,
+            tokenDecimals: token.decimals,
+            merchantDisplayName: merchant.displayName,
+          })
+        : null;
     const row = await this.opener.insert({
-      id: randomUUID(),
+      id,
       organizationId,
       endUserAddress: owner.endUserAddress,
-      kind: side,
+      kind,
       deployment,
       token,
       match: {
@@ -311,6 +389,7 @@ export class OrdersService {
       externalReference: dto.externalReference?.trim() || null,
       payer,
       beneficiary,
+      qr: qr as unknown as Record<string, unknown> | undefined,
     });
 
     if (side === 'BUY') {
@@ -319,31 +398,46 @@ export class OrdersService {
     }
     return {
       ...(await this.clientView(row, true)),
-      transactions: this.sellTransactions(row),
+      transactions: transaction ? [transaction] : [],
     };
   }
 
-  /** What the seller's wallet signs to open a sale: the exact approval, then `openWithDeposit`. */
-  private sellTransactions(row: P2pOrderRow): TransactionView[] {
-    const chainId = this.chainIdOf(row);
+  /**
+   * What the seller's wallet signs to open a sale or a QR payment:
+   * `open_with_deposit`, whose pull of the tokens into the market is covered
+   * by the same signature (no approval). A refusal in its simulation (no
+   * balance, no trustline) is a 400 naming the contract's error.
+   */
+  async sellTransaction(
+    d: Deployment,
+    row: P2pOrderTerms & {
+      contract: string;
+      network: string;
+      tokenSymbol: string;
+      tokenDecimals: number;
+      merchantDisplayName: string | null;
+    },
+  ): Promise<BuiltTransaction> {
     const amount = BigInt(row.tokenAmount);
-    const human = `${formatUnits(amount, row.tokenDecimals).replace(/\.?0+$/, '')} ${row.tokenSymbol}`;
-    return [
-      {
-        chainId,
-        to: row.token,
-        data: approveCalldata(row.contract, amount),
-        value: '0',
-        description: `Allow the P2P market to take exactly ${human}`,
-      },
-      {
-        chainId,
-        to: row.contract,
-        data: p2pCalldata.openWithDeposit(openParamsOf(row)),
-        value: '0',
-        description: `Lock ${human} in a sale to ${row.merchantDisplayName ?? 'the merchant'}; it is released to them once you confirm their payment`,
-      },
-    ];
+    const human = `${humanAmount(amount, row.tokenDecimals)} ${row.tokenSymbol}`;
+    try {
+      return await this.builder.invoke(
+        d,
+        row.sellerAddress,
+        p2pCall.openWithDeposit(row.contract, openParamsOf(row)),
+        'open_with_deposit',
+        `Lock ${human} in a sale to ${row.merchantDisplayName ?? 'the merchant'}; it is released to them once you confirm their payment`,
+      );
+    } catch (err) {
+      if (err instanceof ChainCallReverted) {
+        throw ApiError.badRequest(
+          ErrorCode.InvalidState,
+          `Your wallet cannot open this sale (${err.contractError ?? 'refused'}): check its ${row.tokenSymbol} balance.`,
+          [err.detail.slice(0, 300)],
+        );
+      }
+      throw err;
+    }
   }
 
   async list(org: OrgPrincipal, query: QueryOrdersDto): Promise<Page<OrderView>> {
@@ -419,7 +513,7 @@ export class OrdersService {
         ErrorCode.InvalidState,
         kind === 'PAYOUT'
           ? 'A payout is cancelled here only before its merchant accepts it; release or dispute it from your wallet (POST /v1/p2p/transactions).'
-          : 'A sale is signed by the seller’s wallet: build the transaction with POST /v1/p2p/transactions.',
+          : 'A sale or a QR payment is signed by the seller’s wallet: build the transaction with POST /v1/p2p/transactions.',
       );
     }
     const needed: Record<typeof action, string[]> = {
@@ -434,12 +528,13 @@ export class OrdersService {
       );
     }
     const deployment = await this.reader.requireLive(row.tier as Tier, row.network);
-    const call: P2pOrderAction = action === 'paid' ? 'markPaid' : action;
+    const call: P2pOrderAction = action === 'paid' ? 'mark_paid' : action;
+    const matcher = this.deployments.matcherKey().publicKey();
     try {
       await this.matcher.send(deployment, {
-        kind: call === 'markPaid' ? 'markPaid' : call,
+        kind: action === 'paid' ? 'markPaid' : action,
         orderId: row.id,
-        data: p2pCalldata.orderAction(call, BigInt(row.onchainId)),
+        operation: p2pCall.orderAction(deployment.contract, call, matcher, BigInt(row.onchainId)),
       });
     } catch (err) {
       if (err instanceof ChainCallReverted) {

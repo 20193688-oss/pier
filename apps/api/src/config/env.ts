@@ -1,15 +1,18 @@
 import { createHash } from 'node:crypto';
-import { getAddress, isAddress, type Hex } from 'viem';
-import { privateKeyToAddress } from 'viem/accounts';
+import { Keypair, StrKey } from '@stellar/stellar-sdk';
 import { z } from 'zod';
 import {
-  isNetworkId,
+  NETWORK_IDS,
   NETWORKS,
   TIERS,
+  isNetworkId,
+  tableTokens,
+  tokenOf,
   type NetworkId,
   type Tier,
   type Token,
 } from '@/chain/networks';
+import { isAccountAddress, isContractAddress, isSecretSeed } from '@/common/stellar';
 
 /**
  * The service's whole configuration, read ONCE from the environment and
@@ -17,13 +20,34 @@ import {
  * a request later. Everything else reads `AppConfig`, never `process.env`.
  */
 
-export interface TierDeploymentConfig {
-  /** `P2P_CONTRACTS_<TIER>`: network id → contract address (EIP-55). */
-  contracts: Partial<Record<NetworkId, string>>;
-  /** `P2P_DEPLOY_BLOCKS_<TIER>`: where the indexer starts. */
-  deployBlocks: Partial<Record<NetworkId, number>>;
-  /** `P2P_RPC_URLS_<TIER>`: a node per network (test networks have public defaults). */
-  rpcUrls: Partial<Record<NetworkId, string>>;
+/** One Stellar network as configured: where to reach it, and the market there (if any). */
+export interface NetworkConfig {
+  id: NetworkId;
+  tier: Tier;
+  /** `STELLAR_<NET>_RPC_URL`, or the table's public one; null when neither. */
+  rpcUrl: string | null;
+  /** `STELLAR_<NET>_HORIZON_URL`, or the table's; optional. */
+  horizonUrl: string | null;
+  /** `P2P_<NET>_CONTRACT`: the market contract (C...), or null. */
+  contract: string | null;
+  /** `P2P_<NET>_START_LEDGER`: where the indexer starts when it has no cursor. */
+  startLedger: number | null;
+  /** The table's tokens plus `P2P_<NET>_TOKENS` (never on mainnet). */
+  tokens: Token[];
+}
+
+/** The gasless sponsor's limits. */
+export interface SponsorLimits {
+  /** The most an inner transaction's fee may be, stroops. */
+  maxFeeStroops: number;
+  /** Fees plus reserves the sponsor commits per UTC day, stroops. */
+  dailyBudgetStroops: bigint;
+  /** Sponsored submissions one address may make per hour. */
+  perAddressPerHour: number;
+  /** Sponsored submissions one client (IP) may make per hour. */
+  perIpPerHour: number;
+  /** Sponsored activations one client (IP) may ask for per day. */
+  activationsPerIpPerDay: number;
 }
 
 export interface AppConfig {
@@ -31,33 +55,43 @@ export interface AppConfig {
   port: number;
   host: string;
   databaseUrl: string;
+  /** The product's name, in one place (`BRAND_NAME`). */
+  brandName: string;
   /** Where this API is reachable, for links it hands out. */
   publicApiUrl: string;
   /** Browser origins allowed to call with credentials (CORS) and to send cookie-authenticated writes. */
   webOrigins: string[];
   /** `trust proxy` hops (0: the socket's address is the client's). */
   trustProxy: number;
-  siwe: {
-    /** The `domain` a SIWE message must name (the web app's host). */
-    domain: string;
-    nonceTtlSeconds: number;
+  sep10: {
+    /** `SEP10_HOME_DOMAIN`: the web host (`<home domain> auth` in every challenge). */
+    homeDomain: string;
+    /** `SEP10_WEB_AUTH_DOMAIN`: the host serving the auth endpoint (default: the home domain). */
+    webAuthDomain: string;
+    /** The network challenges are signed for (`SEP10_NETWORK`). */
+    network: NetworkId;
+    /** `SEP10_SIGNING_SECRET`; never funded. Null: sign-in is unavailable. */
+    signingSecret: string | null;
     sessionTtlSeconds: number;
   };
   cookieSecure: boolean;
-  /** Wallets that may use `/v1/admin/*` (EIP-55). */
+  /** Accounts (G...) that may use `/v1/admin/*`. */
   adminAddresses: string[];
   /** AES-256-GCM key for personal data and webhook secrets at rest. */
   dataEncryptionKey: Buffer;
+  networks: Record<NetworkId, NetworkConfig>;
   p2p: {
-    tiers: Record<Tier, TierDeploymentConfig>;
-    /** The dev chain's tokens (`local` network only). */
-    localTokens: Token[];
-    /** The matcher's key: opens orders within sellers' caps and acts for buyers. */
-    matcherPrivateKey: Hex | null;
+    /** The matcher's secret: opens orders within sellers' caps and acts for buyers, paying its own fees. */
+    matcherSecret: string | null;
     merchantMaxOpenOrders: number;
     rpcTimeoutMs: number;
     /** Base URL of the hosted charge page; a charge's link is `<url>/<chargeId>`. */
     checkoutUrl: string;
+  };
+  sponsor: {
+    /** `P2P_SPONSOR_SECRET`: fee-bumps and reserves; holds only XLM. Null: gasless is off. */
+    secret: string | null;
+    limits: SponsorLimits;
   };
   /** The public app (`/v1/app/*`): its tier and optional integrator fee. */
   app: {
@@ -80,12 +114,10 @@ export interface AppConfig {
   dev: {
     /** Enables `/v1/dev/*` (simulate a bank transfer); refused in production. */
     tools: boolean;
-    /** Keys of the dev chain's wallets the dev tools may sign with. */
-    walletKeys: Hex[];
+    /** Secrets of the dev accounts the dev tools may sign with (local and testnet only). */
+    walletSecrets: string[];
   };
 }
-
-const PRIVATE_KEY_RE = /^0x[0-9a-fA-F]{64}$/;
 
 function bool(defaultValue: boolean) {
   return z
@@ -100,6 +132,21 @@ function int(defaultValue: number, min: number, max: number) {
     .optional()
     .transform((v, ctx) => {
       if (v === undefined || v === '') return defaultValue;
+      const n = Number(v);
+      if (!Number.isInteger(n) || n < min || n > max) {
+        ctx.addIssue({ code: 'custom', message: `must be an integer from ${min} to ${max}` });
+        return z.NEVER;
+      }
+      return n;
+    });
+}
+
+function optionalInt(min: number, max: number) {
+  return z
+    .string()
+    .optional()
+    .transform((v, ctx) => {
+      if (v === undefined || v === '') return null;
       const n = Number(v);
       if (!Number.isInteger(n) || n < min || n > max) {
         ctx.addIssue({ code: 'custom', message: `must be an integer from ${min} to ${max}` });
@@ -143,48 +190,85 @@ function json<T>(schema: z.ZodType<T>, fallback: T) {
     });
 }
 
-const address = z.string().refine((v) => isAddress(v, { strict: false }), 'must be an EVM address');
-const byNetwork = <T extends z.ZodType>(value: T) => z.record(z.string(), value);
+const optionalText = z
+  .string()
+  .optional()
+  .transform((v) => (v && v.trim() ? v.trim() : null));
+const optionalUrl = z
+  .string()
+  .optional()
+  .refine((v) => !v || URL.canParse(v), 'must be a URL')
+  .transform((v) => (v ? v.replace(/\/+$/, '') : null));
+const secret = z
+  .string()
+  .optional()
+  .refine((v) => !v || isSecretSeed(v), 'must be a Stellar secret seed (S...)')
+  .transform((v) => v || null);
+const contract = z
+  .string()
+  .optional()
+  .refine((v) => !v || isContractAddress(v), 'must be a contract address (C...)')
+  .transform((v) => v || null);
+const extraTokens = json(
+  z.array(
+    z.object({
+      code: z.string().regex(/^[A-Za-z0-9]{1,12}$/, 'an asset code of 1 to 12 letters or digits'),
+      issuer: z.string().refine((v) => isAccountAddress(v), 'must be an account address (G...)'),
+      symbol: z.string().min(1).max(12).optional(),
+    }),
+  ),
+  [],
+);
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: int(4000, 1, 65535),
   HOST: z.string().default('0.0.0.0'),
   DATABASE_URL: z.string().min(1, 'is required'),
+  BRAND_NAME: z.string().min(1).max(40).default('pedospe'),
   PUBLIC_API_URL: z.string().url().optional(),
   WEB_ORIGINS: list(),
   TRUST_PROXY: int(0, 0, 10),
-  SIWE_DOMAIN: z.string().default('localhost:3000'),
-  SIWE_NONCE_TTL_SECONDS: int(600, 60, 3600),
+  SEP10_HOME_DOMAIN: z
+    .string()
+    .regex(/^[a-z0-9.-]+(:\d{1,5})?$/i, 'must be a host (and optional port)')
+    .default('localhost:3000'),
+  SEP10_WEB_AUTH_DOMAIN: z
+    .string()
+    .regex(/^[a-z0-9.-]+(:\d{1,5})?$/i, 'must be a host (and optional port)')
+    .optional(),
+  SEP10_NETWORK: z.enum(NETWORK_IDS).optional(),
+  SEP10_SIGNING_SECRET: secret,
   SESSION_TTL_SECONDS: int(7 * 24 * 3600, 300, 90 * 24 * 3600),
   COOKIE_SECURE: z.enum(['true', 'false']).optional(),
   ADMIN_ADDRESSES: list(),
   DATA_ENCRYPTION_KEY: z.string().min(1, 'is required (32 bytes, hex or base64)'),
-  P2P_CONTRACTS_LIVE: json(byNetwork(address), {}),
-  P2P_CONTRACTS_TEST: json(byNetwork(address), {}),
-  P2P_DEPLOY_BLOCKS_LIVE: json(byNetwork(z.number().int().min(0)), {}),
-  P2P_DEPLOY_BLOCKS_TEST: json(byNetwork(z.number().int().min(0)), {}),
-  P2P_RPC_URLS_LIVE: json(byNetwork(z.string().url()), {}),
-  P2P_RPC_URLS_TEST: json(byNetwork(z.string().url()), {}),
-  P2P_LOCAL_TOKENS: json(
-    z.array(
-      z.object({
-        symbol: z.string().min(1).max(12),
-        address,
-        decimals: z.number().int().min(0).max(36),
-      }),
-    ),
-    [],
-  ),
-  P2P_MATCHER_PRIVATE_KEY: z
-    .string()
-    .optional()
-    .refine((v) => !v || PRIVATE_KEY_RE.test(v), 'must be 0x + 64 hex'),
+  STELLAR_LOCAL_RPC_URL: optionalUrl,
+  STELLAR_LOCAL_HORIZON_URL: optionalUrl,
+  STELLAR_TESTNET_RPC_URL: optionalUrl,
+  STELLAR_TESTNET_HORIZON_URL: optionalUrl,
+  STELLAR_MAINNET_RPC_URL: optionalUrl,
+  STELLAR_MAINNET_HORIZON_URL: optionalUrl,
+  P2P_LOCAL_CONTRACT: contract,
+  P2P_TESTNET_CONTRACT: contract,
+  P2P_MAINNET_CONTRACT: contract,
+  P2P_LOCAL_START_LEDGER: optionalInt(1, 2 ** 32 - 1),
+  P2P_TESTNET_START_LEDGER: optionalInt(1, 2 ** 32 - 1),
+  P2P_MAINNET_START_LEDGER: optionalInt(1, 2 ** 32 - 1),
+  P2P_LOCAL_TOKENS: extraTokens,
+  P2P_TESTNET_TOKENS: extraTokens,
+  P2P_MATCHER_SECRET: secret,
+  P2P_SPONSOR_SECRET: secret,
   P2P_MERCHANT_MAX_OPEN_ORDERS: int(5, 1, 1000),
-  P2P_RPC_TIMEOUT_MS: int(10_000, 1000, 120_000),
+  P2P_RPC_TIMEOUT_MS: int(15_000, 1000, 120_000),
   CHECKOUT_URL: z.string().url().optional(),
+  SPONSOR_MAX_FEE_STROOPS: int(2_000_000, 100, 100_000_000),
+  SPONSOR_DAILY_BUDGET_XLM: int(200, 1, 10_000_000),
+  SPONSOR_ADDRESS_LIMIT_PER_HOUR: int(60, 1, 100_000),
+  SPONSOR_IP_LIMIT_PER_HOUR: int(240, 1, 1_000_000),
+  SPONSOR_ACTIVATIONS_PER_IP_PER_DAY: int(5, 1, 100_000),
   APP_TIER: z.enum(TIERS).default('live'),
-  APP_INTEGRATOR_ADDRESS: address.optional(),
+  APP_INTEGRATOR_ADDRESS: optionalText,
   APP_INTEGRATOR_FEE_BPS: int(0, 0, 500),
   APP_MAX_LIVE_ORDERS_PER_WALLET: int(3, 1, 100),
   JOBS_ENABLED: bool(true),
@@ -193,7 +277,7 @@ const schema = z.object({
   WEBHOOK_TIMEOUT_MS: int(10_000, 1000, 60_000),
   WEBHOOKS_ALLOW_INSECURE: bool(false),
   DEV_TOOLS: bool(false),
-  DEV_WALLET_KEYS: list(),
+  DEV_WALLET_SECRETS: list(),
 });
 
 /** A 32-byte key from hex (64 chars, optional 0x) or base64. */
@@ -214,39 +298,11 @@ export class ConfigError extends Error {
   }
 }
 
-function tierConfig(
-  tier: Tier,
-  contracts: Record<string, string>,
-  deployBlocks: Record<string, number>,
-  rpcUrls: Record<string, string>,
-  problems: string[],
-): TierDeploymentConfig {
-  const suffix = tier.toUpperCase();
-  const out: TierDeploymentConfig = { contracts: {}, deployBlocks: {}, rpcUrls: {} };
-  for (const [id, contract] of Object.entries(contracts)) {
-    if (!isNetworkId(id)) {
-      problems.push(`P2P_CONTRACTS_${suffix}: ${id} is not a network id`);
-      continue;
-    }
-    const entry = NETWORKS[id].tiers[tier];
-    if (!entry) {
-      problems.push(`P2P_CONTRACTS_${suffix}: ${id} has no ${tier} network`);
-      continue;
-    }
-    out.contracts[id] = getAddress(contract);
-    if (!rpcUrls[id] && !entry.defaultRpcUrl) {
-      problems.push(`P2P_RPC_URLS_${suffix}: ${id} needs a node (no public default on ${tier})`);
-    }
-  }
-  for (const [id, block] of Object.entries(deployBlocks)) {
-    if (isNetworkId(id)) out.deployBlocks[id] = block;
-    else problems.push(`P2P_DEPLOY_BLOCKS_${suffix}: ${id} is not a network id`);
-  }
-  for (const [id, url] of Object.entries(rpcUrls)) {
-    if (isNetworkId(id)) out.rpcUrls[id] = url;
-    else problems.push(`P2P_RPC_URLS_${suffix}: ${id} is not a network id`);
-  }
-  return out;
+const NET = (id: NetworkId) => id.toUpperCase() as 'LOCAL' | 'TESTNET' | 'MAINNET';
+
+/** The account (G...) a secret seed controls. */
+export function publicKeyOf(secretSeed: string): string {
+  return Keypair.fromSecret(secretSeed).publicKey();
 }
 
 /** Reads and validates the environment; throws `ConfigError` listing every problem. */
@@ -266,44 +322,81 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     problems.push('DATA_ENCRYPTION_KEY: must be 32 bytes, as 64 hex characters or base64');
   }
 
-  const tiers: Record<Tier, TierDeploymentConfig> = {
-    live: tierConfig(
-      'live',
-      e.P2P_CONTRACTS_LIVE,
-      e.P2P_DEPLOY_BLOCKS_LIVE,
-      e.P2P_RPC_URLS_LIVE,
-      problems,
-    ),
-    test: tierConfig(
-      'test',
-      e.P2P_CONTRACTS_TEST,
-      e.P2P_DEPLOY_BLOCKS_TEST,
-      e.P2P_RPC_URLS_TEST,
-      problems,
-    ),
-  };
-  if (tiers.test.contracts.local) {
-    if (production)
-      problems.push('P2P_CONTRACTS_TEST: the local dev chain is refused in production');
-    if (e.P2P_LOCAL_TOKENS.length === 0) {
-      problems.push('P2P_LOCAL_TOKENS: the local network needs its token(s)');
+  const networks = {} as Record<NetworkId, NetworkConfig>;
+  for (const id of NETWORK_IDS) {
+    const n = NET(id);
+    const table = NETWORKS[id];
+    const extra = id === 'mainnet' ? [] : e[`P2P_${n as 'LOCAL' | 'TESTNET'}_TOKENS`];
+    const tokens = [...tableTokens(id)];
+    for (const t of extra) {
+      const token = tokenOf(id, t.code, t.issuer, t.symbol ?? t.code);
+      if (tokens.some((x) => x.symbol === token.symbol || x.contract === token.contract)) {
+        problems.push(`P2P_${n}_TOKENS: ${token.symbol} is listed twice`);
+        continue;
+      }
+      tokens.push(token);
     }
+    const config: NetworkConfig = {
+      id,
+      tier: table.tier,
+      rpcUrl: e[`STELLAR_${n}_RPC_URL`] ?? table.defaultRpcUrl,
+      horizonUrl: e[`STELLAR_${n}_HORIZON_URL`] ?? table.defaultHorizonUrl,
+      contract: e[`P2P_${n}_CONTRACT`],
+      startLedger: e[`P2P_${n}_START_LEDGER`],
+      tokens,
+    };
+    if (config.contract) {
+      if (!config.rpcUrl) problems.push(`STELLAR_${n}_RPC_URL: required with P2P_${n}_CONTRACT`);
+      if (config.tokens.length === 0) {
+        problems.push(`P2P_${n}_TOKENS: the ${id} network lists no token for its market`);
+      }
+      if (production && table.devOnly) {
+        problems.push(`P2P_${n}_CONTRACT: the ${id} network is refused in production`);
+      }
+    }
+    networks[id] = config;
   }
 
-  const matcher = (e.P2P_MATCHER_PRIVATE_KEY as Hex | undefined) ?? null;
-  if (
-    matcher &&
-    dataEncryptionKey &&
-    Buffer.from(matcher.slice(2), 'hex').equals(dataEncryptionKey)
-  ) {
-    problems.push('P2P_MATCHER_PRIVATE_KEY: must not equal DATA_ENCRYPTION_KEY');
+  // The three server keys play distinct roles and must be distinct keys.
+  const keys = {
+    P2P_MATCHER_SECRET: e.P2P_MATCHER_SECRET,
+    P2P_SPONSOR_SECRET: e.P2P_SPONSOR_SECRET,
+    SEP10_SIGNING_SECRET: e.SEP10_SIGNING_SECRET,
+  };
+  const set = Object.entries(keys).filter(([, v]) => v !== null) as [string, string][];
+  for (let i = 0; i < set.length; i++) {
+    for (let j = i + 1; j < set.length; j++) {
+      if (set[i][1] === set[j][1]) problems.push(`${set[j][0]}: must not equal ${set[i][0]}`);
+    }
   }
-  const anyDeployment = TIERS.some((t) => Object.keys(tiers[t].contracts).length > 0);
-  if (anyDeployment && !matcher) {
-    problems.push('P2P_MATCHER_PRIVATE_KEY: required once a P2P contract is configured');
+  if (production) {
+    for (const [name, value] of Object.entries(keys)) {
+      if (!value) problems.push(`${name}: required in production (three distinct keys)`);
+    }
+  }
+  for (const [name, value] of set) {
+    if (
+      dataEncryptionKey &&
+      Buffer.from(StrKey.decodeEd25519SecretSeed(value)).equals(dataEncryptionKey)
+    ) {
+      problems.push(`${name}: must not equal DATA_ENCRYPTION_KEY`);
+    }
+  }
+  const anyContract = NETWORK_IDS.some((id) => networks[id].contract);
+  if (anyContract && !e.P2P_MATCHER_SECRET) {
+    problems.push('P2P_MATCHER_SECRET: required once a market contract is configured');
+  }
+
+  const appTier = e.APP_TIER;
+  const sep10Network = e.SEP10_NETWORK ?? (appTier === 'live' ? 'mainnet' : 'testnet');
+  if (production && NETWORKS[sep10Network].devOnly) {
+    problems.push('SEP10_NETWORK: the local network is refused in production');
   }
 
   const appFee = e.APP_INTEGRATOR_FEE_BPS;
+  if (e.APP_INTEGRATOR_ADDRESS && !isAccountAddress(e.APP_INTEGRATOR_ADDRESS)) {
+    problems.push('APP_INTEGRATOR_ADDRESS: must be an account address (G...)');
+  }
   if (appFee > 0 && !e.APP_INTEGRATOR_ADDRESS) {
     problems.push('APP_INTEGRATOR_ADDRESS: required when APP_INTEGRATOR_FEE_BPS > 0');
   }
@@ -312,22 +405,22 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
   if (production && e.WEBHOOKS_ALLOW_INSECURE) {
     problems.push('WEBHOOKS_ALLOW_INSECURE: refused in production');
   }
-  const walletKeys = e.DEV_WALLET_KEYS.filter((k) => {
-    if (PRIVATE_KEY_RE.test(k)) return true;
-    problems.push('DEV_WALLET_KEYS: every key must be 0x + 64 hex');
+  const walletSecrets = e.DEV_WALLET_SECRETS.filter((k) => {
+    if (isSecretSeed(k)) return true;
+    problems.push('DEV_WALLET_SECRETS: every entry must be a secret seed (S...)');
     return false;
-  }) as Hex[];
-  if (walletKeys.length > 0 && !e.DEV_TOOLS) {
-    problems.push('DEV_WALLET_KEYS: only read with DEV_TOOLS=true');
+  });
+  if (walletSecrets.length > 0 && !e.DEV_TOOLS) {
+    problems.push('DEV_WALLET_SECRETS: only read with DEV_TOOLS=true');
   }
-  if (matcher && walletKeys.some((k) => k.toLowerCase() === matcher.toLowerCase())) {
-    problems.push('DEV_WALLET_KEYS: must not include the matcher key');
+  if (set.some(([, v]) => walletSecrets.includes(v))) {
+    problems.push('DEV_WALLET_SECRETS: must not include a server key');
   }
 
   const admins: string[] = [];
   for (const a of e.ADMIN_ADDRESSES) {
-    if (isAddress(a, { strict: false })) admins.push(getAddress(a));
-    else problems.push(`ADMIN_ADDRESSES: ${a} is not an EVM address`);
+    if (isAccountAddress(a)) admins.push(a);
+    else problems.push(`ADMIN_ADDRESSES: ${a} is not an account address (G...)`);
   }
 
   if (problems.length > 0) throw new ConfigError(problems);
@@ -340,28 +433,40 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     port,
     host: e.HOST,
     databaseUrl: e.DATABASE_URL,
+    brandName: e.BRAND_NAME,
     publicApiUrl,
     webOrigins,
     trustProxy: e.TRUST_PROXY,
-    siwe: {
-      domain: e.SIWE_DOMAIN,
-      nonceTtlSeconds: e.SIWE_NONCE_TTL_SECONDS,
+    sep10: {
+      homeDomain: e.SEP10_HOME_DOMAIN,
+      webAuthDomain: e.SEP10_WEB_AUTH_DOMAIN ?? e.SEP10_HOME_DOMAIN,
+      network: sep10Network,
+      signingSecret: e.SEP10_SIGNING_SECRET,
       sessionTtlSeconds: e.SESSION_TTL_SECONDS,
     },
     cookieSecure: e.COOKIE_SECURE ? e.COOKIE_SECURE === 'true' : production,
     adminAddresses: admins,
     dataEncryptionKey: dataEncryptionKey as Buffer,
+    networks,
     p2p: {
-      tiers,
-      localTokens: e.P2P_LOCAL_TOKENS.map((t) => ({ ...t, address: getAddress(t.address) })),
-      matcherPrivateKey: matcher,
+      matcherSecret: e.P2P_MATCHER_SECRET,
       merchantMaxOpenOrders: e.P2P_MERCHANT_MAX_OPEN_ORDERS,
       rpcTimeoutMs: e.P2P_RPC_TIMEOUT_MS,
       checkoutUrl: (e.CHECKOUT_URL ?? `${webOrigins[0]}/pay`).replace(/\/$/, ''),
     },
+    sponsor: {
+      secret: e.P2P_SPONSOR_SECRET,
+      limits: {
+        maxFeeStroops: e.SPONSOR_MAX_FEE_STROOPS,
+        dailyBudgetStroops: BigInt(e.SPONSOR_DAILY_BUDGET_XLM) * 10_000_000n,
+        perAddressPerHour: e.SPONSOR_ADDRESS_LIMIT_PER_HOUR,
+        perIpPerHour: e.SPONSOR_IP_LIMIT_PER_HOUR,
+        activationsPerIpPerDay: e.SPONSOR_ACTIVATIONS_PER_IP_PER_DAY,
+      },
+    },
     app: {
-      tier: e.APP_TIER,
-      integratorAddress: e.APP_INTEGRATOR_ADDRESS ? getAddress(e.APP_INTEGRATOR_ADDRESS) : null,
+      tier: appTier,
+      integratorAddress: e.APP_INTEGRATOR_ADDRESS,
       integratorFeeBps: appFee,
       maxLiveOrdersPerWallet: e.APP_MAX_LIVE_ORDERS_PER_WALLET,
     },
@@ -371,17 +476,25 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
       webhookIntervalMs: e.WEBHOOK_INTERVAL_MS,
     },
     webhooks: { allowInsecure: e.WEBHOOKS_ALLOW_INSECURE, timeoutMs: e.WEBHOOK_TIMEOUT_MS },
-    dev: { tools: e.DEV_TOOLS, walletKeys },
+    dev: { tools: e.DEV_TOOLS, walletSecrets },
   };
 }
 
-/** The matcher's address, or null. */
+/** The matcher's account (G...), or null. */
 export function matcherAddressOf(config: AppConfig): string | null {
-  const key = config.p2p.matcherPrivateKey;
-  return key ? privateKeyToAddress(key) : null;
+  return config.p2p.matcherSecret ? publicKeyOf(config.p2p.matcherSecret) : null;
 }
 
 /** A short, stable id of a key (never the key): for logs and sealed values. */
 export function keyId(key: Buffer): string {
   return createHash('sha256').update(key).digest('hex').slice(0, 8);
+}
+
+/** The tiers that have at least one market contract configured. */
+export function tiersWithMarket(config: AppConfig): Tier[] {
+  return TIERS.filter((t) =>
+    NETWORK_IDS.some(
+      (id) => isNetworkId(id) && config.networks[id].tier === t && config.networks[id].contract,
+    ),
+  );
 }

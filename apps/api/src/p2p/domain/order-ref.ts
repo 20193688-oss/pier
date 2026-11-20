@@ -1,5 +1,5 @@
-import { keccak256, type Hex } from 'viem';
-import { ZERO_ADDRESS, type P2pOpenParams } from '@/chain/market-codec';
+import { createHash } from 'node:crypto';
+import type { P2pOpenParams } from '@/chain/market-codec';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -8,14 +8,17 @@ export function isUuid(value: string): boolean {
 }
 
 /**
- * The `ref` an order carries on-chain: keccak-256 of its uuid's 16 bytes.
- * Deterministic, so the indexer finds the order by it, and unique per opener in
- * the contract (`orderIdOf(opener, ref)`), so nobody can take an order's ref
- * by opening first: their copy is under their own address.
+ * The `ref_id` an order carries on-chain: SHA-256 of its uuid's 16 bytes, hex
+ * (no 0x). Deterministic, so the indexer finds the order by it and the web
+ * derives it the same way, and unique per opener in the contract
+ * (`order_id_of(opener, ref_id)`), so nobody can take an order's ref by
+ * opening first: their copy is under their own address.
  */
 export function orderRef(id: string): string {
   if (!isUuid(id)) throw new Error(`order id ${id} is not a uuid`);
-  return keccak256(`0x${id.replace(/-/g, '')}` as Hex);
+  return createHash('sha256')
+    .update(Buffer.from(id.replace(/-/g, ''), 'hex'))
+    .digest('hex');
 }
 
 /** The columns of an order that make its `OpenParams`. */
@@ -35,8 +38,9 @@ export interface P2pOrderTerms {
 
 /** The `OpenParams` an order is opened with, and checked against when indexed. */
 export function openParamsOf(order: P2pOrderTerms): P2pOpenParams {
+  const integrated = order.integratorFeeBps > 0 && order.integratorAddress;
   return {
-    ref: orderRef(order.id),
+    refId: orderRef(order.id),
     seller: order.sellerAddress,
     buyer: order.buyerAddress,
     token: order.token,
@@ -45,10 +49,7 @@ export function openParamsOf(order: P2pOrderTerms): P2pOpenParams {
     acceptWindow: order.acceptWindow,
     paymentWindow: order.paymentWindow,
     settleWindow: order.settleWindow,
-    integrator:
-      order.integratorFeeBps > 0 && order.integratorAddress
-        ? order.integratorAddress
-        : ZERO_ADDRESS,
-    integratorFeeBps: order.integratorAddress ? order.integratorFeeBps : 0,
+    integrator: integrated ? order.integratorAddress : null,
+    integratorFeeBps: integrated ? order.integratorFeeBps : 0,
   };
 }

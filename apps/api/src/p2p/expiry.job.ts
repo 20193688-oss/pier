@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ChainCallReverted } from '@/chain/chain-client.service';
 import { DeploymentsService } from '@/chain/deployments.service';
-import { p2pCalldata } from '@/chain/market-codec';
+import { p2pCall } from '@/chain/market-codec';
 import { MarketReader } from '@/chain/market-reader.service';
 import type { Tier } from '@/chain/networks';
 import { APP_CONFIG } from '@/config/config.module';
@@ -66,7 +66,7 @@ export class ExpiryJob extends ScheduledJob {
     await this.prisma.p2pQuote.deleteMany({
       where: { expiresAt: { lt: stale } },
     });
-    await this.prisma.p2pAccountChallenge.deleteMany({
+    await this.prisma.authChallenge.deleteMany({
       where: { expiresAt: { lt: stale } },
     });
   }
@@ -102,7 +102,7 @@ export class ExpiryJob extends ScheduledJob {
         where: {
           orderId: order.id,
           kind: 'cancel',
-          status: { in: ['signed', 'sent'] },
+          status: { in: ['queued', 'signed', 'sent'] },
         },
       });
       if (inFlight > 0) continue;
@@ -110,6 +110,7 @@ export class ExpiryJob extends ScheduledJob {
       if (!d || !order.onchainId) continue;
       try {
         const onchain = await this.reader.getOrder(d, BigInt(order.onchainId));
+        if (!onchain) continue;
         if (onchain.status !== 'Offered' && onchain.status !== 'Active') {
           // Moved on-chain already; a failed order is not followed by the
           // indexer, so record where it went and stop looking at it.
@@ -122,7 +123,12 @@ export class ExpiryJob extends ScheduledJob {
         await this.matcher.send(d, {
           kind: 'cancel',
           orderId: order.id,
-          data: p2pCalldata.orderAction('cancel', BigInt(order.onchainId)),
+          operation: p2pCall.orderAction(
+            d.contract,
+            'cancel',
+            this.deployments.matcherKey().publicKey(),
+            BigInt(order.onchainId),
+          ),
         });
         this.logger.log(`P2P order ${order.id} past its deadline: cancel sent`);
       } catch (err) {
@@ -139,7 +145,7 @@ export class ExpiryJob extends ScheduledJob {
   async failUnsignedSales(): Promise<void> {
     const before = new Date(Date.now() - P2P_SELL_SIGNATURE_TTL_SECONDS * 1000);
     const unsigned = await this.prisma.p2pOrder.findMany({
-      where: { kind: 'SELL', status: 'pending', createdAt: { lt: before } },
+      where: { kind: { in: ['SELL', 'QR_PAY'] }, status: 'pending', createdAt: { lt: before } },
       take: P2P_EXPIRY_BATCH,
       select: { id: true },
     });

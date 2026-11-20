@@ -34,10 +34,7 @@ export class OffersService {
 
   private symbolOf(tier: Tier, row: P2pOfferRow): string {
     const d = this.deployments.find(tier, row.network);
-    return (
-      d?.tokens.find((t) => t.address.toLowerCase() === row.token.toLowerCase())?.symbol ??
-      row.token
-    );
+    return d?.tokens.find((t) => t.contract === row.token)?.symbol ?? row.token;
   }
 
   private view(tier: Tier, row: P2pOfferRow): OfferView {
@@ -63,10 +60,17 @@ export class OffersService {
     if (errors.length) throw ApiError.validation(errors);
   }
 
-  private checkRails(currency: string, rails: string[]): void {
+  private checkRails(currency: string, rails: string[], side: string): void {
     const wrong = rails.filter((r) => !isP2pRailId(r) || P2P_RAILS[r].currency !== currency);
     if (wrong.length) {
       throw ApiError.validation([`rails ${wrong.join(', ')} do not pay in ${currency}`]);
+    }
+    // A QR rail pays a scanned QR: only a merchant that BUYS tokens can pay one.
+    const qr = rails.filter((r) => isP2pRailId(r) && P2P_RAILS[r].qr);
+    if (qr.length && side !== 'BUY_TOKEN') {
+      throw ApiError.validation([
+        `rails ${qr.join(', ')} serve only BUY_TOKEN offers (QR payments)`,
+      ]);
     }
   }
 
@@ -81,7 +85,7 @@ export class OffersService {
     }
     const deployment = this.deployments.require(tier, dto.network);
     const token = this.deployments.token(deployment, dto.token);
-    this.checkRails(dto.currency, dto.rails);
+    this.checkRails(dto.currency, dto.rails, dto.side);
     this.checkTerms(dto.currency, dto);
     const row = await this.prisma.p2pOffer.create({
       data: {
@@ -90,7 +94,7 @@ export class OffersService {
         tier,
         side: dto.side,
         network: deployment.network,
-        token: token.address,
+        token: token.contract,
         currency: dto.currency,
         rails: [...new Set(dto.rails)],
         price: dto.price,
@@ -143,7 +147,7 @@ export class OffersService {
     const tier = tierOf(org, this.deployments);
     const organizationId = org.organizationId;
     const row = await this.owned(organizationId, tier, id);
-    if (dto.rails) this.checkRails(row.currency, dto.rails);
+    if (dto.rails) this.checkRails(row.currency, dto.rails, row.side);
     this.checkTerms(row.currency, {
       price: dto.price ?? row.price,
       minFiat: dto.minFiat ?? row.minFiat,
