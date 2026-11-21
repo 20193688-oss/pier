@@ -1,8 +1,8 @@
 import { createHmac } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
-  MIDPOINT_SIGNATURE_HEADER,
-  MidpointWebhookError,
+  PIER_SIGNATURE_HEADER,
+  PierWebhookError,
   parseWebhook,
   signWebhook,
   verifyWebhook,
@@ -26,7 +26,7 @@ function header(body: string, timestamp = t, key = secret): string {
 
 describe('verifyWebhook', () => {
   it('names the header the API signs in', () => {
-    expect(MIDPOINT_SIGNATURE_HEADER).toBe('midpoint-signature');
+    expect(PIER_SIGNATURE_HEADER).toBe('pier-signature');
   });
 
   it('accepts a delivery signed with the secret within the tolerance', () => {
@@ -140,8 +140,8 @@ describe('parseWebhook', () => {
       } catch (error) {
         caught = error;
       }
-      expect(caught).toBeInstanceOf(MidpointWebhookError);
-      expect((caught as MidpointWebhookError).reason).toBe(c.reason);
+      expect(caught).toBeInstanceOf(PierWebhookError);
+      expect((caught as PierWebhookError).reason).toBe(c.reason);
     }
   });
 

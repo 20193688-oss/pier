@@ -439,7 +439,7 @@ describe('app transfers of the lumen', () => {
       },
     };
     const service = new AppWalletService(
-      { app: { tier: 'test' }, brandName: 'Midpoint' } as never,
+      { app: { tier: 'test' }, brandName: 'Pier' } as never,
       prisma as never,
       { pick: () => deployment, token: () => XLM } as never,
       { requireLive: async () => deployment } as never,

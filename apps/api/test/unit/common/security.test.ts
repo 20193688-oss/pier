@@ -34,7 +34,7 @@ describe('configuration', () => {
     expect(config.sponsor.secret).toBeNull();
     expect(config.app.tier).toBe('live');
     expect(config.sep10.network).toBe('mainnet');
-    expect(config.brandName).toBe('Midpoint');
+    expect(config.brandName).toBe('Pier');
     expect(config.networks.testnet.tokens.map((t) => t.symbol)).toEqual(['USDC']);
     expect(config.networks.testnet.rpcUrl).toBe('https://soroban-testnet.stellar.org');
     expect(config.networks.mainnet.rpcUrl).toBeNull();

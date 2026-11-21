@@ -65,7 +65,7 @@ export interface MockState {
 }
 
 const VERSION = 8;
-const STORAGE_KEY = 'midpoint.mock';
+const STORAGE_KEY = 'pier.mock';
 
 export const now = () => Date.now();
 export const iso = (ms: number) => new Date(ms).toISOString();
@@ -534,7 +534,7 @@ function seed(): MockState {
       {
         id: 'wh_bot',
         _org: 'org_nortecambios',
-        url: 'https://bot.nortecambios.example/hooks/midpoint',
+        url: 'https://bot.nortecambios.example/hooks/pier',
         description: 'Bot de liberación',
         events: [
           'P2P_ORDER_CREATED',
@@ -550,7 +550,7 @@ function seed(): MockState {
       {
         id: 'wh_shop',
         _org: 'org_tiendalerma',
-        url: 'https://tiendalerma.example/api/midpoint',
+        url: 'https://tiendalerma.example/api/pier',
         description: null,
         events: ['P2P_CHARGE_SUCCEEDED', 'P2P_PAYOUT_BATCH_COMPLETED'],
         active: true,

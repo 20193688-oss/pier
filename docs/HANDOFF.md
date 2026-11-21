@@ -1,11 +1,11 @@
-# Midpoint: handoff
+# Pier: handoff
 
 The state of the project and everything a new session needs to continue it. Last updated at the
 end of 2026-11-19, after the move to Stellar and the mobile payments app. Read this first, then
 [`AGENTS.md`](../AGENTS.md) (binding conventions), [`docs/STELLAR.md`](STELLAR.md) (the design
 contract of the Stellar port and the app) and the workspace READMEs.
 
-## 1. What Midpoint is
+## 1. What Pier is
 
 A peer-to-peer market for stablecoins (USDC) against local money (bank transfers, PIX, Argentina's
 interoperable QR...), modelled on p2p.me but with a **public API**, running on **Stellar**. On top
@@ -23,26 +23,26 @@ The owner's requests (Spanish), in order:
 
 Owner decisions so far:
 
-| Topic                 | Decision                                                                                                                                        |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| Product               | Independent project named **Midpoint** (renamed from "pedospe" on 2026-11-20; not part of any other company's product)                          |
-| Chain                 | **Stellar** (Soroban contract `P2PMarket`), replacing the first EVM build entirely                                                              |
-| User wallets          | **Pollar** (`@pollar/react` / `@pollar/core` 0.12): email or Google login gives a classic G account                                             |
-| Fees                  | **Gasless**: the API fee-bumps every user transaction and sponsors activation reserves                                                          |
-| Mobile                | An installable **PWA** inside `apps/web` (Capacitor later if the stores are needed)                                                             |
-| App features (v1)     | Send/receive dollars, `@handles`, pay charges by QR, pay shop QRs (AR interoperable, PIX) through a merchant                                    |
-| Who confirms the fiat | The party that receives the local money (or its bot) releases; deadlines refund; disputes go to an arbiter                                      |
-| Matching              | The user types an amount and the market picks the merchant (no ads book)                                                                        |
-| Client tools          | Merchant bots via API, embedded buy/sell for businesses, collections (charges) and payouts                                                      |
-| Repo                  | Private `Emanuel250YT/pedospe`, local folder `C:\Users\emanu\OneDrive\Desktop\pedospe` (both still under the old name), npm workspaces monorepo |
-| UI languages          | Spanish (default) and English                                                                                                                   |
+| Topic                 | Decision                                                                                                                                                                                                                                                                                                                                   |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Product               | Independent project named **Pier** (renamed "pedospe" → Midpoint → Pier on 2026-11-20, branch `pier`; Midpoint's last state is `d8d41a4` on `chore/rename-midpoint`; not part of any other company's product). Data identifiers kept from Midpoint: the dev database's user and name `midpoint` and the app organization id `midpoint_app` |
+| Chain                 | **Stellar** (Soroban contract `P2PMarket`), replacing the first EVM build entirely                                                                                                                                                                                                                                                         |
+| User wallets          | **Pollar** (`@pollar/react` / `@pollar/core` 0.12): email or Google login gives a classic G account                                                                                                                                                                                                                                        |
+| Fees                  | **Gasless**: the API fee-bumps every user transaction and sponsors activation reserves                                                                                                                                                                                                                                                     |
+| Mobile                | An installable **PWA** inside `apps/web` (Capacitor later if the stores are needed)                                                                                                                                                                                                                                                        |
+| App features (v1)     | Send/receive dollars, `@handles`, pay charges by QR, pay shop QRs (AR interoperable, PIX) through a merchant                                                                                                                                                                                                                               |
+| Who confirms the fiat | The party that receives the local money (or its bot) releases; deadlines refund; disputes go to an arbiter                                                                                                                                                                                                                                 |
+| Matching              | The user types an amount and the market picks the merchant (no ads book)                                                                                                                                                                                                                                                                   |
+| Client tools          | Merchant bots via API, embedded buy/sell for businesses, collections (charges) and payouts                                                                                                                                                                                                                                                 |
+| Repo                  | Private `Emanuel250YT/pedospe`, local folder `C:\Users\emanu\OneDrive\Desktop\pedospe` (both still under the old name), npm workspaces monorepo                                                                                                                                                                                            |
+| UI languages          | Spanish (default) and English                                                                                                                                                                                                                                                                                                              |
 
 ## 2. History you should know
 
 1. The market was first built inside another company's repositories (the owner's employer,
    Cosmos Pay); the owner then said it must be independent. Those pull requests were closed
-   unmerged. **Never put Midpoint work in Cosmos Pay repositories, never copy their infrastructure,
-   and never use Cosmos Pay's Pollar app**: Midpoint needs its own.
+   unmerged. **Never put Pier work in Cosmos Pay repositories, never copy their infrastructure,
+   and never use Cosmos Pay's Pollar app**: Pier needs its own.
 2. 2026-11-19, first build (EVM): Solidity contract, NestJS API with viem and SIWE, React web with
    browser wallets, all merged into `main` (`1dcd8a1`, handoff `a52dd3f`).
 3. 2026-11-19 evening, the pivot: everything moved to Stellar and the payments app was added, on
@@ -56,13 +56,13 @@ Owner decisions so far:
 
 ## 3. Layout and stack
 
-| Workspace                                      | Stack                                                                                                                                               | Docs                                                              |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
-| `packages/contracts` (`@midpoint/contracts`)   | Soroban contract in Rust (`soroban-sdk` 29.0.1, Rust 1.97.1 pinned, `wasm32v1-none`); committed wasm + spec as a TS artifact; Vitest + `cargo test` | [`packages/contracts/README.md`](../packages/contracts/README.md) |
-| `packages/payment-qr` (`@midpoint/payment-qr`) | Dependency-free TS: StrKey, SEP-7, the app's payment/charge links, handles, EMVCo merchant QRs (PIX, AR interoperable) behind `parseScan`           | source docblocks                                                  |
-| `apps/api` (`@midpoint/api`)                   | NestJS 12, Prisma 7 + Postgres, `@stellar/stellar-sdk` 17.4 (Soroban RPC), Vitest + SWC; OpenAPI `apps/api/openapi.json` (89 operations)            | [`apps/api/README.md`](../apps/api/README.md)                     |
-| `packages/sdk` (`@midpoint/sdk`)               | openapi-fetch client typed from the spec, webhook verification, reference merchant bot (signs `release` with a Stellar key)                         | [`packages/sdk/README.md`](../packages/sdk/README.md)             |
-| `apps/web` (`@midpoint/web`)                   | Vite 8 + React 19 + React Router 8 + Tailwind 4, stellar-sdk, Pollar (lazy chunk), jsQR fallback, hand-written service worker, Playwright           | [`apps/web/README.md`](../apps/web/README.md)                     |
+| Workspace                                  | Stack                                                                                                                                               | Docs                                                              |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `packages/contracts` (`@pier/contracts`)   | Soroban contract in Rust (`soroban-sdk` 29.0.1, Rust 1.97.1 pinned, `wasm32v1-none`); committed wasm + spec as a TS artifact; Vitest + `cargo test` | [`packages/contracts/README.md`](../packages/contracts/README.md) |
+| `packages/payment-qr` (`@pier/payment-qr`) | Dependency-free TS: StrKey, SEP-7, the app's payment/charge links, handles, EMVCo merchant QRs (PIX, AR interoperable) behind `parseScan`           | source docblocks                                                  |
+| `apps/api` (`@pier/api`)                   | NestJS 12, Prisma 7 + Postgres, `@stellar/stellar-sdk` 17.4 (Soroban RPC), Vitest + SWC; OpenAPI `apps/api/openapi.json` (89 operations)            | [`apps/api/README.md`](../apps/api/README.md)                     |
+| `packages/sdk` (`@pier/sdk`)               | openapi-fetch client typed from the spec, webhook verification, reference merchant bot (signs `release` with a Stellar key)                         | [`packages/sdk/README.md`](../packages/sdk/README.md)             |
+| `apps/web` (`@pier/web`)                   | Vite 8 + React 19 + React Router 8 + Tailwind 4, stellar-sdk, Pollar (lazy chunk), jsQR fallback, hand-written service worker, Playwright           | [`apps/web/README.md`](../apps/web/README.md)                     |
 
 Tooling: Node 26, TypeScript **6.0.3**, ESLint (forbids relative imports in `src`/`test`),
 Prettier, `cargo fmt` + `clippy -D warnings` for the contract. Root scripts `build`, `test`,
@@ -79,7 +79,7 @@ npm run dev:stack -- --reset            # fresh database and a fresh deployment
 npm run dev:stack -- --no-web
 npm run dev:stack -- --api-port 4300 --web-port 3300 --pg-port 54349   # other ports
 npm run dev:simulate -- <orderId> --api http://localhost:4100           # play the merchant
-npm run dev:mock -w @midpoint/web        # the whole web with no backend (demo wallet)
+npm run dev:mock -w @pier/web        # the whole web with no backend (demo wallet)
 ```
 
 - Defaults: API **:4100**, web **:3100**, embedded Postgres **:54339**. Network: Stellar `local`
@@ -135,7 +135,7 @@ npm run dev:mock -w @midpoint/web        # the whole web with no backend (demo w
   checks the XLM shapes: a send is the SAC's `transfer` to any destination with no memo on chain
   (the person's note stays off chain), and the activation is only the missing account (begin,
   create with nothing in it, end, as the sponsor's transaction). The app's home screen shows a
-  chip per listed token; the person's pick is remembered (`midpoint.app.token`).
+  chip per listed token; the person's pick is remembered (`pier.app.token`).
 - Clicking through: open the web's `/app` and sign up or sign in with Pollar (email code or
   Google; needs `VITE_POLLAR_PUBLISHABLE_KEY`, section 8, and the web on an origin the Pollar app
   allows, today `http://localhost:3300`). To use a printed dev secret instead, open
@@ -162,7 +162,7 @@ npm run dev:mock -w @midpoint/web        # the whole web with no backend (demo w
 | payment-qr                                          | 16 pass (PIX manual CRC vector, SEP-23 vectors, duplicate-field and fail-closed cases)                                    | orchestrator                                                          |
 | SDK                                                 | 56 pass                                                                                                                   | orchestrator                                                          |
 | API unit + e2e wiring (embedded Postgres)           | 473 pass (every route vs wrong callers, scopes, roles, tiers, orgs, CSRF, revoked keys, SEP-10 replay and cross-purpose)  | orchestrator                                                          |
-| API chain e2e on **testnet**                        | 5/5: sponsored activation, gasless transfer to an `@handle`, BUY, SELL, QR_PAY, a charge paid from the balance            | API agent (`E2E_STELLAR=testnet npm run test:chain -w @midpoint/api`) |
+| API chain e2e on **testnet**                        | 5/5: sponsored activation, gasless transfer to an `@handle`, BUY, SELL, QR_PAY, a charge paid from the balance            | API agent (`E2E_STELLAR=testnet npm run test:chain -w @pier/api`)     |
 | Web unit                                            | 224 pass (102 are the ported transaction checks)                                                                          | orchestrator                                                          |
 | Web Playwright (mock mode)                          | 54 pass: 18 flows × Pixel 7, iPhone 14 (Chromium) and desktop, es/en                                                      | orchestrator                                                          |
 | Web against the real testnet stack                  | dev-key sign-in, send, BUY, QR_PAY, charge from the balance, dashboard sign-in and deposit                                | web agent; sign-in → home with balance re-checked by the orchestrator |
@@ -215,8 +215,8 @@ offered to liquidity merchants.
 ### 6.3 API
 
 - **Tenancy/auth:** organizations with members, API keys `pk_live_` / `pk_test_` (tier by prefix,
-  every query filtered by organization AND tier), members' headers `Midpoint-Organization` /
-  `Midpoint-Tier`. Wallet sign-in is **SEP-10** (`GET /v1/auth/challenge`, `POST /v1/auth/verify`,
+  every query filtered by organization AND tier), members' headers `Pier-Organization` /
+  `Pier-Tier`. Wallet sign-in is **SEP-10** (`GET /v1/auth/challenge`, `POST /v1/auth/verify`,
   plus the standard `/v1/auth/sep10` pair and `/.well-known/stellar.toml`); wallet proofs for
   account registration use SEP-10-shaped challenges bound to the organization.
 - **Transactions:** every user transaction is built by the API as a prepared XDR (source = the
@@ -235,7 +235,7 @@ offered to liquidity merchants.
   ledger); the indexer reads `getEvents` from a persisted cursor with compare-and-swap transitions
   committed with their webhook outbox rows; refusals are named after the contract that raised
   them (market error, or `Token…` for a SAC).
-- **Webhooks:** transactional outbox, `midpoint-signature: t=<unix>,v1=<HMAC-SHA256(secret, t.body)>`,
+- **Webhooks:** transactional outbox, `pier-signature: t=<unix>,v1=<HMAC-SHA256(secret, t.body)>`,
   backoff, SSRF guard, per-role allowlisted bodies (no personal details, no `chainId` now).
 - **Payment details and QR payloads** sealed at rest with AES-256-GCM (`DATA_ENCRYPTION_KEY`).
 
@@ -264,7 +264,7 @@ offered to liquidity merchants.
     market's approximate price (`approxPrice` / `usePrice` in `features/app/data.tsx`), the
     screen says so before any quote, with "Add money" opening `/app/add?currency=…&amount=…`
     already filled with what is missing (2 % over).
-  - **Autofill** (`src/lib/app/remember.ts`, localStorage `midpoint.fill.*`, cleared on
+  - **Autofill** (`src/lib/app/remember.ts`, localStorage `pier.fill.*`, cleared on
     sign-out): the payer per currency and the payout account per rail come back in add money,
     withdraw and the charge page; the sign-in email fills email fields and suggests the handle.
   - **Layout and motion**: phones get the floating dock and 24px gutters. From 768px up there is
@@ -274,7 +274,7 @@ offered to liquidity merchants.
 - More of the owner's asks (2026-11-20, later; the hackathon is in Bolivia):
   - **Bolivia first.** BOB is the default currency everywhere (`HOME_CURRENCY` /
     `defaultCurrency` in `src/lib/p2p/rails.ts`; the app's pick is stored under
-    `midpoint.app.currency.v2`). The rail is `bo_bank_transfer` (CI/NIT as the payer's document).
+    `pier.app.currency.v2`). The rail is `bo_bank_transfer` (CI/NIT as the payer's document).
     The testnet market lists USDC and XLM only (no TUSD).
   - **Flags.** Each currency shows its country's round flag (`CurrencyMark` in
     `components/p2p/parts.tsx`, from `country-flag-icons`). Home's local-value line and the
@@ -325,7 +325,7 @@ offered to liquidity merchants.
       line in the form (`useToastWhen` in `components/ui/Toast.tsx`).
     - The wallet kind is kept in localStorage, so a new tab keeps it.
   - **Peru's QR** (Yape, Plin, the banks) is the rail `pe_qr`. Yape puts its account in field 39
-    as an opaque token, which `@midpoint/payment-qr` accepts for PE only.
+    as an opaque token, which `@pier/payment-qr` accepts for PE only.
   - **Send to a bank account abroad** (`/app/send/bank`): a sale whose beneficiary is someone
     else (`TradeForm recipient="other"`).
     - A CBU, CVU, alias, CCI or CLABE typed in Send's "To" is recognised and opens it filled in
@@ -379,13 +379,13 @@ offered to liquidity merchants.
   buttons (`.btn-white`, `.btn-glass` on the aura);
   action `.tile`s with tracked capitals (`.caps`); wide uppercase `.display` headlines on the aura;
   an ice highlighter (`.marker`) for the exact amount.
-- The logo (2026-11-20, the owner's choices on the logo canvas): MIDPOINT drawn from the hero's
-  letters (Archivo at width 116, weight 720), every letter cut on a slant with its lower part slid
-  right, POINT at 50 % with its O whole and a dot at its centre. Flat, in the current colour, on
-  no tile (`Logo`); the cut M alone is `LogoGlyph`. Only the favicon and the app icons set the M on
+- The logo (2026-11-20, the owner's choices on the logo canvas for Midpoint, carried over to the
+  rename): PIER drawn from the hero's letters (Archivo at width 116, weight 720), every letter cut
+  on a slant with its lower part slid right. Flat, in the current colour, on
+  no tile (`Logo`); the cut P alone is `LogoGlyph`. Only the favicon and the app icons set the P on
   an ink tile. The outlines are generated: `python apps/web/scripts/gen-logo.py` (fontTools,
   brotli, skia-pathops) writes `apps/web/src/components/ui/logo-paths.ts` from the app's own
-  font file, then `npm run icons -w @midpoint/web` redraws `public/favicon.svg` and the PNGs.
+  font file, then `npm run icons -w @pier/web` redraws `public/favicon.svg` and the PNGs.
 
 ## 7. Security invariants (keep them)
 
@@ -414,13 +414,13 @@ offered to liquidity merchants.
 
 ## 8. Open decisions and set-up for the owner
 
-1. **Pollar app for Midpoint** (never another company's): publishable key
+1. **Pollar app for Pier** (never another company's): publishable key
    (`VITE_POLLAR_PUBLISHABLE_KEY`), allowed origins (`http://localhost:3100`, `:3000` and
    production), email OTP + Google, signing rules allowlisting only the market contract's user
    functions, the USDC/TUSD SAC `transfer`, classic `payment` / `change_trust` of those assets and
    SEP-10 for our home domain; a prompt-style confirmation policy; Pollar's own fee sponsorship
    off (our API sponsors). Checklist in `apps/web/README.md`.
-2. **The new product name** (one constant per workspace, then the `@midpoint/*` scope, repo and
+2. **The new product name** (one constant per workspace, then the `@pier/*` scope, repo and
    domain).
 3. Protocol fee value (contract cap 3%).
 4. Owner and arbiter multisig addresses and the treasury address.
@@ -461,17 +461,17 @@ offered to liquidity merchants.
 - Landing not prerendered (SEO); admin dispute screen not built; payout extras cut (CSV, retries).
 - A build with Stellar CLI ≥ 25.2 (`stellar contract build`) has not been compared byte for byte
   with `npm run compile`.
-- After an API spec change: `npm run openapi -w @midpoint/api`, then `npm run gen:api -w
-@midpoint/web` and `npm run generate -w @midpoint/sdk`.
+- After an API spec change: `npm run openapi -w @pier/api`, then `npm run gen:api -w
+@pier/web` and `npm run generate -w @pier/sdk`.
 
 ## 10. Environment gotchas (this Windows machine)
 
 - Shell tools: the Bash tool is Git Bash (POSIX); never kill processes by name, only single PIDs
   (`taskkill //PID <pid> //F`). Never start Docker Desktop or other GUI apps from a session.
 - `soroban-sdk` 28+ refuses to build except through `stellar contract build` from CLI ≥ 25.2 (it
-  shakes the contract spec); this machine has CLI 25.1, so `npm run compile -w @midpoint/contracts`
+  shakes the contract spec); this machine has CLI 25.1, so `npm run compile -w @pier/contracts`
   does the shaking itself. The `wasm32v1-none` target was added to the pinned Rust 1.97.1.
-- `npm test -w @midpoint/contracts` takes about 1.5 minutes (cargo).
+- `npm test -w @pier/contracts` takes about 1.5 minutes (cargo).
 - stellar-sdk 17's XDR objects expose plain properties (`event.contractId`, `body.v0.topics`), not
   the accessor functions of older versions.
 - Testnet: friendbot funds dev accounts; SDF's RPC keeps about 7 days of events.
@@ -480,6 +480,6 @@ offered to liquidity merchants.
 - Worktrees from the 2026-11-19 sessions (remove with `git worktree remove <path>` when done):
   `C:/Users/emanu/wt/pst-contracts`, `pst-api`, `pst-web` (the agents' branches, merged),
   `pst-gates` (clean gate runs), `pst-preview` (a preview stack on :4300/:3300/:54349 with a
-  throwaway patch), and the older `midpoint-api`, `midpoint-web`, `p2p-cs`, `p2p-dp`.
+  throwaway patch), and the older `pier-api`, `pier-web`, `p2p-cs`, `p2p-dp`.
 - The first EVM dev stack may still be running from the main folder (web :3000, API :4000, anvil
   :8545) and locks `node_modules` (anvil.exe): stop it before `npm install` there.

@@ -3,7 +3,7 @@
  * wasm, hash and interface spec to src/p2p-market.artifact.ts, which is
  * committed and reviewed like code.
  *
- *   npm run compile -w @midpoint/contracts
+ *   npm run compile -w @pier/contracts
  *
  * Deployments are checked against MARKET_WASM_HASH, so a changed contract is a
  * new artifact and a new deployment; `test/artifact.test.ts` rebuilds the

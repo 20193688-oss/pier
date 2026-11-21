@@ -6,7 +6,7 @@ import { ApiError, itemOf, request } from '@/lib/api/client';
 import { ROUTES } from '@/lib/api/routes';
 import { readSubmit, tx } from '@/lib/api/endpoints';
 import { normalizeOrder, type Decimals } from '@/lib/p2p/normalize';
-import { normalizeHandle } from '@midpoint/payment-qr';
+import { normalizeHandle } from '@pier/payment-qr';
 import { body as checked } from '@/lib/api/spec';
 import type {
   ActivityItem,

@@ -8,7 +8,7 @@ import {
   type ReleaseCheck,
   type ReleaseSender,
 } from '@/bot/release';
-import { createMidpointClient } from '@/client';
+import { createPierClient } from '@/client';
 import type { Transaction, TransferMatch } from '@/types';
 import {
   MARKET,
@@ -24,15 +24,15 @@ const OTHER_CONTRACT = 'CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7
 
 describe('readBotConfig', () => {
   const env = {
-    MIDPOINT_API_URL: 'https://api.midpoint.test',
-    MIDPOINT_API_KEY: API_KEY,
+    PIER_API_URL: 'https://api.pier.test',
+    PIER_API_KEY: API_KEY,
     BOT_SECRET: MERCHANT.secret(),
     MARKET_CONTRACT: MARKET,
   };
 
   it('reads the settings with their defaults; a bare contract is the tier’s network', () => {
     expect(readBotConfig(env)).toEqual({
-      apiUrl: env.MIDPOINT_API_URL,
+      apiUrl: env.PIER_API_URL,
       apiKey: API_KEY,
       secret: MERCHANT.secret(),
       minScore: 3,
@@ -45,8 +45,8 @@ describe('readBotConfig', () => {
 
   it('reads MIN_SCORE, DRY_RUN, MAX_FEE_STROOPS and per-network contracts', () => {
     const config = readBotConfig({
-      MIDPOINT_API_URL: env.MIDPOINT_API_URL,
-      MIDPOINT_API_KEY: API_KEY,
+      PIER_API_URL: env.PIER_API_URL,
+      PIER_API_KEY: API_KEY,
       MIN_SCORE: '2',
       DRY_RUN: 'true',
       MAX_FEE_STROOPS: '500000',
@@ -62,9 +62,9 @@ describe('readBotConfig', () => {
   });
 
   it('requires the secret (unless a dry run) and the market contract', () => {
-    expect(() =>
-      readBotConfig({ MIDPOINT_API_URL: env.MIDPOINT_API_URL, MIDPOINT_API_KEY: API_KEY }),
-    ).toThrow(/BOT_SECRET is required[\s\S]*MARKET_CONTRACT is required/);
+    expect(() => readBotConfig({ PIER_API_URL: env.PIER_API_URL, PIER_API_KEY: API_KEY })).toThrow(
+      /BOT_SECRET is required[\s\S]*MARKET_CONTRACT is required/,
+    );
   });
 
   it('refuses mainnet with a test key, and testnet with a live key', () => {
@@ -74,13 +74,12 @@ describe('readBotConfig', () => {
     expect(() =>
       readBotConfig({
         ...env,
-        MIDPOINT_API_KEY: 'pk_live_x',
+        PIER_API_KEY: 'pk_live_x',
         MARKET_CONTRACT: `testnet=${MARKET}`,
       }),
     ).toThrow(/live API key never signs/);
     expect(
-      readBotConfig({ ...env, MIDPOINT_API_KEY: 'pk_live_x', MARKET_CONTRACT: MARKET })
-        .marketContracts,
+      readBotConfig({ ...env, PIER_API_KEY: 'pk_live_x', MARKET_CONTRACT: MARKET }).marketContracts,
     ).toEqual({ mainnet: MARKET });
   });
 
@@ -88,8 +87,8 @@ describe('readBotConfig', () => {
     let message = '';
     try {
       readBotConfig({
-        MIDPOINT_API_URL: 'nope',
-        MIDPOINT_API_KEY: 'sk_live_leaked',
+        PIER_API_URL: 'nope',
+        PIER_API_KEY: 'sk_live_leaked',
         BOT_SECRET: 'Sdeadbeef-secret',
         MIN_SCORE: '5',
         MARKET_CONTRACT: '0x1234',
@@ -99,8 +98,8 @@ describe('readBotConfig', () => {
       message = (error as Error).message;
     }
     for (const name of [
-      'MIDPOINT_API_URL',
-      'MIDPOINT_API_KEY',
+      'PIER_API_URL',
+      'PIER_API_KEY',
       'BOT_SECRET',
       'MIN_SCORE',
       'MARKET_CONTRACT',
@@ -226,8 +225,8 @@ describe('releaseProblem', () => {
 describe('createReleaseSender', () => {
   it('signs with the merchant’s key and submits through /v1/p2p/submit, then polls', async () => {
     const calls: { url: string; body: unknown }[] = [];
-    const client = createMidpointClient({
-      baseUrl: 'https://api.midpoint.test',
+    const client = createPierClient({
+      baseUrl: 'https://api.pier.test',
       apiKey: API_KEY,
       fetch: async (request) => {
         const body = request.method === 'POST' ? await request.json() : null;
@@ -271,8 +270,8 @@ describe('createReleaseSender', () => {
 describe('handleTransfer', () => {
   function context(matches: TransferMatch[], sender: ReleaseSender | null) {
     const bodies: unknown[] = [];
-    const client = createMidpointClient({
-      baseUrl: 'https://api.midpoint.test',
+    const client = createPierClient({
+      baseUrl: 'https://api.pier.test',
       apiKey: API_KEY,
       fetch: async (request) => {
         bodies.push(await request.json());

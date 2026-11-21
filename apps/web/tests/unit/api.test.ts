@@ -80,8 +80,8 @@ test('a call carries the organization and tier, and a failure becomes an ApiErro
   await webhooks.list({ org: 'org_1', tier: 'test' });
   assert.equal(seen[1].headers?.[ORG_HEADER], 'org_1');
   assert.equal(seen[1].headers?.[TIER_HEADER], 'test');
-  assert.equal(ORG_HEADER, 'Midpoint-Organization');
-  assert.equal(TIER_HEADER, 'Midpoint-Tier');
+  assert.equal(ORG_HEADER, 'Pier-Organization');
+  assert.equal(TIER_HEADER, 'Pier-Tier');
   assert.equal(await auth.session(), null, 'a 401 on the session means nobody is signed in');
   await assert.rejects(
     () => market.get(),
@@ -155,7 +155,7 @@ test('sessions, members, keys, webhooks and deliveries are read tolerantly', () 
   assert.equal(
     normalizeCreatedApiKey({ id: 'k', key: 'sk_live_x' }),
     null,
-    'only a Midpoint key is shown',
+    'only a Pier key is shown',
   );
   assert.equal(
     normalizeCreatedApiKey({ apiKey: { id: 'k', name: 'n' }, key: 'pk_test_abcdefgh12345678' })

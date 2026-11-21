@@ -460,7 +460,7 @@ test('transfer matches, charges and payout batches', () => {
     recipientAddress: MERCHANT,
     description: null,
     status: 'open',
-    url: 'https://midpoint.example/c/c',
+    url: 'https://pier.example/c/c',
     multiUse: false,
     expiresAt: '2026-11-20T12:00:00Z',
     paidAt: null,

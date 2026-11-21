@@ -5,7 +5,7 @@
    market pays out in (it becomes the wallet's token at the market's price, and what reaches the
    wallet is said under it). Copy and share (Web Share API). */
 import { useMemo, useState } from 'react';
-import { buildPaymentLink, buildSep7Pay } from '@midpoint/payment-qr';
+import { buildPaymentLink, buildSep7Pay } from '@pier/payment-qr';
 import { fmt, useI18n } from '@/i18n';
 import { Field, Notice, Switch } from '@/components/ui/controls';
 import { CopyButton, CopyRow, Qr } from '@/components/ui/misc';

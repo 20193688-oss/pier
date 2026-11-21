@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getOrderMessageAttachment, listOrderMessages, sendOrderMessage } from '@/chat';
-import { createMidpointClient, MidpointError } from '@/client';
+import { createPierClient, PierError } from '@/client';
 import type { OrderMessage } from '@/types';
 
 const ORDER = '3f1c2b7e-8d4a-4c1e-9b2f-6a5d4c3b2a10';
@@ -17,8 +17,8 @@ const MESSAGE: OrderMessage = {
 /** A client whose fetch records each request and answers from `answer`. */
 function recording(answer: (request: Request) => Response) {
   const calls: { method: string; path: string; body: unknown }[] = [];
-  const client = createMidpointClient({
-    baseUrl: 'https://api.midpoint.test',
+  const client = createPierClient({
+    baseUrl: 'https://api.pier.test',
     apiKey: 'pk_test_3kQ9x7Lm2Vb8',
     fetch: async (request) => {
       const body = request.method === 'POST' ? await request.clone().json() : undefined;
@@ -71,7 +71,7 @@ describe('the order chat client', () => {
       ),
     );
     await expect(getOrderMessageAttachment(client, 'merchant', ORDER, MESSAGE.id)).rejects.toThrow(
-      MidpointError,
+      PierError,
     );
   });
 });

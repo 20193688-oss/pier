@@ -34,7 +34,7 @@
  * sub-invocations. It is then submitted through the API (`/v1/p2p/submit`,
  * fee-bumped by the sponsor) and followed until applied.
  *
- * Environment: `MIDPOINT_API_URL`, `MIDPOINT_API_KEY` (a `pk_test_` key),
+ * Environment: `PIER_API_URL`, `PIER_API_KEY` (a `pk_test_` key),
  * `BOT_SECRET` (the merchant account's key, or an operator with the
  * permissions to accept and release), `MARKET_CONTRACT` (`testnet=C...` or
  * `local=C...`), and optionally `BOT_NAME` (for the log and the receipts),
@@ -56,7 +56,7 @@ import {
 } from '@/bot/release';
 import { receiptMessage } from '@/bot/receipt';
 import { listOrderMessages, sendOrderMessage } from '@/chat';
-import { createMidpointClient, MidpointError, unwrap, type MidpointClient } from '@/client';
+import { createPierClient, PierError, unwrap, type PierClient } from '@/client';
 import type { MerchantOrder, OrderMessage, Transaction } from '@/types';
 
 /** What the bot does next with one order. */
@@ -166,7 +166,7 @@ export type StepOutcome =
   | { status: 'failed'; error: string };
 
 export interface SimulatedMerchantContext {
-  client: MidpointClient;
+  client: PierClient;
   /** Null in a dry run. */
   sender: ReleaseSender | null;
   /** The bot's account (the merchant's, or its operator's). */
@@ -212,7 +212,7 @@ function describe(order: MerchantOrder): string {
 }
 
 function reason(error: unknown): string {
-  if (error instanceof MidpointError) return `${error.code}: ${error.message}`;
+  if (error instanceof PierError) return `${error.code}: ${error.message}`;
   return error instanceof Error ? error.message : String(error);
 }
 
@@ -400,7 +400,7 @@ export function readSimulatedMerchantConfig(env: Env): SimulatedMerchantConfig {
   const base = readBotConfig(env);
   const problems: string[] = [];
   if (base.tier !== 'test') {
-    problems.push('MIDPOINT_API_KEY must be a pk_test_ key: the simulated merchant never pays.');
+    problems.push('PIER_API_KEY must be a pk_test_ key: the simulated merchant never pays.');
   }
   if (Object.keys(base.marketContracts).some((n) => BOT_NETWORKS[n]?.tier !== 'test')) {
     problems.push('MARKET_CONTRACT must name only test networks (testnet, local).');
@@ -427,7 +427,7 @@ export function readSimulatedMerchantConfig(env: Env): SimulatedMerchantConfig {
 
 async function main(): Promise<void> {
   const config = readSimulatedMerchantConfig(process.env);
-  const client = createMidpointClient({ baseUrl: config.apiUrl, apiKey: config.apiKey });
+  const client = createPierClient({ baseUrl: config.apiUrl, apiKey: config.apiKey });
   const sender =
     config.dryRun || config.secret === null
       ? null

@@ -1,5 +1,5 @@
 /**
- * `@midpoint/contracts`: the P2PMarket Soroban contract's committed wasm, its
+ * `@pier/contracts`: the P2PMarket Soroban contract's committed wasm, its
  * interface spec and error codes, and its constants and value shapes. No
  * runtime dependency: decode with stellar-sdk's `new contract.Spec(MARKET_SPEC)`.
  */

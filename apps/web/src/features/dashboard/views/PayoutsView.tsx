@@ -349,7 +349,7 @@ function CreatePayouts({
     );
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'midpoint-payouts.csv';
+    link.download = 'pier-payouts.csv';
     link.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };

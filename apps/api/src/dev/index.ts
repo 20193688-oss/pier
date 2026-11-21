@@ -1,5 +1,5 @@
 /**
- * Local development tooling, exported as `@midpoint/api/dev` for the root
+ * Local development tooling, exported as `@pier/api/dev` for the root
  * `npm run dev:stack` and used by the e2e tests. Never imported by the
  * service itself.
  */

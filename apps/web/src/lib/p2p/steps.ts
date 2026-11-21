@@ -5,7 +5,7 @@ import type { P2pTransaction } from '@/lib/p2p/types';
 import type { AcceptedQuote } from '@/lib/p2p/fees';
 import { isAccount } from '@/lib/stellar/network';
 
-const KEY = (orderId: string) => `midpoint.steps:${orderId}`;
+const KEY = (orderId: string) => `pier.steps:${orderId}`;
 
 export function saveSteps(orderId: string, steps: P2pTransaction[] | undefined) {
   try {
@@ -28,7 +28,7 @@ export function savedSteps(orderId: string): P2pTransaction[] | undefined {
 /** What the person accepted when a sale opened (the amount they typed, the fee shown to them,
     the addresses the quote named), kept beside its steps so the signing check compares the
     transaction with what they saw, not with what a later answer says (tx-verify.ts). */
-const TERMS = (orderId: string) => `midpoint.accepted:${orderId}`;
+const TERMS = (orderId: string) => `pier.accepted:${orderId}`;
 
 export function saveQuoteTerms(orderId: string, accepted: AcceptedQuote | undefined) {
   try {
@@ -64,7 +64,7 @@ export function savedQuoteTerms(orderId: string): AcceptedQuote | null {
 /** Who a sale to someone else's account pays (their name as the person typed it), kept on this
     device so the order speaks of them instead of "your account". Null: one's own account, or
     another device. */
-const RECIPIENT = (orderId: string) => `midpoint.recipient:${orderId}`;
+const RECIPIENT = (orderId: string) => `pier.recipient:${orderId}`;
 
 export function saveRecipient(orderId: string, name: string | null) {
   try {

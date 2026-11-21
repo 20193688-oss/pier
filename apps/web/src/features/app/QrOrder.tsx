@@ -29,7 +29,7 @@ import type { P2pOrder } from '@/lib/p2p/types';
 
 function shopOf(id: string): { name: string | null; city: string | null } | null {
   try {
-    return JSON.parse(sessionStorage.getItem(`midpoint.app.qr-order:${id}`) ?? 'null');
+    return JSON.parse(sessionStorage.getItem(`pier.app.qr-order:${id}`) ?? 'null');
   } catch {
     return null;
   }

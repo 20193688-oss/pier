@@ -1,6 +1,6 @@
-# Midpoint: agent and contributor guide
+# Pier: agent and contributor guide
 
-Midpoint is a peer-to-peer market for stablecoins (USDC) against local money (bank transfers, PIX,
+Pier is a peer-to-peer market for stablecoins (USDC) against local money (bank transfers, PIX,
 Argentina's interoperable QR...) on **Stellar**, with a public API, and a simple payments app on
 top of it (an installable PWA at `/app`). A user types an amount; the matching service picks a
 merchant (no ads book). Merchants keep liquidity in a Soroban contract; the contract locks each
@@ -12,9 +12,10 @@ run the local test server, the design and security invariants, open decisions an
 Keep it current when a session changes any of those. The design contract of the Stellar port and
 the app is [`docs/STELLAR.md`](docs/STELLAR.md).
 
-The product is **Midpoint** (renamed from "pedospe" on 2026-11-20). Keep the display name in its
+The product is **Pier** (renamed from "pedospe" to Midpoint, then to Pier, both on 2026-11-20;
+Midpoint's last state is commit `d8d41a4` on `chore/rename-midpoint`). Keep the display name in its
 one place per workspace (web `src/lib/brand.ts`, API `BRAND_NAME`), never spread it through copy.
-Technical names (`@midpoint/*` packages, `Midpoint-*` headers, `MIDPOINT_*` variables, storage
+Technical names (`@pier/*` packages, `Pier-*` headers, `PIER_*` variables, storage
 keys) are part of the API contract.
 
 ## Layout (npm workspaces)
@@ -46,7 +47,7 @@ keys) are part of the API contract.
 ## Conventions
 
 - **Imports: always the `@/` alias, never relative paths** (`./x`, `../x`). Each package's `@/`
-  points to its own `src/`. Across packages, import by package name (`@midpoint/contracts`), never
+  points to its own `src/`. Across packages, import by package name (`@pier/contracts`), never
   with `../`. Configure the alias in every tool of the package (tsconfig `paths`, Vite/Vitest,
   bundler, runtime). A package consumed by others exposes built output (`dist/`) through `exports`,
   so its own `@/` never leaks into a consumer.
@@ -59,16 +60,16 @@ keys) are part of the API contract.
 
 ## Commands
 
-| Command                                  | What it does                                                                                                          |
-| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| `npm install`                            | installs every workspace                                                                                              |
-| `npm run build`                          | builds every workspace (contracts and payment-qr first)                                                               |
-| `npm test`                               | every workspace's tests (the contract's `cargo test` included)                                                        |
-| `npm run typecheck`                      | every workspace's type check                                                                                          |
-| `npm run lint`                           | ESLint + Prettier everywhere, `cargo fmt --check` + `clippy -D warnings` for the contract                             |
-| `npm run compile -w @midpoint/contracts` | rebuilds the release wasm into `src/p2p-market.artifact.ts` (the artifact test fails if source and artifact disagree) |
-| `npm run dev:stack -- --testnet`         | the whole market locally on Stellar testnet (section 4 of the handoff)                                                |
-| `npm run dev:mock -w @midpoint/web`      | the whole web with an in-browser mock API and a demo wallet                                                           |
+| Command                              | What it does                                                                                                          |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `npm install`                        | installs every workspace                                                                                              |
+| `npm run build`                      | builds every workspace (contracts and payment-qr first)                                                               |
+| `npm test`                           | every workspace's tests (the contract's `cargo test` included)                                                        |
+| `npm run typecheck`                  | every workspace's type check                                                                                          |
+| `npm run lint`                       | ESLint + Prettier everywhere, `cargo fmt --check` + `clippy -D warnings` for the contract                             |
+| `npm run compile -w @pier/contracts` | rebuilds the release wasm into `src/p2p-market.artifact.ts` (the artifact test fails if source and artifact disagree) |
+| `npm run dev:stack -- --testnet`     | the whole market locally on Stellar testnet (section 4 of the handoff)                                                |
+| `npm run dev:mock -w @pier/web`      | the whole web with an in-browser mock API and a demo wallet                                                           |
 
 Before finishing a task: run the type check, lint and tests of every workspace you touched, and say
 what was verified and what was not.

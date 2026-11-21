@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { createMidpointClient, MidpointError, unwrap } from '@/client';
+import { createPierClient, PierError, unwrap } from '@/client';
 
-const baseUrl = 'https://api.midpoint.test';
+const baseUrl = 'https://api.pier.test';
 const apiKey = 'pk_test_3kQ9x7Lm2Vb8';
 const sessionToken = 'ps_sess_Zr4f8Ty1Qw6e';
 
@@ -24,23 +24,23 @@ function fakeFetch(...responses: Response[]) {
   return { fetch, requests };
 }
 
-describe('createMidpointClient', () => {
+describe('createPierClient', () => {
   it('sends an API key as a bearer token and no session headers', async () => {
     const { fetch, requests } = fakeFetch(json(200, { available: true }));
-    const client = createMidpointClient({ baseUrl, apiKey, fetch });
+    const client = createPierClient({ baseUrl, apiKey, fetch });
     await client.GET('/v1/market');
 
     expect(requests).toHaveLength(1);
     expect(requests[0].method).toBe('GET');
     expect(requests[0].url).toBe(`${baseUrl}/v1/market`);
     expect(requests[0].headers.get('authorization')).toBe(`Bearer ${apiKey}`);
-    expect(requests[0].headers.has('midpoint-organization')).toBe(false);
-    expect(requests[0].headers.has('midpoint-tier')).toBe(false);
+    expect(requests[0].headers.has('pier-organization')).toBe(false);
+    expect(requests[0].headers.has('pier-tier')).toBe(false);
   });
 
   it('sends a session token with the organization and tier to act for', async () => {
     const { fetch, requests } = fakeFetch(json(200, { data: [], total: 0 }));
-    const client = createMidpointClient({
+    const client = createPierClient({
       baseUrl: `${baseUrl}/`,
       sessionToken,
       organizationId: 'org_42',
@@ -52,13 +52,13 @@ describe('createMidpointClient', () => {
     const [request] = requests;
     expect(request.url).toBe(`${baseUrl}/v1/p2p/orders?take=5`);
     expect(request.headers.get('authorization')).toBe(`Bearer ${sessionToken}`);
-    expect(request.headers.get('midpoint-organization')).toBe('org_42');
-    expect(request.headers.get('midpoint-tier')).toBe('live');
+    expect(request.headers.get('pier-organization')).toBe('org_42');
+    expect(request.headers.get('pier-tier')).toBe('live');
   });
 
   it('posts JSON bodies', async () => {
     const { fetch, requests } = fakeFetch(json(200, { data: [] }));
-    const client = createMidpointClient({ baseUrl, apiKey, fetch });
+    const client = createPierClient({ baseUrl, apiKey, fetch });
     const body = { currency: 'ARS' as const, amount: '125050.00', payerName: 'Juan Gómez' };
     const result = await unwrap(client.POST('/v1/p2p/merchant/transfer-matches', { body }));
 
@@ -70,21 +70,21 @@ describe('createMidpointClient', () => {
 
   it('calls public routes without credentials', async () => {
     const { fetch, requests } = fakeFetch(json(200, { available: true }));
-    await createMidpointClient({ baseUrl, fetch }).GET('/v1/market');
+    await createPierClient({ baseUrl, fetch }).GET('/v1/market');
     expect(requests[0].headers.has('authorization')).toBe(false);
   });
 
   it('rejects contradictory or malformed credentials without echoing them', () => {
-    expect(() => createMidpointClient({ baseUrl, apiKey, sessionToken })).toThrow(/either/);
-    expect(() => createMidpointClient({ baseUrl, apiKey, organizationId: 'org_42' })).toThrow(
+    expect(() => createPierClient({ baseUrl, apiKey, sessionToken })).toThrow(/either/);
+    expect(() => createPierClient({ baseUrl, apiKey, organizationId: 'org_42' })).toThrow(
       /sessions/,
     );
-    expect(() => createMidpointClient({ baseUrl, apiKey, tier: 'live' })).toThrow(/sessions/);
-    expect(() => createMidpointClient({ baseUrl: 'api.midpoint.test', apiKey })).toThrow(/baseUrl/);
-    expect(() => createMidpointClient({ baseUrl, apiKey: sessionToken })).toThrow(TypeError);
-    expect(() => createMidpointClient({ baseUrl, sessionToken: apiKey })).toThrow(TypeError);
+    expect(() => createPierClient({ baseUrl, apiKey, tier: 'live' })).toThrow(/sessions/);
+    expect(() => createPierClient({ baseUrl: 'api.pier.test', apiKey })).toThrow(/baseUrl/);
+    expect(() => createPierClient({ baseUrl, apiKey: sessionToken })).toThrow(TypeError);
+    expect(() => createPierClient({ baseUrl, sessionToken: apiKey })).toThrow(TypeError);
     try {
-      createMidpointClient({ baseUrl, apiKey: 'sk_secret_value' });
+      createPierClient({ baseUrl, apiKey: 'sk_secret_value' });
     } catch (error) {
       expect((error as Error).message).not.toContain('sk_secret_value');
     }
@@ -94,19 +94,19 @@ describe('createMidpointClient', () => {
 describe('unwrap', () => {
   it('returns the success body', async () => {
     const { fetch } = fakeFetch(json(200, { available: true, tier: 'test' }));
-    const client = createMidpointClient({ baseUrl, fetch });
+    const client = createPierClient({ baseUrl, fetch });
     const market = await unwrap(client.GET('/v1/market'));
     expect(market).toEqual({ available: true, tier: 'test' });
   });
 
   it('accepts an already awaited result', async () => {
     const { fetch } = fakeFetch(json(200, { available: true }));
-    const client = createMidpointClient({ baseUrl, fetch });
+    const client = createPierClient({ baseUrl, fetch });
     const result = await client.GET('/v1/market');
     expect(await unwrap(result)).toEqual({ available: true });
   });
 
-  it('throws a MidpointError with the API error code, message and details', async () => {
+  it('throws a PierError with the API error code, message and details', async () => {
     const { fetch } = fakeFetch(
       json(400, {
         error: {
@@ -116,15 +116,15 @@ describe('unwrap', () => {
         },
       }),
     );
-    const client = createMidpointClient({ baseUrl, apiKey, fetch });
+    const client = createPierClient({ baseUrl, apiKey, fetch });
     const call = unwrap(
       client.POST('/v1/p2p/merchant/transfer-matches', {
         body: { currency: 'ARS', amount: '-1' },
       }),
     );
-    await expect(call).rejects.toBeInstanceOf(MidpointError);
+    await expect(call).rejects.toBeInstanceOf(PierError);
     await expect(call).rejects.toMatchObject({
-      name: 'MidpointError',
+      name: 'PierError',
       status: 400,
       code: 'validation_failed',
       message: 'The request is not valid.',
@@ -136,16 +136,16 @@ describe('unwrap', () => {
     const { fetch } = fakeFetch(
       json(401, { error: { code: 'unauthorized', message: 'This API key is not valid.' } }),
     );
-    const client = createMidpointClient({ baseUrl, apiKey, fetch });
+    const client = createPierClient({ baseUrl, apiKey, fetch });
     const error = await unwrap(client.GET('/v1/p2p/orders')).catch((e: unknown) => e);
-    expect(error).toBeInstanceOf(MidpointError);
+    expect(error).toBeInstanceOf(PierError);
     expect(error).toMatchObject({ status: 401, code: 'unauthorized' });
-    expect((error as MidpointError).details).toBeUndefined();
+    expect((error as PierError).details).toBeUndefined();
   });
 
   it('reports a response without the error body as unexpected', async () => {
     const { fetch } = fakeFetch(new Response('<html>Bad gateway</html>', { status: 502 }));
-    const client = createMidpointClient({ baseUrl, fetch });
+    const client = createPierClient({ baseUrl, fetch });
     await expect(unwrap(client.GET('/v1/market'))).rejects.toMatchObject({
       status: 502,
       code: 'unexpected_response',
@@ -154,7 +154,7 @@ describe('unwrap', () => {
 
   it('returns undefined for a 204', async () => {
     const { fetch, requests } = fakeFetch(new Response(null, { status: 204 }));
-    const client = createMidpointClient({ baseUrl, apiKey, fetch });
+    const client = createPierClient({ baseUrl, apiKey, fetch });
     const result = await unwrap(
       client.DELETE('/v1/webhook-endpoints/{id}', { params: { path: { id: 'we_1' } } }),
     );

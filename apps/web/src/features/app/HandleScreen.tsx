@@ -3,7 +3,7 @@
    already filled from the email they signed in with. */
 import { useState, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { normalizeHandle } from '@midpoint/payment-qr';
+import { normalizeHandle } from '@pier/payment-qr';
 import { fmt, useI18n } from '@/i18n';
 import { app } from '@/lib/api/app';
 import { ApiError } from '@/lib/api/client';

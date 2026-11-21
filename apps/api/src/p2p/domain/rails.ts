@@ -22,7 +22,7 @@ export interface P2pRailField {
 
 export type RailDetails = Record<string, string>;
 
-/** The scanned QR standards the market pays, each on its own QR rail (`@midpoint/payment-qr`'s names). */
+/** The scanned QR standards the market pays, each on its own QR rail (`@pier/payment-qr`'s names). */
 export const P2P_QR_STANDARDS = ['ar-interoperable', 'pix', 'pe-interoperable'] as const;
 export type P2pQrStandard = (typeof P2P_QR_STANDARDS)[number];
 

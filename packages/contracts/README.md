@@ -1,4 +1,4 @@
-# @midpoint/contracts
+# @pier/contracts
 
 The P2PMarket Soroban contract (Rust crate `p2p-market`, contract `P2PMarket`), its committed
 release wasm and interface spec, and the constants and value shapes JavaScript needs. It is a port
@@ -9,7 +9,7 @@ The package has **no runtime dependency**. Consumers decode with stellar-sdk 17:
 
 ```ts
 import { contract } from '@stellar/stellar-sdk';
-import { MARKET_ERRORS, MARKET_SPEC, MARKET_WASM_HASH } from '@midpoint/contracts';
+import { MARKET_ERRORS, MARKET_SPEC, MARKET_WASM_HASH } from '@pier/contracts';
 
 const spec = new contract.Spec([...MARKET_SPEC]);
 const args = spec.funcArgsToScVals('open', { caller, p }); // p: OpenParams
@@ -134,13 +134,13 @@ archived, never lost: the client restores it with the simulation's restore pream
 
 ## Commands
 
-| Command                                    | What it does                                                                                                      |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| `npm run compile -w @midpoint/contracts`   | builds the release wasm and regenerates `src/p2p-market.artifact.ts`; writes the wasm to `target/p2p-market.wasm` |
-| `npm test -w @midpoint/contracts`          | `cargo test` (every Rust test) then vitest (artifact = fresh build, spec, interface)                              |
-| `npm run lint -w @midpoint/contracts`      | eslint + prettier, `cargo fmt --check`, `cargo clippy -D warnings`                                                |
-| `npm run typecheck -w @midpoint/contracts` | `tsc --noEmit`                                                                                                    |
-| `npm run build -w @midpoint/contracts`     | builds `dist/` (no runtime dependency)                                                                            |
+| Command                                | What it does                                                                                                      |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `npm run compile -w @pier/contracts`   | builds the release wasm and regenerates `src/p2p-market.artifact.ts`; writes the wasm to `target/p2p-market.wasm` |
+| `npm test -w @pier/contracts`          | `cargo test` (every Rust test) then vitest (artifact = fresh build, spec, interface)                              |
+| `npm run lint -w @pier/contracts`      | eslint + prettier, `cargo fmt --check`, `cargo clippy -D warnings`                                                |
+| `npm run typecheck -w @pier/contracts` | `tsc --noEmit`                                                                                                    |
+| `npm run build -w @pier/contracts`     | builds `dist/` (no runtime dependency)                                                                            |
 
 Requirements: rustup (the toolchain in `rust-toolchain.toml`, 1.97.1 with the `wasm32v1-none`
 target, installs on first use) and Node 24.9+. The Stellar CLI is not needed to build.
@@ -172,7 +172,7 @@ output's "Using wasm hash") with `MARKET_WASM_HASH`.
 ## Deploying (testnet example)
 
 ```sh
-npm run compile -w @midpoint/contracts        # writes target/p2p-market.wasm
+npm run compile -w @pier/contracts        # writes target/p2p-market.wasm
 stellar contract deploy --wasm packages/contracts/target/p2p-market.wasm \
   --source <deployer> --network testnet \
   -- --owner <owner> --treasury <treasury> --arbiter <arbiter> --protocol_fee_bps 100

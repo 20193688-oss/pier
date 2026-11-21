@@ -27,7 +27,7 @@ export const RAW_CATALOGS: Record<Lang, Messages> = { es, en };
 export const CATALOGS: Record<Lang, Messages> = { es: withBrand(es), en: withBrand(en) };
 export const DEFAULT_LANG: Lang = 'es';
 
-const STORAGE_KEY = 'midpoint.lang';
+const STORAGE_KEY = 'pier.lang';
 
 export const isLang = (v: unknown): v is Lang =>
   typeof v === 'string' && (LANGS as readonly string[]).includes(v);

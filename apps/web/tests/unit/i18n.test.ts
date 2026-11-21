@@ -70,8 +70,8 @@ test('the product name is written once: catalogs say {brand}', () => {
   for (const lang of LANGS) {
     for (const [k, v] of leaves(RAW_CATALOGS[lang])) {
       // Technical names that are part of the API contract are not the brand.
-      const text = v.replace(/midpoint-signature|\/midpoint\//g, '');
-      assert.ok(!/midpoint/i.test(text), `${lang}:${k} writes the product name`);
+      const text = v.replace(/pier-signature|\/pier\//g, '');
+      assert.ok(!/\bpier\b/i.test(text), `${lang}:${k} writes the product name`);
     }
     for (const [k, v] of leaves(CATALOGS[lang]))
       assert.ok(!v.includes('{brand}'), `${lang}:${k} still has {brand}`);

@@ -6,7 +6,7 @@ import { keypairWallet } from '@/lib/wallet/keypair';
 import { BRAND } from '@/lib/brand';
 import type { StellarWallet } from '@/lib/wallet/types';
 
-const KEY = 'midpoint.demo-persona';
+const KEY = 'pier.demo-persona';
 
 export function demoWallet(persona: Persona = 'user'): StellarWallet {
   try {

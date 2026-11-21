@@ -1,18 +1,18 @@
 // Generates src/lib/api/openapi.gen.ts (the API's paths and schemas as TypeScript types) from the
 // API's committed OpenAPI document, so every request body the web app sends is type-checked
-// against the API's own spec. The spec: MIDPOINT_OPENAPI_PATH, else apps/api/openapi.json.
-// Usage: npm run gen:api -w @midpoint/web
+// against the API's own spec. The spec: PIER_OPENAPI_PATH, else apps/api/openapi.json.
+// Usage: npm run gen:api -w @pier/web
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import openapiTS, { astToString } from 'openapi-typescript';
 
 const specPath =
-  process.env.MIDPOINT_OPENAPI_PATH ||
+  process.env.PIER_OPENAPI_PATH ||
   fileURLToPath(new URL('../../api/openapi.json', import.meta.url));
 const outPath = fileURLToPath(new URL('../src/lib/api/openapi.gen.ts', import.meta.url));
 
 if (!existsSync(specPath)) {
-  console.error(`No OpenAPI document at ${specPath}. Set MIDPOINT_OPENAPI_PATH.`);
+  console.error(`No OpenAPI document at ${specPath}. Set PIER_OPENAPI_PATH.`);
   process.exit(1);
 }
 const spec = JSON.parse(readFileSync(specPath, 'utf8'));

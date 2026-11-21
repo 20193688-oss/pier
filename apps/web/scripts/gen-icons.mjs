@@ -1,8 +1,8 @@
-// Renders the app's icons from the logo's cut M (src/components/ui/logo-paths.ts, made by
+// Renders the app's icons from the logo's cut P (src/components/ui/logo-paths.ts, made by
 // scripts/gen-logo.py) on an ink tile: public/favicon.svg, and with Playwright's Chromium the PNGs
-// in public/icons: 192 and 512 (purpose "any"), a 512 maskable one (the M inside the safe zone on
+// in public/icons: 192 and 512 (purpose "any"), a 512 maskable one (the P inside the safe zone on
 // a full ink field) and the 180 apple-touch-icon (no transparency). Run after changing the logo:
-// `npm run icons -w @midpoint/web`. The files are committed.
+// `npm run icons -w @pier/web`. The files are committed.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { chromium } from '@playwright/test';
@@ -14,7 +14,7 @@ const favicon = fileURLToPath(new URL('../public/favicon.svg', import.meta.url))
 const { LOGO } = await import(new URL('../src/components/ui/logo-paths.ts', import.meta.url).href);
 const { mark } = LOGO;
 
-/** The M on a 512-unit tile, 236 units tall and centred; `pad` shrinks it further in. */
+/** The P on a 512-unit tile, 236 units tall and centred; `pad` shrinks it further in. */
 const tile = ({ rounded, pad }) => {
   const [x, y, w, h] = mark.box;
   const height = 236 * ((512 - pad * 2) / 512);
@@ -28,7 +28,7 @@ console.log('wrote public/favicon.svg');
 const ICONS = [
   { file: 'icon-192.png', size: 192, svg: tile({ rounded: true, pad: 0 }), transparent: true },
   { file: 'icon-512.png', size: 512, svg: tile({ rounded: true, pad: 0 }), transparent: true },
-  // Maskable: the platform crops to its own shape; the M stays within the central 80 %.
+  // Maskable: the platform crops to its own shape; the P stays within the central 80 %.
   {
     file: 'maskable-512.png',
     size: 512,

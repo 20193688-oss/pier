@@ -1,6 +1,6 @@
 import { randomBytes } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
-import { emvCrc } from '@midpoint/payment-qr';
+import { emvCrc } from '@pier/payment-qr';
 import { Keypair } from '@stellar/stellar-sdk';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { createApp } from '@/app.factory';

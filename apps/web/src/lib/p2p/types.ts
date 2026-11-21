@@ -63,7 +63,7 @@ export interface P2pMarket {
   /* Whether the market runs on at least one network for this tier. */
   available: boolean;
   sellBondBps: number;
-  /* Midpoint's matcher: the address a merchant authorises to open orders on its balance. */
+  /* Pier's matcher: the address a merchant authorises to open orders on its balance. */
   matcher: string;
   maxPayoutItems?: number;
   /* Whether the API pays network fees and reserves (a fee-bump from its sponsor account). */

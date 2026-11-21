@@ -1,5 +1,5 @@
 {
-  "name": "@midpoint/payment-qr",
+  "name": "@pier/payment-qr",
   "version": "0.1.0",
   "private": true,
   "description": "Reads what a payments app scans or pastes (Stellar addresses, SEP-7 payment URIs, app payment links, charge links, EMVCo merchant QR codes such as PIX and Argentina's interoperable QR) and builds payment links",

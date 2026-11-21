@@ -1,11 +1,11 @@
 /* What this device remembers to fill forms in again, so a person types things once: the payer
    (name and document) per currency, the payout account per rail, and the email last used to sign
-   in (which also suggests an @handle). Kept in localStorage under `midpoint.fill.*` and cleared on
+   in (which also suggests an @handle). Kept in localStorage under `pier.fill.*` and cleared on
    sign-out (src/lib/session.tsx). Unreadable or malformed entries count as nothing remembered.
    Pure apart from storage; tests/unit/remember.test.ts. */
-import { normalizeHandle } from '@midpoint/payment-qr';
+import { normalizeHandle } from '@pier/payment-qr';
 
-const PREFIX = 'midpoint.fill.';
+const PREFIX = 'pier.fill.';
 
 export function remember(key: string, value: unknown): void {
   try {

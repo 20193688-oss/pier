@@ -1,5 +1,5 @@
 {
-  "name": "@midpoint/contracts",
+  "name": "@pier/contracts",
   "version": "0.1.0",
   "private": true,
   "description": "The P2PMarket Soroban contract (Rust), its committed wasm, interface spec, error codes and constants",

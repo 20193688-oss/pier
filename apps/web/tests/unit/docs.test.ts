@@ -98,7 +98,7 @@ test('blocks: headings with unique ids, lists, tables, notes and code samples', 
 
 const SPEC = {
   openapi: '3.0.3',
-  info: { title: 'Midpoint API', version: '1.0.0' },
+  info: { title: 'Pier API', version: '1.0.0' },
   security: [{ apiKey: [] }],
   tags: [{ name: 'orders', description: 'Buy and sell orders' }, { name: 'market' }],
   components: {
@@ -299,9 +299,9 @@ test('pages: addresses, lookups, and every code sample a guide places exists in 
 });
 
 // The API's committed document (apps/api/openapi.json in this repo), or another copy named by
-// MIDPOINT_OPENAPI_PATH; skipped while neither exists.
+// PIER_OPENAPI_PATH; skipped while neither exists.
 const API_SPEC =
-  process.env.MIDPOINT_OPENAPI_PATH ||
+  process.env.PIER_OPENAPI_PATH ||
   fileURLToPath(new URL('../../../api/openapi.json', import.meta.url));
 test.skipIf(!existsSync(API_SPEC))("the API's published document flattens", () => {
   const view = flattenSpec(JSON.parse(readFileSync(API_SPEC, 'utf8')));

@@ -1,5 +1,5 @@
-/* The dashboard's context: the organization and tier every call is scoped to (the Midpoint-
-   Organization and Midpoint-Tier headers), the market's published rules for that tier, and what
+/* The dashboard's context: the organization and tier every call is scoped to (the Pier-
+   Organization and Pier-Tier headers), the market's published rules for that tier, and what
    the member's role allows. The choice of organization and tier is kept for next time. */
 import {
   createContext,
@@ -15,8 +15,8 @@ import type { Tier } from '@/lib/api/client';
 import type { OrgMembership } from '@/lib/api/types';
 import type { P2pMarket } from '@/lib/p2p/types';
 
-const ORG_KEY = 'midpoint.dash.org';
-const TIER_KEY = 'midpoint.dash.tier';
+const ORG_KEY = 'pier.dash.org';
+const TIER_KEY = 'pier.dash.tier';
 
 const read = (key: string) => {
   try {

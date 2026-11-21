@@ -58,7 +58,7 @@ const admin = {
     create: 'Agregar endpoint',
     createTitle: 'Nuevo endpoint de webhook',
     url: 'URL del endpoint',
-    urlPlaceholder: 'https://tu-servidor.example/midpoint/webhooks',
+    urlPlaceholder: 'https://tu-servidor.example/pier/webhooks',
     urlHint: 'Solo https. Tu servidor responde 2xx para confirmar cada aviso.',
     urlError: 'Escribe una URL que empiece con https://',
     description: 'Descripción',
@@ -70,7 +70,7 @@ const admin = {
     creating: 'Creando…',
     secretTitle: 'Copia el secreto de firma ahora',
     secretBody:
-      'Tu servidor lo usa para verificar la cabecera midpoint-signature de cada aviso. No lo vamos a mostrar de nuevo: si lo pierdes, elimina el endpoint y crea otro.',
+      'Tu servidor lo usa para verificar la cabecera pier-signature de cada aviso. No lo vamos a mostrar de nuevo: si lo pierdes, elimina el endpoint y crea otro.',
     secretLabel: 'Secreto de firma',
     saved: 'Lo guardé',
     created: 'Endpoint agregado',
@@ -94,7 +94,7 @@ const admin = {
     nextAttempt: 'Próximo intento: {time}',
     verifyTitle: 'Verifica cada aviso',
     verifyBody:
-      'Cada aviso trae la cabecera midpoint-signature con la hora y un HMAC-SHA256 del cuerpo. Compruébalo antes de confiar en el aviso.',
+      'Cada aviso trae la cabecera pier-signature con la hora y un HMAC-SHA256 del cuerpo. Compruébalo antes de confiar en el aviso.',
     verifyLink: 'Cómo verificar la firma',
     empty: 'Todavía no hay endpoints.',
     emptyBody: 'Agrega uno para que tu servidor o tu bot se enteren de cada cambio sin preguntar.',

@@ -25,7 +25,7 @@ import { PrismaService } from '@/prisma/prisma.service';
 /** Seconds of clock skew a transaction's upper bound may carry past the build TTL. */
 const TTL_SKEW_SECONDS = 60;
 /** HKDF label of the key client addresses are MACed under on submissions. */
-const SUBMIT_CLIENT_KEY_LABEL = 'midpoint submission client v1';
+const SUBMIT_CLIENT_KEY_LABEL = 'pier submission client v1';
 
 /** Who submits: a wallet session (for itself) or an organization (for its accounts). */
 export type SubmitPrincipal =

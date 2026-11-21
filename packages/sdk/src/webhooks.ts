@@ -2,14 +2,14 @@ import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { WebhookEnvelope } from '@/types';
 
 /** The header every webhook delivery is signed in (HTTP header names are case-insensitive). */
-export const MIDPOINT_SIGNATURE_HEADER = 'midpoint-signature';
+export const PIER_SIGNATURE_HEADER = 'pier-signature';
 /** How far a delivery's timestamp may be from the receiver's clock, in seconds. */
 export const DEFAULT_WEBHOOK_TOLERANCE_SECONDS = 300;
 
 export interface VerifyWebhookOptions {
   /** The raw request body, exactly as received (not re-serialized JSON). */
   payload: string;
-  /** The `midpoint-signature` header value. */
+  /** The `pier-signature` header value. */
   header: string | null | undefined;
   /** The endpoint's signing secret, shown once when the endpoint was created. */
   secret: string;
@@ -23,9 +23,9 @@ export interface VerifyWebhookOptions {
 export type WebhookFailure =
   'malformed_header' | 'timestamp_out_of_tolerance' | 'signature_mismatch' | 'invalid_payload';
 
-/** A delivery that is not authentic, is stale, or is not a Midpoint event. */
-export class MidpointWebhookError extends Error {
-  override readonly name = 'MidpointWebhookError';
+/** A delivery that is not authentic, is stale, or is not a Pier event. */
+export class PierWebhookError extends Error {
+  override readonly name = 'PierWebhookError';
   readonly reason: WebhookFailure;
 
   constructor(reason: WebhookFailure, message: string) {
@@ -95,7 +95,7 @@ function check(options: VerifyWebhookOptions): WebhookFailure | null {
 }
 
 /**
- * Whether a delivery is authentic: `midpoint-signature` carries
+ * Whether a delivery is authentic: `pier-signature` carries
  * `t=<unix seconds>,v1=<hex HMAC-SHA256(secret, "<t>.<payload>")>`, the MAC
  * matches (constant-time compare) and `t` is within the tolerance of `now`,
  * so a captured delivery cannot be replayed later.
@@ -106,25 +106,22 @@ export function verifyWebhook(options: VerifyWebhookOptions): boolean {
 
 /**
  * Verifies a delivery and returns its event envelope; throws a
- * `MidpointWebhookError` (with its `reason`) when it is not authentic or is
+ * `PierWebhookError` (with its `reason`) when it is not authentic or is
  * not an event. Deduplicate on `envelope.id`: retries carry the same id.
  */
 export function parseWebhook(options: VerifyWebhookOptions): WebhookEnvelope {
   const failure = check(options);
   if (failure !== null) {
-    throw new MidpointWebhookError(failure, `Webhook verification failed: ${failure}.`);
+    throw new PierWebhookError(failure, `Webhook verification failed: ${failure}.`);
   }
   let body: unknown;
   try {
     body = JSON.parse(options.payload);
   } catch {
-    throw new MidpointWebhookError('invalid_payload', 'The webhook payload is not JSON.');
+    throw new PierWebhookError('invalid_payload', 'The webhook payload is not JSON.');
   }
   if (!isEnvelope(body)) {
-    throw new MidpointWebhookError(
-      'invalid_payload',
-      'The webhook payload is not an event envelope.',
-    );
+    throw new PierWebhookError('invalid_payload', 'The webhook payload is not an event envelope.');
   }
   return body;
 }
@@ -144,7 +141,7 @@ function isEnvelope(body: unknown): body is WebhookEnvelope {
 
 /**
  * Signs a payload the way the API does, for testing a webhook receiver:
- * returns the `midpoint-signature` header value.
+ * returns the `pier-signature` header value.
  */
 export function signWebhook(options: { payload: string; secret: string; now?: Date }): string {
   const t = String(Math.floor((options.now ?? new Date()).getTime() / 1000));

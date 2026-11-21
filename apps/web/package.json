@@ -1,8 +1,8 @@
 {
-  "name": "@midpoint/web",
+  "name": "@pier/web",
   "version": "0.1.0",
   "private": true,
-  "description": "Midpoint web app: the public buy/sell app, the hosted charge page, the merchant dashboard and the docs",
+  "description": "Pier web app: the public buy/sell app, the hosted charge page, the merchant dashboard and the docs",
   "license": "UNLICENSED",
   "type": "module",
   "scripts": {
@@ -19,7 +19,7 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
-    "@midpoint/contracts": "0.1.0",
+    "@pier/contracts": "0.1.0",
     "@playwright/test": "1.65.1",
     "@tailwindcss/vite": "4.3.5",
     "@types/node": "26.6.6",
@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@fontsource-variable/archivo": "5.3.0",
-    "@midpoint/payment-qr": "0.1.0",
+    "@pier/payment-qr": "0.1.0",
     "@pollar/core": "0.12.0",
     "@pollar/react": "0.12.0",
     "@stellar/stellar-sdk": "17.4.0",

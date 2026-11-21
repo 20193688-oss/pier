@@ -107,12 +107,12 @@ export class AuthGuard implements CanActivate {
     if (!organizationId) {
       throw ApiError.badRequest(
         ErrorCode.ValidationFailed,
-        'Name the organization to act for in the Midpoint-Organization header.',
+        'Name the organization to act for in the Pier-Organization header.',
       );
     }
     const tier = header(req, TIER_HEADER) ?? 'test';
     if (!isTier(tier)) {
-      throw ApiError.badRequest(ErrorCode.ValidationFailed, 'Midpoint-Tier must be live or test.');
+      throw ApiError.badRequest(ErrorCode.ValidationFailed, 'Pier-Tier must be live or test.');
     }
     const member = await this.prisma.member.findFirst({
       where: { organizationId, address: session.address, organization: { system: false } },

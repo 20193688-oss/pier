@@ -8,15 +8,15 @@ export interface Snippet {
   code: string;
 }
 
-const env = `export API="$MIDPOINT_API_URL/v1/p2p"
-export AUTH="Authorization: Bearer $MIDPOINT_API_KEY"   # pk_test_... or pk_live_...`;
+const env = `export API="$PIER_API_URL/v1/p2p"
+export AUTH="Authorization: Bearer $PIER_API_KEY"   # pk_test_... or pk_live_...`;
 
 export const SNIPPETS: Record<string, Snippet> = {
   env: { lang: 'bash', code: env },
 
   market: {
     lang: 'bash',
-    code: `curl "$MIDPOINT_API_URL/v1/market?tier=test"
+    code: `curl "$PIER_API_URL/v1/market?tier=test"
 # -> { "available": true, "tier": "test",
 #      "networks": [ { "id": "testnet", "name": "Stellar Testnet",
 #        "networkPassphrase": "Test SDF Network ; September 2015",
@@ -170,9 +170,9 @@ curl -X POST $API/offers -H "$AUTH" -H "Content-Type: application/json" \\
     lang: 'ts',
     code: `import { Keypair, TransactionBuilder } from '@stellar/stellar-sdk';
 
-const API = \`\${process.env.MIDPOINT_API_URL}/v1/p2p\`;
+const API = \`\${process.env.PIER_API_URL}/v1/p2p\`;
 const headers = {
-  Authorization: \`Bearer \${process.env.MIDPOINT_API_KEY}\`,
+  Authorization: \`Bearer \${process.env.PIER_API_KEY}\`,
   'Content-Type': 'application/json',
 };
 const bot = Keypair.fromSecret(process.env.BOT_SECRET!); // the bot's own key, never the merchant's
@@ -261,18 +261,18 @@ curl -X POST $API/orders -H "$AUTH" -H "Content-Type: application/json" \\
   qrPay: {
     lang: 'bash',
     code: `# The person scanned a shop's QR (EMV payload, CRC checked). Session routes: the app's own.
-curl -X POST "$MIDPOINT_API_URL/v1/app/quotes" -b session.txt -H "Content-Type: application/json" \\
+curl -X POST "$PIER_API_URL/v1/app/quotes" -b session.txt -H "Content-Type: application/json" \\
   -d '{ "kind": "QR_PAY", "network": "testnet", "token": "USDC",
         "qr": "00020101021243...6304ABCD", "fiatAmount": "12500.00" }'
 
-curl -X POST "$MIDPOINT_API_URL/v1/app/orders" -b session.txt -H "Content-Type: application/json" \\
+curl -X POST "$PIER_API_URL/v1/app/orders" -b session.txt -H "Content-Type: application/json" \\
   -d '{ "kind": "QR_PAY", "quoteId": "QUOTE_ID", "qr": "00020101021243...6304ABCD" }'
 # -> the order and its unsigned open_with_deposit: accept 2 min, payment 10 min, settle 1 h.`,
   },
 
   appTransfer: {
     lang: 'bash',
-    code: `curl -X POST "$MIDPOINT_API_URL/v1/app/transfers" -b session.txt -H "Content-Type: application/json" \\
+    code: `curl -X POST "$PIER_API_URL/v1/app/transfers" -b session.txt -H "Content-Type: application/json" \\
   -d '{ "network": "testnet", "to": "@lucia", "token": "USDC", "amount": "125000000",
         "note": "Asado" }'
 # -> { "transfer": { "id": "...", "to": "G...", "toHandle": "lucia", "status": "PENDING", ... },
@@ -299,15 +299,15 @@ curl -X POST "$MIDPOINT_API_URL/v1/app/orders" -b session.txt -H "Content-Type: 
   checkout: {
     lang: 'bash',
     code: `# No API key: these are the payer's routes.
-curl "$MIDPOINT_API_URL/v1/p2p-checkout/charges/CHARGE_ID"
+curl "$PIER_API_URL/v1/p2p-checkout/charges/CHARGE_ID"
 
-curl -X POST "$MIDPOINT_API_URL/v1/p2p-checkout/charges/CHARGE_ID/orders" \\
+curl -X POST "$PIER_API_URL/v1/p2p-checkout/charges/CHARGE_ID/orders" \\
   -H "Content-Type: application/json" \\
   -d '{ "rail": "ar_bank_transfer",
         "payer": { "name": "Ana Gómez", "document": "32964233", "email": "ana@example.com" } }'
 # -> { "id": "...", "status": "pending", "payerToken": "..." }
 
-curl "$MIDPOINT_API_URL/v1/p2p-checkout/orders/ORDER_ID" -H "X-Payer-Token: PAYER_TOKEN"`,
+curl "$PIER_API_URL/v1/p2p-checkout/orders/ORDER_ID" -H "X-Payer-Token: PAYER_TOKEN"`,
   },
 
   payouts: {
@@ -344,7 +344,7 @@ MXN,2500,mx_spei,María López,GODE561231GR8,,,,,,002010077777777771,inv-1003`,
   apiKey: {
     lang: 'bash',
     code: `# A test key trades on Stellar testnet, a live key on mainnet.
-curl "$MIDPOINT_API_URL/v1/p2p/orders" -H "Authorization: Bearer pk_test_..."`,
+curl "$PIER_API_URL/v1/p2p/orders" -H "Authorization: Bearer pk_test_..."`,
   },
 
   webhookPayload: {
@@ -378,9 +378,9 @@ curl "$MIDPOINT_API_URL/v1/p2p/orders" -H "Authorization: Bearer pk_test_..."`,
 
 const TOLERANCE_SECONDS = 5 * 60;
 
-/** True when the midpoint-signature header was made with your endpoint's secret over this exact
+/** True when the pier-signature header was made with your endpoint's secret over this exact
     raw body, less than five minutes ago. Call it before parsing the JSON. */
-export function verifyMidpointSignature(rawBody: string, header: string | undefined, secret: string): boolean {
+export function verifyPierSignature(rawBody: string, header: string | undefined, secret: string): boolean {
   if (!header) return false;
   const parts = Object.fromEntries(
     header.split(',').map((p) => {
@@ -398,8 +398,8 @@ export function verifyMidpointSignature(rawBody: string, header: string | undefi
 }
 
 // Express: keep the raw body for this route.
-// app.post('/hooks/midpoint', express.raw({ type: 'application/json' }), (req, res) => {
-//   const ok = verifyMidpointSignature(req.body.toString('utf8'), req.header('midpoint-signature'), SECRET);
+// app.post('/hooks/pier', express.raw({ type: 'application/json' }), (req, res) => {
+//   const ok = verifyPierSignature(req.body.toString('utf8'), req.header('pier-signature'), SECRET);
 //   if (!ok) return res.sendStatus(400);
 //   const event = JSON.parse(req.body.toString('utf8'));
 //   // Process event.id once; read the order from the API before moving money.

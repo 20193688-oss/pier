@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
-import { parseEmv, type MerchantQr } from '@midpoint/payment-qr';
+import { parseEmv, type MerchantQr } from '@pier/payment-qr';
 import { P2P_CURRENCIES, type P2pCurrency } from '@/p2p/domain/constants';
 import { formatUnits, parseDecimalUnits } from '@/p2p/domain/pricing';
 import { P2P_RAILS, qrRailFor, type P2pRailId } from '@/p2p/domain/rails';
 
 /**
  * A scanned merchant QR as a QR payment (`QR_PAY`) reads it. Parsing is
- * `@midpoint/payment-qr`'s `parseEmv` (CRC checked, repeated or ambiguous
+ * `@pier/payment-qr`'s `parseEmv` (CRC checked, repeated or ambiguous
  * fields refused); this only decides whether the market pays it: the
  * standard must have a QR rail (Argentina's interoperable QR → `ar_qr`, PIX
  * → `br_pix_qr`, Peru's interoperable QR of Yape, Plin and the banks →

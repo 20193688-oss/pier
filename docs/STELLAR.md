@@ -38,10 +38,10 @@ silently.
   - pay a business's charge by scanning its QR;
   - pay a shop's local-money QR through a market merchant (p2p.me "Scan & Pay" style): Argentina's
     interoperable QR (Transferencias 3.0) and Brazil's PIX.
-- **The product is Midpoint** (renamed from "pedospe" on 2026-11-20). Keep the display name in one
+- **The product is Pier** (renamed from "pedospe" on 2026-11-20). Keep the display name in one
   place per workspace (web: `src/lib/brand.ts`, passed into i18n strings as a parameter; API: a
-  `BRAND_NAME` config value). Technical names (the `@midpoint/*` packages, the `Midpoint-*` request
-  headers, the `midpoint-signature` webhook header, `MIDPOINT_*` variables, storage keys) are part
+  `BRAND_NAME` config value). Technical names (the `@pier/*` packages, the `Pier-*` request
+  headers, the `pier-signature` webhook header, `PIER_*` variables, storage keys) are part
   of the API contract: change them only with a versioned migration.
 - The UI stays in Spanish (default) and English. Its look ("night and aura" since 2026-11-20:
   near-black ink, white sheets, an ice-to-night gradient textured with dots, Archivo, an ice
@@ -95,7 +95,7 @@ signature, SSRF guard), rate limits, i18n and the look.
 
 - StrKey `G` for accounts and `C` for contracts. `M` (muxed) is accepted only as a payment
   destination.
-- Validate with stellar-sdk `StrKey` or `@midpoint/payment-qr` `isStellarAddress`.
+- Validate with stellar-sdk `StrKey` or `@pier/payment-qr` `isStellarAddress`.
 - Never change their case.
 
 **Transactions a user signs.**
@@ -114,7 +114,7 @@ signature, SSRF guard), rate limits, i18n and the look.
 - **Libraries:** `@stellar/stellar-sdk` 17.x.
   - Soroban RPC for contract calls, simulation, events and ledger entries.
   - Horizon only where RPC has no equivalent.
-- **Shared parsing:** `@midpoint/payment-qr` (already on `feat/stellar`) reads everything a user can
+- **Shared parsing:** `@pier/payment-qr` (already on `feat/stellar`) reads everything a user can
   scan or paste:
   - Stellar addresses, `@handle`s and SEP-7 `pay` URIs;
   - the app's own payment links (`/app/send?to=...`) and charge links (`/pay/<id>`, `/c/<id>`);
@@ -246,7 +246,7 @@ no zero address.
 - An archived entry is restored by its client (the API applies the simulation's restore preamble).
   It is never lost.
 
-### 4.6 JavaScript exports (`@midpoint/contracts`, built to `dist/` as now)
+### 4.6 JavaScript exports (`@pier/contracts`, built to `dist/` as now)
 
 ```ts
 export const MARKET_WASM_BASE64: string;              // the committed release wasm
@@ -361,7 +361,7 @@ protocolFeeBps, paused, tokens }`. `chainId` and `nativeSymbol` go.
 
 - `GET /v1/app/profile` → `{ address, handle | null }`.
 - `PUT /v1/app/profile { handle }` claims or changes it:
-  - normalised with `normalizeHandle` from `@midpoint/payment-qr`;
+  - normalised with `normalizeHandle` from `@pier/payment-qr`;
   - unique, case-insensitive; reserved words refused;
   - `409 handle_taken` when someone has it.
 - `GET /v1/app/handles/{handle}` → `{ handle, address }`, or 404. Rate-limited. There is no

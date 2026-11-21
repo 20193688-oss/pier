@@ -1,6 +1,6 @@
 /* The market contract's functions a wallet signs, with every argument's name and type: what the
    signing check (src/lib/p2p/tx-verify.ts) decodes an invocation against. The table is read from
-   the contract's own interface, `MARKET_SPEC` of @midpoint/contracts (base64 `ScSpecEntry` XDR),
+   the contract's own interface, `MARKET_SPEC` of @pier/contracts (base64 `ScSpecEntry` XDR),
    by `describeSpec`; `MARKET_INTERFACE` is the same table written from docs/STELLAR.md section
    4, which tests/unit/market-interface.test.ts compares with the spec so the two never drift.
 

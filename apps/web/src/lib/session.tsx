@@ -36,7 +36,7 @@ import { MOCK } from '@/lib/env';
 import { usePollarApi, POLLAR_KEY } from '@/lib/wallet/pollar-store';
 import type { StellarWallet, WalletKind } from '@/lib/wallet/types';
 
-const KIND_KEY = 'midpoint.wallet-kind';
+const KIND_KEY = 'pier.wallet-kind';
 
 export type SignInStep = 'challenge' | 'signing' | 'checking';
 

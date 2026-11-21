@@ -333,7 +333,7 @@ const docs: typeof es = {
         '@@code webhookPayload',
         'Use `id` to process each event once. Read the order again from the API before you move money or tokens: an event tells you something changed; the order tells you what it is now.',
         '## Verify the signature',
-        'Every delivery carries the header `midpoint-signature: t=<unix>,v1=<hex>`: `v1` is a hex HMAC-SHA256 of `t`, a dot and the raw body, with your endpoint’s secret. Verify it before you trust the event:',
+        'Every delivery carries the header `pier-signature: t=<unix>,v1=<hex>`: `v1` is a hex HMAC-SHA256 of `t`, a dot and the raw body, with your endpoint’s secret. Verify it before you trust the event:',
         '@@code webhookVerify',
         '- Use the body exactly as it arrived, before you parse the JSON: one extra space changes the signature.',
         '- Compare with `timingSafeEqual`, never with `===`.',

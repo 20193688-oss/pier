@@ -1,9 +1,9 @@
-/* Where a scanned or pasted text takes the person: @midpoint/payment-qr reads it (parseScan, the one
+/* Where a scanned or pasted text takes the person: @pier/payment-qr reads it (parseScan, the one
    reader for scanned text), this decides the screen. A payment request for another asset or
    network, or with a memo the app cannot carry, is refused here rather than half-honoured; a
    merchant QR the market does not take is refused; a secret key is a warning, never kept. Pure;
    tests/unit/scan-route.test.ts. */
-import { parseScan, parseSep7, type ScanResult } from '@midpoint/payment-qr';
+import { parseScan, parseSep7, type ScanResult } from '@pier/payment-qr';
 import { qrRail } from '@/lib/p2p/qr-pay';
 
 export type ScanProblem =

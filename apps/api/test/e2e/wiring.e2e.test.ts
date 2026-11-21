@@ -222,8 +222,8 @@ describe('who may call each route', () => {
         expect(DENIED).not.toContain(res.status);
         const asMember = await send(method, path, {
           ...bearer(policy === 'read' ? memberSession : org.session),
-          'midpoint-organization': org.id,
-          'midpoint-tier': 'test',
+          'pier-organization': org.id,
+          'pier-tier': 'test',
         });
         expect(DENIED).not.toContain(asMember.status);
       });
@@ -231,7 +231,7 @@ describe('who may call each route', () => {
       it(`${route} refuses a session that is not a member (403)`, async () => {
         const res = await send(method, path, {
           ...bearer(outsiderSession),
-          'midpoint-organization': org.id,
+          'pier-organization': org.id,
         });
         expect(res.status).toBe(403);
       });
@@ -246,7 +246,7 @@ describe('who may call each route', () => {
         expect((await send(method, path, bearer(readOnlyKey))).status).toBe(403);
         const res = await send(method, path, {
           ...bearer(memberSession),
-          'midpoint-organization': org.id,
+          'pier-organization': org.id,
         });
         expect(res.status).toBe(403);
       });
@@ -276,8 +276,8 @@ describe('isolation', () => {
       .http()
       .get(`/v1/p2p/accounts/${account.id}`)
       .set(bearer(org.session))
-      .set('midpoint-organization', org.id)
-      .set('midpoint-tier', 'live')
+      .set('pier-organization', org.id)
+      .set('pier-tier', 'live')
       .expect(404);
     expect(asSession.body.error.code).toBe('not_found');
   });
@@ -330,7 +330,7 @@ describe('credentials', () => {
   });
 
   it('refuses a cookie-authenticated write from another origin, and takes it from the web app', async () => {
-    const cookie = `midpoint_session=${org.session}`;
+    const cookie = `pier_session=${org.session}`;
     await h
       .http()
       .post('/v1/organizations')

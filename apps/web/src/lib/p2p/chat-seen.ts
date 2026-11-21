@@ -3,7 +3,7 @@
    per browser on purpose; a lost mark only shows a dot again. */
 import type { ChatScope } from '@/lib/api/chat';
 
-const key = (scope: ChatScope, orderId: string) => `midpoint.chat.seen.${scope}.${orderId}`;
+const key = (scope: ChatScope, orderId: string) => `pier.chat.seen.${scope}.${orderId}`;
 
 export function seenAt(scope: ChatScope, orderId: string): string | null {
   try {

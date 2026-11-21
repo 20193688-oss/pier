@@ -1,6 +1,6 @@
 /* Merchant QR payloads for mock mode and tests, built the way EMVCo specifies (TLV fields and a
-   CRC16 in field 63), so @midpoint/payment-qr reads them like a real scan. */
-import { emvCrc } from '@midpoint/payment-qr';
+   CRC16 in field 63), so @pier/payment-qr reads them like a real scan. */
+import { emvCrc } from '@pier/payment-qr';
 
 const tlv = (id: string, value: string) => `${id}${String(value.length).padStart(2, '0')}${value}`;
 const withCrc = (body: string) => `${body}6304${emvCrc(`${body}6304`)}`;

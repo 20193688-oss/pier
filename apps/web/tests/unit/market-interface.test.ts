@@ -3,7 +3,7 @@
    argument names and types; the spec reader refuses what it cannot hold. */
 import { test } from 'vitest';
 import assert from 'node:assert/strict';
-import { MARKET_SPEC, MARKET_ERRORS } from '@midpoint/contracts';
+import { MARKET_SPEC, MARKET_ERRORS } from '@pier/contracts';
 import {
   describeSpec,
   MARKET_INTERFACE,

@@ -2,7 +2,7 @@
    loaded only when the browser has no detector); the flashlight where the camera has one. Or paste
    a QR: the "Paste QR" button reads the clipboard (an image is decoded, text is read as is), and
    Ctrl+V / the system's paste anywhere on the screen does the same; or type the code, or pick an
-   image. What is read goes through @midpoint/payment-qr (routeScan) and
+   image. What is read goes through @pier/payment-qr (routeScan) and
    opens the right screen. A secret key is never kept: the screen warns and forgets it. */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
@@ -21,7 +21,7 @@ interface Detector {
 }
 type DetectorCtor = new (o: { formats: string[] }) => Detector;
 
-const QR_KEY = 'midpoint.app.qr';
+const QR_KEY = 'pier.app.qr';
 
 /** Keep a merchant QR for the pay screen (this tab only). */
 export function keepQr(payload: string) {

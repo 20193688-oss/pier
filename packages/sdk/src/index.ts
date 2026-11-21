@@ -1,17 +1,17 @@
 /**
- * @midpoint/sdk: a typed client for the Midpoint API, webhook verification and
+ * @pier/sdk: a typed client for the Pier API, webhook verification and
  * the decision rule of the reference auto-release bot. The bot itself
  * (`dist/bot/auto-release.js`) needs `viem`; nothing exported here does.
  */
 export {
-  createMidpointClient,
+  createPierClient,
   ORGANIZATION_HEADER,
-  MidpointError,
+  PierError,
   TIER_HEADER,
   UNEXPECTED_RESPONSE,
   unwrap,
-  type MidpointClient,
-  type MidpointClientOptions,
+  type PierClient,
+  type PierClientOptions,
   type Unwrapped,
 } from '@/client';
 export {
@@ -23,8 +23,8 @@ export {
 export {
   DEFAULT_WEBHOOK_TOLERANCE_SECONDS,
   parseWebhook,
-  MIDPOINT_SIGNATURE_HEADER,
-  MidpointWebhookError,
+  PIER_SIGNATURE_HEADER,
+  PierWebhookError,
   signWebhook,
   verifyWebhook,
   type VerifyWebhookOptions,

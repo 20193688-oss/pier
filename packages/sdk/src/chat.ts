@@ -1,4 +1,4 @@
-import { unwrap, type MidpointClient } from '@/client';
+import { unwrap, type PierClient } from '@/client';
 import type { NewOrderMessage, OrderMessage, OrderMessageAttachment } from '@/types';
 
 /**
@@ -19,7 +19,7 @@ export type OrderChatRoutes = 'creator' | 'merchant' | 'app';
 
 /** The order's latest messages (200 at most), oldest first. */
 export async function listOrderMessages(
-  client: MidpointClient,
+  client: PierClient,
   as: OrderChatRoutes,
   orderId: string,
 ): Promise<OrderMessage[]> {
@@ -38,7 +38,7 @@ export async function listOrderMessages(
  * at most 2 MiB, base64), or both.
  */
 export async function sendOrderMessage(
-  client: MidpointClient,
+  client: PierClient,
   as: OrderChatRoutes,
   orderId: string,
   body: NewOrderMessage,
@@ -53,7 +53,7 @@ export async function sendOrderMessage(
 
 /** A message's file, its bytes in base64 (a `404 not_found` when it has none). */
 export async function getOrderMessageAttachment(
-  client: MidpointClient,
+  client: PierClient,
   as: OrderChatRoutes,
   orderId: string,
   messageId: string,

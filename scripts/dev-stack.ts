@@ -47,7 +47,7 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { BotMerchant, DevAccounts, DevChain, DevMarket, SeedResult } from '@midpoint/api/dev';
+import type { BotMerchant, DevAccounts, DevChain, DevMarket, SeedResult } from '@pier/api/dev';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STATE_DIR = join(ROOT, '.dev-stack');
@@ -169,16 +169,16 @@ async function main(): Promise<void> {
       'run',
       'build',
       '-w',
-      '@midpoint/contracts',
+      '@pier/contracts',
       '-w',
-      '@midpoint/payment-qr',
+      '@pier/payment-qr',
       '-w',
-      '@midpoint/api',
+      '@pier/api',
       '-w',
-      '@midpoint/sdk',
+      '@pier/sdk',
     ]);
   }
-  const dev = await import('@midpoint/api/dev');
+  const dev = await import('@pier/api/dev');
 
   for (const [port, what] of [
     [API_PORT, 'the API'],
@@ -377,7 +377,7 @@ async function main(): Promise<void> {
         env: {
           ...process.env,
           PORT: String(WEB_PORT),
-          MIDPOINT_API_URL: API_URL,
+          PIER_API_URL: API_URL,
           API_URL,
           VITE_API_URL: API_URL,
           PUBLIC_API_URL: API_URL,
@@ -462,8 +462,8 @@ async function main(): Promise<void> {
         cwd: ROOT,
         env: {
           ...process.env,
-          MIDPOINT_API_URL: API_URL,
-          MIDPOINT_API_KEY: m.api.apiKey,
+          PIER_API_URL: API_URL,
+          PIER_API_KEY: m.api.apiKey,
           BOT_SECRET: m.secret,
           MARKET_CONTRACT: `${chain.network}=${market.contract}`,
           BOT_NAME: m.displayName,
@@ -483,7 +483,7 @@ async function main(): Promise<void> {
       });
     };
     if (!existsSync(BOT_ENTRY)) {
-      mlog(`no bots: ${BOT_ENTRY} is missing (build the SDK: npm run build -w @midpoint/sdk)`);
+      mlog(`no bots: ${BOT_ENTRY} is missing (build the SDK: npm run build -w @pier/sdk)`);
     } else {
       for (const m of ready) startBot(m);
     }
@@ -536,7 +536,7 @@ async function main(): Promise<void> {
     const percent = (bps: number) => `${(bps / 100).toFixed(2)} %`;
     const lines = [
       '',
-      '================ Midpoint dev stack ================',
+      '================ Pier dev stack ================',
       `API            ${API_URL}   (OpenAPI: /v1/openapi.json)`,
       `Market         ${API_URL}/v1/market?tier=test`,
       `Web app        ${webDev && !flags.has('--no-web') ? WEB_ORIGIN : '(not started)'}`,

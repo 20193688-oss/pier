@@ -68,7 +68,7 @@ export class ChargeView {
   expiresAt!: Date;
 
   @ApiProperty({
-    example: `https://midpoint.money/pay/${CHARGE_ID}`,
+    example: `https://pier.money/pay/${CHARGE_ID}`,
     description: 'The payer’s page. Share it, or show it as a QR.',
   })
   url!: string;

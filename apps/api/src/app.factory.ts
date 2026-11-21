@@ -63,8 +63,8 @@ export async function createApp(
     allowedHeaders: [
       'content-type',
       'authorization',
-      'midpoint-organization',
-      'midpoint-tier',
+      'pier-organization',
+      'pier-tier',
       'x-payer-token',
     ],
     exposedHeaders: ['retry-after'],

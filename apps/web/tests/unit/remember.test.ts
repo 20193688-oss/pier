@@ -46,7 +46,7 @@ test('a payer and an account come back as kept; another shape counts as nothing'
   assert.equal(recall('payer.BRL', isPayer), null);
   remember('payer.MXN', { name: 'x' });
   assert.equal(recall('payer.MXN', isPayer), null);
-  localStorage.setItem('midpoint.fill.payer.COP', '{not json');
+  localStorage.setItem('pier.fill.payer.COP', '{not json');
   assert.equal(recall('payer.COP', isPayer), null);
   const account = { holderName: 'Sofía', document: '', details: { cbu: '0170099220000001234561' } };
   remember('account.ar_bank', account);
@@ -58,12 +58,12 @@ test('a payer and an account come back as kept; another shape counts as nothing'
 test('sign-out forgets everything kept, and only that', () => {
   rememberEmail(' ana@gmail.com ');
   remember('payer.ARS', { name: 'A', document: '1' });
-  localStorage.setItem('midpoint.theme', 'dark');
+  localStorage.setItem('pier.theme', 'dark');
   assert.equal(recallEmail(), 'ana@gmail.com');
   forgetFilled();
   assert.equal(recallEmail(), null);
   assert.equal(recall('payer.ARS', isPayer), null);
-  assert.equal(localStorage.getItem('midpoint.theme'), 'dark');
+  assert.equal(localStorage.getItem('pier.theme'), 'dark');
 });
 
 test('without storage nothing breaks and nothing is recalled', () => {

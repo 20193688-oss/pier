@@ -240,8 +240,8 @@ export default function LandingPage() {
           <figure className="tone-dark min-w-0 self-start rounded-[22px] border border-line bg-paper p-5 text-ink sm:p-6">
             <figcaption className="caps mb-4 text-ink-3">{l.business.codeLabel}</figcaption>
             <pre className="overflow-x-auto text-[0.8125rem] leading-relaxed">
-              <code>{`curl "$MIDPOINT_API_URL/v1/p2p/charges" \\
-  -H "Authorization: Bearer $MIDPOINT_KEY" \\
+              <code>{`curl "$PIER_API_URL/v1/p2p/charges" \\
+  -H "Authorization: Bearer $PIER_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
     "currency": "BOB",

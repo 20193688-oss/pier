@@ -10,7 +10,7 @@ import {
   tick,
   type SimulatedMerchantContext,
 } from '@/bot/simulated-merchant';
-import { createMidpointClient } from '@/client';
+import { createPierClient } from '@/client';
 import type { MerchantOrder, OrderMessage, Transaction } from '@/types';
 import { MARKET, MERCHANT, releaseXdr, transferMatch } from '@test/fixtures';
 
@@ -105,8 +105,8 @@ describe('orderActionProblem', () => {
 describe('tick', () => {
   function harness(orders: MerchantOrder[], sendStatus: 'success' | 'reverted' = 'success') {
     const requests: string[] = [];
-    const client = createMidpointClient({
-      baseUrl: 'https://api.midpoint.test',
+    const client = createPierClient({
+      baseUrl: 'https://api.pier.test',
       apiKey: API_KEY,
       fetch: async (request) => {
         const url = new URL(request.url);
@@ -243,8 +243,8 @@ describe('the bot on the order’s chat', () => {
   /** A fake API with the merchant's orders, each with its chat, and what the bot posted. */
   function chatApi(orders: MerchantOrder[], messages: Record<string, OrderMessage[]>) {
     const posted: { path: string; body: { text?: string; attachment?: { data: string } } }[] = [];
-    const client = createMidpointClient({
-      baseUrl: 'https://api.midpoint.test',
+    const client = createPierClient({
+      baseUrl: 'https://api.pier.test',
       apiKey: API_KEY,
       fetch: async (request) => {
         const url = new URL(request.url);
@@ -383,8 +383,8 @@ describe('the bot on the order’s chat', () => {
 
 describe('readSimulatedMerchantConfig', () => {
   const env = {
-    MIDPOINT_API_URL: 'http://localhost:4100',
-    MIDPOINT_API_KEY: API_KEY,
+    PIER_API_URL: 'http://localhost:4100',
+    PIER_API_KEY: API_KEY,
     BOT_SECRET: MERCHANT.secret(),
     MARKET_CONTRACT: `testnet=${MARKET}`,
     BOT_NAME: 'Andes Cambio',
@@ -404,7 +404,7 @@ describe('readSimulatedMerchantConfig', () => {
     expect(() =>
       readSimulatedMerchantConfig({
         ...env,
-        MIDPOINT_API_KEY: 'pk_live_3kQ9x7Lm2Vb8',
+        PIER_API_KEY: 'pk_live_3kQ9x7Lm2Vb8',
         MARKET_CONTRACT: `mainnet=${MARKET}`,
       }),
     ).toThrow(/pk_test_/);

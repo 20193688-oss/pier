@@ -25,7 +25,7 @@ import {
 import { CurrencyMark } from '@/components/p2p/parts';
 import type { ActivityItem } from '@/lib/app/types';
 
-const HIDE_KEY = 'midpoint.app.hide-balance';
+const HIDE_KEY = 'pier.app.hide-balance';
 
 /** The balance's size for a text of this length: the longer the text, the smaller the cut. */
 function balanceSize(text: string): string {

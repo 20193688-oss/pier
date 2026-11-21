@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { MARKET_WASM_BASE64, MARKET_WASM_HASH } from '@midpoint/contracts';
+import { MARKET_WASM_BASE64, MARKET_WASM_HASH } from '@pier/contracts';
 import {
   Address,
   Asset,

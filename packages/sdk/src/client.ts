@@ -3,23 +3,23 @@ import type { paths } from '@/generated/schema';
 import type { ErrorCode, Tier } from '@/types';
 
 /** A typed `openapi-fetch` client for every route of the API contract. */
-export type MidpointClient = Client<paths>;
+export type PierClient = Client<paths>;
 
 /** The header a wallet session names the organization it acts for in. */
-export const ORGANIZATION_HEADER = 'Midpoint-Organization';
+export const ORGANIZATION_HEADER = 'Pier-Organization';
 /** The header a wallet session names the tier (`live` or `test`) it acts on in. */
-export const TIER_HEADER = 'Midpoint-Tier';
+export const TIER_HEADER = 'Pier-Tier';
 
-export interface MidpointClientOptions {
-  /** The API origin, e.g. `https://api.midpoint.money` (the contract's paths start with `/v1`). */
+export interface PierClientOptions {
+  /** The API origin, e.g. `https://api.pier.money` (the contract's paths start with `/v1`). */
   baseUrl: string;
   /** An API key (`pk_live_...` or `pk_test_...`): it acts for one organization on one tier. */
   apiKey?: string;
   /** A wallet session token (`ps_sess_...`) from `POST /v1/auth/verify`. */
   sessionToken?: string;
-  /** Sessions only: the organization to act for (sent as `Midpoint-Organization`). */
+  /** Sessions only: the organization to act for (sent as `Pier-Organization`). */
   organizationId?: string;
-  /** Sessions only: the tier to act on (sent as `Midpoint-Tier`; the API defaults to `test`). */
+  /** Sessions only: the tier to act on (sent as `Pier-Tier`; the API defaults to `test`). */
   tier?: Tier;
   /** A custom `fetch` (tests, proxies, retries). Defaults to `globalThis.fetch`. */
   fetch?: (request: Request) => Promise<Response>;
@@ -29,17 +29,17 @@ const API_KEY = /^pk_(?:live|test)_\S+$/;
 const SESSION_TOKEN = /^ps_sess_\S+$/;
 
 /**
- * Creates a client for the Midpoint API. Pass an API key for server-to-server
+ * Creates a client for the Pier API. Pass an API key for server-to-server
  * calls, or a session token (with the organization and tier to act for) on
  * behalf of a signed-in wallet. With neither, only the public routes work
  * (`/v1/market`, sign-in and the hosted charge's payer routes).
  *
  * ```ts
- * const client = createMidpointClient({ baseUrl, apiKey: process.env.MIDPOINT_API_KEY });
+ * const client = createPierClient({ baseUrl, apiKey: process.env.PIER_API_KEY });
  * const market = await unwrap(client.GET('/v1/market'));
  * ```
  */
-export function createMidpointClient(options: MidpointClientOptions): MidpointClient {
+export function createPierClient(options: PierClientOptions): PierClient {
   const { baseUrl, apiKey, sessionToken, organizationId, tier } = options;
   if (!URL.canParse(baseUrl)) {
     throw new TypeError(`baseUrl must be an absolute URL, got "${baseUrl}".`);
@@ -48,10 +48,10 @@ export function createMidpointClient(options: MidpointClientOptions): MidpointCl
     throw new TypeError('Pass either apiKey or sessionToken, not both.');
   }
   if (apiKey !== undefined && !API_KEY.test(apiKey)) {
-    throw new TypeError('apiKey must be a Midpoint API key (pk_live_... or pk_test_...).');
+    throw new TypeError('apiKey must be a Pier API key (pk_live_... or pk_test_...).');
   }
   if (sessionToken !== undefined && !SESSION_TOKEN.test(sessionToken)) {
-    throw new TypeError('sessionToken must be a Midpoint session token (ps_sess_...).');
+    throw new TypeError('sessionToken must be a Pier session token (ps_sess_...).');
   }
   if (apiKey !== undefined && (organizationId !== undefined || tier !== undefined)) {
     throw new TypeError(
@@ -71,12 +71,12 @@ export function createMidpointClient(options: MidpointClientOptions): MidpointCl
   return createClient<paths>({ baseUrl, headers, fetch: options.fetch });
 }
 
-/** The code a `MidpointError` carries when the API answered without its error body. */
+/** The code a `PierError` carries when the API answered without its error body. */
 export const UNEXPECTED_RESPONSE = 'unexpected_response';
 
 /** An API error: the HTTP status and the API's `{ code, message, details? }`. */
-export class MidpointError extends Error {
-  override readonly name = 'MidpointError';
+export class PierError extends Error {
+  override readonly name = 'PierError';
   readonly status: number;
   readonly code: ErrorCode | typeof UNEXPECTED_RESPONSE;
   readonly details?: string[];
@@ -94,12 +94,12 @@ export class MidpointError extends Error {
   }
 
   /** Builds the error from a failed response's status and (parsed) body. */
-  static fromResponse(status: number, body: unknown): MidpointError {
+  static fromResponse(status: number, body: unknown): PierError {
     if (isApiErrorBody(body)) {
       const { code, message, details } = body.error;
-      return new MidpointError({ status, code, message, details });
+      return new PierError({ status, code, message, details });
     }
-    return new MidpointError({
+    return new PierError({
       status,
       code: UNEXPECTED_RESPONSE,
       message: `The API answered HTTP ${status} without an error body.`,
@@ -135,7 +135,7 @@ export type Unwrapped<R extends FetchResult> = [Exclude<R['data'], undefined>] e
   : Exclude<R['data'], undefined>;
 
 /**
- * Returns a call's success body, or throws a `MidpointError` with the API's
+ * Returns a call's success body, or throws a `PierError` with the API's
  * error code when the response is not 2xx. Takes the call itself or its
  * awaited result:
  *
@@ -147,6 +147,6 @@ export async function unwrap<R extends FetchResult>(
   result: R | PromiseLike<R>,
 ): Promise<Unwrapped<R>> {
   const { data, error, response } = await result;
-  if (!response.ok) throw MidpointError.fromResponse(response.status, error);
+  if (!response.ok) throw PierError.fromResponse(response.status, error);
   return data as Unwrapped<R>;
 }

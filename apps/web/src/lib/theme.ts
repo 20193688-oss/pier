@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 export type ThemeChoice = 'light' | 'dark' | 'system';
-const KEY = 'midpoint.theme';
+const KEY = 'pier.theme';
 
 function read(): ThemeChoice {
   try {

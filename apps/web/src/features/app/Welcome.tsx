@@ -1,7 +1,7 @@
 /* Welcome, sign-up and sign-in. The welcome sits on the aura over the whole screen: the mark's
-   slid M drawn large in the ice, then, where the aura turns to night, what the app is for and two
+   slid P drawn large in the ice, then, where the aura turns to night, what the app is for and two
    ways in (create an account, sign in). Each opens a plain page with the form (src/components/
-   wallet/SignIn.tsx). From a tablet up both are split in two: the aura with the slid M on the
+   wallet/SignIn.tsx). From a tablet up both are split in two: the aura with the slid P on the
    left, the words and the way in on the right. The screen stays on the route the person was going
    to, so after signing in they land there (a payment link opens the send screen). */
 import { useEffect, useState } from 'react';
@@ -27,7 +27,7 @@ export default function Welcome() {
   return <Intro onMode={setMode} />;
 }
 
-/** The aura half of the welcome on a wide screen: the logo and the slid M, large. */
+/** The aura half of the welcome on a wide screen: the logo and the slid P, large. */
 function AuraPanel() {
   return (
     <div className="aura-screen grain m-4 hidden flex-col overflow-hidden rounded-[32px] p-10 md:flex">
