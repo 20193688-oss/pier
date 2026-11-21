@@ -168,10 +168,15 @@ describe('handles', () => {
     expect(isReservedHandle('pier_team', 'pier')).toBe(true);
     expect(isReservedHandle('newbrand', 'New Brand')).toBe(true);
     expect(isReservedHandle('maria_salta', 'pier')).toBe(false);
-    // The name followed by a word that passes for the product's own, but not a person's name.
-    expect(isReservedHandle('pierteam', 'pier')).toBe(true);
-    expect(isReservedHandle('pieroficial', 'pier')).toBe(true);
-    expect(isReservedHandle('pierre', 'pier')).toBe(false);
-    expect(isReservedHandle('piero_93', 'pier')).toBe(false);
+    // Deny by default: everything that starts with the product's name...
+    for (const h of ['pier', 'pierteam', 'pieroficial', 'pierhq', 'pier1', 'pierwallet'])
+      expect(isReservedHandle(h, 'pier'), h).toBe(true);
+    expect(isReservedHandle('pierredupont', 'pier'), 'a name glued to more letters').toBe(true);
+    // ...but a person's name that starts with it, alone or with `_` or digits.
+    for (const h of ['pierre', 'piero_93', 'pierre_dupont', 'piero93', 'pierina'])
+      expect(isReservedHandle(h, 'pier'), h).toBe(false);
+    // The earlier names stay reserved.
+    for (const h of ['midpoint', 'midpoint_team', 'midpointapp', 'pedospe'])
+      expect(isReservedHandle(h, 'pier'), h).toBe(true);
   });
 });

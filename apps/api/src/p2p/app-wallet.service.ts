@@ -87,19 +87,35 @@ export const RESERVED_HANDLES = new Set([
   'wallet',
 ]);
 
-/* Words that, after the product's name, would pass a handle off as the product's own. */
-const OFFICIAL_SUFFIXES =
-  /^(app|team|equipo|support|soporte|help|ayuda|admin|official|oficial|pay|pagos)$/;
+/* The product's earlier names: still nobody's handle, nor anything that starts with them. */
+const LEGACY_BRANDS = ['midpoint', 'pedospe'];
 
-/** Whether a normalised handle is reserved: the platform's words, the product's name, the name
-    followed by `_` (`pier_team`) or by a word that would pass it off as the product's
-    (`pierteam`, `pieroficial`). A person's name that merely starts with it (`pierre`) is free. */
+/* People's names that start with the product's name. Each is free alone or followed by `_` or
+   digits (`pierre`, `pierre_dupont`, `piero93`); anything else that starts with the product's
+   name is reserved (`pierhq`, `pier1`, `pierwallet`, `pieroficial`, `pierredupont`). */
+const NAMES_STARTING_WITH_BRAND = [
+  'pierre',
+  'piero',
+  'pierina',
+  'pierino',
+  'pierluigi',
+  'pierpaolo',
+  'pierangelo',
+  'piergiorgio',
+  'pierfrancesco',
+  'pierce',
+];
+
+/** Whether a normalised handle is reserved: the platform's words, and every handle that starts
+    with the product's name or an earlier one (deny by default), but for the people's names
+    above. */
 export function isReservedHandle(handle: string, brandName: string): boolean {
   const brand = brandName.toLowerCase().replace(/[^a-z0-9_]/g, '');
-  if (RESERVED_HANDLES.has(handle) || handle === brand) return true;
+  if (RESERVED_HANDLES.has(handle)) return true;
+  if (LEGACY_BRANDS.some((b) => handle.startsWith(b))) return true;
   if (!brand || !handle.startsWith(brand)) return false;
-  const rest = handle.slice(brand.length);
-  return rest.startsWith('_') || OFFICIAL_SUFFIXES.test(rest);
+  const name = NAMES_STARTING_WITH_BRAND.find((n) => handle.startsWith(n));
+  return !(name && /^(_.*|\d*)$/.test(handle.slice(name.length)));
 }
 
 /**

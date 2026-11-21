@@ -289,4 +289,4 @@ export const HANDLES: Record<string, string> = {
   tiendalerma: BUSINESS_WALLET,
 };
 /** Words nobody can claim as a handle. */
-export const RESERVED_HANDLES = ['admin', 'support', 'soporte', 'pier', 'app', 'root'];
+export const RESERVED_HANDLES = ['admin', 'support', 'soporte', 'pier', 'midpoint', 'app', 'root'];
