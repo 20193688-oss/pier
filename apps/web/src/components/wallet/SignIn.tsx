@@ -14,6 +14,7 @@ import { fmt, useT } from '@/i18n';
 import { Field, Notice, Spinner } from '@/components/ui/controls';
 import { Icon } from '@/components/ui/Icon';
 import { MOCK } from '@/lib/env';
+import { rememberEmail } from '@/lib/app/remember';
 import { useSession, type SignInStep } from '@/lib/session';
 import {
   getPollar,
@@ -26,6 +27,8 @@ import { WalletError, type StellarWallet } from '@/lib/wallet/types';
 import { EMAIL_CODE_LENGTH, emailCode } from '@/lib/wallet/email-code';
 import { ApiError } from '@/lib/api/client';
 import type { Session } from '@/lib/api/types';
+import { useGuard } from '@/lib/use-action';
+import { useToastWhen } from '@/components/ui/Toast';
 
 const DEV = import.meta.env.DEV;
 /* Compile-time: a production build has neither the demo wallet nor the dev key, not even as a
@@ -95,6 +98,7 @@ export function SignIn({
   const w = t.common.wallet;
   const { signIn, expired } = useSession();
   const pollar = usePollarApi();
+  useToastWhen(expired, w.expired);
   const [progress, setProgress] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [email, setEmail] = useState('');
@@ -121,6 +125,8 @@ export function SignIn({
 
   const explain = (e: unknown) => {
     setProgress(null);
+    // Cancelled from the waiting screen: back to the form, nothing to say.
+    if (e instanceof WalletError && e.message === 'cancelled') return;
     if (e instanceof WalletError) {
       if (e.message.startsWith('challenge:')) return setError(w.badChallenge);
       setError(
@@ -156,15 +162,20 @@ export function SignIn({
     onSignedIn?.(s);
   };
 
-  const run = async (first: string, get: () => Promise<StellarWallet>) => {
-    setError(null);
-    setProgress(first);
-    try {
-      await finish(await get());
-    } catch (e) {
-      explain(e);
-    }
-  };
+  // One sign-in at a time: a second tap while a wallet is opening is dropped. The forms (the email,
+  // its code, a development key) have their own guard: a code's check goes on to open the wallet.
+  const guard = useGuard();
+  const formGuard = useGuard();
+  const run = (first: string, get: () => Promise<StellarWallet>) =>
+    guard(async () => {
+      setError(null);
+      setProgress(first);
+      try {
+        await finish(await get());
+      } catch (e) {
+        explain(e);
+      }
+    });
 
   /** The demo wallet for this email (mock mode only). */
   const demoFor = async (address: string | null) => {
@@ -173,38 +184,46 @@ export function SignIn({
     return m.demoWallet(m.personaForEmail(address, mode, variant));
   };
 
-  const sendCode = async (e: FormEvent) => {
+  const sendCode = (e: FormEvent) => {
     e.preventDefault();
-    const value = email.trim();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return setError(w.badEmail);
-    setError(null);
-    if (mock) {
-      setCodeFor(value);
-      return;
-    }
-    setProgress(w.loadingPollar);
-    try {
-      await pollar!.sendEmailCode(value);
-      setCodeFor(value);
-      setProgress(null);
-    } catch (err) {
-      explain(err);
-    }
+    return formGuard(async () => {
+      e.preventDefault();
+      const value = email.trim();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return setError(w.badEmail);
+      setError(null);
+      // Kept on this device: it suggests the @handle and fills email fields later.
+      rememberEmail(value);
+      if (mock) {
+        setCodeFor(value);
+        return;
+      }
+      setProgress(w.loadingPollar);
+      try {
+        await pollar!.sendEmailCode(value);
+        setCodeFor(value);
+        setProgress(null);
+      } catch (err) {
+        explain(err);
+      }
+    });
   };
 
-  const verify = async (e: FormEvent) => {
+  const verify = (e: FormEvent) => {
     e.preventDefault();
-    // A code pasted from an email can carry spaces, dashes or invisible characters; it has six.
-    const value = emailCode(code);
-    if (!value) return;
-    if (value.length !== EMAIL_CODE_LENGTH) return setError(w.codeLength);
-    if (mock) {
-      await run(w.checking, () => demoFor(codeFor));
-      return;
-    }
-    await run(w.checking, async () => {
-      await pollar!.verifyEmailCode(value);
-      return pollarWallet();
+    return formGuard(async () => {
+      e.preventDefault();
+      // A code pasted from an email can carry spaces, dashes or invisible characters; it has six.
+      const value = emailCode(code);
+      if (!value) return;
+      if (value.length !== EMAIL_CODE_LENGTH) return setError(w.codeLength);
+      if (mock) {
+        await run(w.checking, () => demoFor(codeFor));
+        return;
+      }
+      await run(w.checking, async () => {
+        await pollar!.verifyEmailCode(value);
+        return pollarWallet();
+      });
     });
   };
 
@@ -222,28 +241,38 @@ export function SignIn({
       return pollarWallet();
     });
 
-  const submitDevKey = async (e: FormEvent) => {
+  const submitDevKey = (e: FormEvent) => {
     e.preventDefault();
-    if (!import.meta.env.DEV) return;
-    const m = await import('@/lib/wallet/dev-key');
-    if (!m.isDevSecret(secret)) return setSecretError(w.devKeyInvalid);
-    setSecretError(null);
-    const wallet = m.devKeyWallet(secret);
-    setSecret('');
-    await run(fmt(w.connecting, { wallet: w.devKey }), async () => wallet);
+    return formGuard(async () => {
+      e.preventDefault();
+      if (!import.meta.env.DEV) return;
+      const m = await import('@/lib/wallet/dev-key');
+      if (!m.isDevSecret(secret)) return setSecretError(w.devKeyInvalid);
+      setSecretError(null);
+      const wallet = m.devKeyWallet(secret);
+      setSecret('');
+      await run(fmt(w.connecting, { wallet: w.devKey }), async () => wallet);
+    });
   };
 
   if (progress)
     return (
-      <div className="flex items-center gap-3 rounded-[16px] bg-well px-4 py-5" role="status">
-        <Spinner />
-        <span>{progress}</span>
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center gap-3 rounded-[16px] bg-well px-4 py-5" role="status">
+          <Spinner />
+          <span>{progress}</span>
+        </div>
+        {/* A Pollar login (Google's window, a wallet) can be dropped instead of waited out. */}
+        {!mock && pollar && (
+          <button type="button" className="btn btn-quiet self-start" onClick={() => pollar.cancel()}>
+            {t.common.actions.cancel}
+          </button>
+        )}
       </div>
     );
 
   return (
     <div className="flex flex-col gap-4">
-      {expired && <Notice tone="warn">{w.expired}</Notice>}
 
       {!mock && POLLAR_KEY && !pollar?.ready && (
         <div className="flex items-center gap-3 text-ink-3" role="status">

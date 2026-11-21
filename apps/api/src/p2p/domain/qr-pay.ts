@@ -9,8 +9,10 @@ import { P2P_RAILS, qrRailFor, type P2pRailId } from '@/p2p/domain/rails';
  * `@midpoint/payment-qr`'s `parseEmv` (CRC checked, repeated or ambiguous
  * fields refused); this only decides whether the market pays it: the
  * standard must have a QR rail (Argentina's interoperable QR → `ar_qr`, PIX
- * → `br_pix_qr`), the QR's currency must be that rail's (ARS or BRL), and a
- * QR that carries its own amount is paid exactly that amount.
+ * → `br_pix_qr`, Peru's interoperable QR of Yape, Plin and the banks →
+ * `pe_qr`), the QR's currency must be that rail's (ARS, BRL or PEN), and a
+ * QR that carries its own amount is paid exactly that amount; a static QR
+ * without one is paid the amount the person types.
  */
 
 /** What the person who scanned sees (no payload). */
@@ -65,7 +67,8 @@ export function readQrPayment(payload: string, fiatAmount?: string): QrPayment {
   if (!rail) {
     return {
       ok: false,
-      error: 'only Argentina’s interoperable QR (Transferencias 3.0) and PIX QR codes are paid',
+      error:
+        'only Argentina’s interoperable QR (Transferencias 3.0), PIX and Peru’s interoperable QR (Yape, Plin, banks) are paid',
     };
   }
   const currency = P2P_RAILS[rail].currency;

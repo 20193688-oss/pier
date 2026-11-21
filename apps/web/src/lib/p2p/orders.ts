@@ -162,3 +162,33 @@ export function pollDelay(status: string): number | null {
   if (isTerminal(status)) return null;
   return status === 'pending' ? 4000 : 10000;
 }
+
+/* The statuses that already show an action's outcome, as the API reads them (it answers
+   `already_done` to a transaction for one, and a buyer's act again with the order). */
+const OUTCOME: Record<string, readonly string[]> = {
+  accept: ['awaiting_payment', 'paid', 'disputed', 'completed', 'resolved'],
+  paid: ['paid', 'disputed', 'completed', 'resolved'],
+  release: ['completed'],
+  cancel: ['cancelled'],
+  dispute: ['disputed', 'resolved'],
+  open: [
+    'awaiting_acceptance',
+    'awaiting_payment',
+    'paid',
+    'disputed',
+    'completed',
+    'resolved',
+    'cancelled',
+    'expired',
+  ],
+};
+const ACTION_ALIASES: Record<string, string> = {
+  markPaid: 'paid',
+  mark_paid: 'paid',
+  open_with_deposit: 'open',
+};
+
+/** Whether an order in `status` already shows what `action` does (a retry of something done). */
+export function showsOutcome(action: string, status: string): boolean {
+  return OUTCOME[ACTION_ALIASES[action] ?? action]?.includes(status) ?? false;
+}

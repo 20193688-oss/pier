@@ -1,4 +1,4 @@
-/* The home page. The hero sits on the night aura; its second half is the thing the product is
+/* The home page. The hero sits on the night aura and opens with the logo, large; its second half is the thing the product is
    about: an order slip (a white sheet) with the exact amount to transfer marked like a receipt
    someone highlighted, the account to pay, and the clock. Then how a purchase works (a real sequence, so numbered), the payments app (/app),
    why nobody keeps the funds, merchants, businesses and the API, and the questions people ask
@@ -6,13 +6,14 @@
 import { Link } from 'react-router';
 import { useDocumentMeta, useI18n } from '@/i18n';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { Logo } from '@/components/ui/Logo';
 import { money, units } from '@/lib/format';
 
 const EXAMPLE = {
-  fiat: 150000,
-  price: 1488.5,
+  fiat: 1200,
+  price: 11.95,
   feeBps: 30,
-  cbu: '0170 0992 2200 0001 2345 61',
+  account: 'Banco Unión · 1000 0234 5678',
   holder: 'Norte Cambios SRL',
 };
 
@@ -37,7 +38,7 @@ function OrderSlip() {
         <div className="px-6 pt-4 pb-5">
           <p className="text-[0.9375rem] text-ink-2">{s.transfer}</p>
           <p className="figure mt-2 text-[clamp(1.55rem,7.4vw,2.2rem)]">
-            <span className="marker marker-sweep">{money(lang, EXAMPLE.fiat, 'ARS')}</span>
+            <span className="marker marker-sweep">{money(lang, EXAMPLE.fiat, 'BOB')}</span>
           </p>
         </div>
         <div className="tear" />
@@ -48,8 +49,8 @@ function OrderSlip() {
             <dd className="text-right font-medium">{EXAMPLE.holder}</dd>
           </div>
           <div className="flex justify-between gap-4">
-            <dt className="text-ink-3">{s.cbu}</dt>
-            <dd className="num text-right font-medium">{EXAMPLE.cbu}</dd>
+            <dt className="text-ink-3">{s.account}</dt>
+            <dd className="num text-right font-medium">{EXAMPLE.account}</dd>
           </div>
           <div className="flex justify-between gap-4 border-t border-dashed border-line-2 pt-3">
             <dt className="text-ink-3">{s.receive}</dt>
@@ -79,8 +80,12 @@ export default function LandingPage() {
   return (
     <>
       <section className="tone-dark aura-night grain text-ink">
-        <div className="mx-auto grid max-w-6xl items-center gap-12 px-4 pt-12 pb-20 md:pt-16 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:pt-24 lg:pb-28">
+        <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 sm:px-8 pt-12 pb-20 md:pt-16 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:pt-24 lg:pb-28">
           <div className="flex flex-col gap-6">
+            <Logo
+              size={56}
+              className="block h-[clamp(2.4rem,7vw,3.75rem)] w-auto self-start text-ink"
+            />
             <h1 className="display text-[clamp(1.7rem,7.2vw,3.6rem)]">{l.hero.title}</h1>
             <p className="max-w-[34rem] text-[1.125rem] text-ink-2">{l.hero.body}</p>
             <div className="flex flex-wrap gap-3">
@@ -98,7 +103,7 @@ export default function LandingPage() {
       </section>
 
       <section aria-labelledby="how-h" className="border-b border-line bg-sheet">
-        <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
+        <div className="mx-auto max-w-6xl px-6 sm:px-8 py-16 md:py-20">
           <h2 id="how-h" className="text-[1.9rem] sm:text-[2.3rem]">
             {l.how.title}
           </h2>
@@ -123,7 +128,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section aria-labelledby="app-h" className="mx-auto max-w-6xl px-4 pt-16 md:pt-24">
+      <section aria-labelledby="app-h" className="mx-auto max-w-6xl px-6 sm:px-8 pt-16 md:pt-24">
         <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr] lg:items-start">
           <div className="flex flex-col gap-5">
             <h2 id="app-h" className="text-[1.9rem] sm:text-[2.3rem]">
@@ -155,7 +160,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section aria-labelledby="trust-h" className="mx-auto max-w-6xl px-4 py-16 md:py-24">
+      <section aria-labelledby="trust-h" className="mx-auto max-w-6xl px-6 sm:px-8 py-16 md:py-24">
         <h2 id="trust-h" className="max-w-[30rem] text-[1.9rem] sm:text-[2.3rem]">
           {l.trust.title}
         </h2>
@@ -182,7 +187,7 @@ export default function LandingPage() {
         aria-labelledby="merchants-h"
         className="tone-dark scroll-mt-20 bg-paper text-ink"
       >
-        <div className="mx-auto grid max-w-6xl gap-10 px-4 py-16 md:grid-cols-2 md:py-20">
+        <div className="mx-auto grid max-w-6xl gap-10 px-6 sm:px-8 py-16 md:grid-cols-2 md:py-20">
           <div className="flex flex-col gap-5">
             <h2 id="merchants-h" className="text-[1.9rem] sm:text-[2.3rem]">
               {l.merchants.title}
@@ -208,7 +213,7 @@ export default function LandingPage() {
       <section
         id="business"
         aria-labelledby="business-h"
-        className="mx-auto max-w-6xl scroll-mt-20 px-4 py-16 md:py-24"
+        className="mx-auto max-w-6xl scroll-mt-20 px-6 sm:px-8 py-16 md:py-24"
       >
         <div className="grid gap-12 lg:grid-cols-[1fr_1.1fr]">
           <div className="flex flex-col gap-5">
@@ -239,8 +244,8 @@ export default function LandingPage() {
   -H "Authorization: Bearer $MIDPOINT_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "currency": "ARS",
-    "fiatAmount": "25000.00",
+    "currency": "BOB",
+    "fiatAmount": "350.00",
     "network": "testnet",
     "token": "USDC",
     "recipient": "acc_...",
@@ -255,7 +260,7 @@ export default function LandingPage() {
       </section>
 
       <section aria-labelledby="faq-h" className="border-t border-line">
-        <div className="mx-auto max-w-3xl px-4 py-16 md:py-20">
+        <div className="mx-auto max-w-3xl px-6 sm:px-8 py-16 md:py-20">
           <h2 id="faq-h" className="text-[1.9rem] sm:text-[2.3rem]">
             {l.faq.title}
           </h2>
@@ -276,7 +281,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section className="mx-auto max-w-6xl px-4">
+      <section className="mx-auto max-w-6xl px-6 sm:px-8">
         <div className="tone-dark aura-night grain flex flex-col items-start gap-5 overflow-hidden rounded-[28px] px-6 py-12 text-ink sm:px-10 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="display text-[clamp(1.6rem,4vw,2.4rem)]">{l.closing.title}</h2>

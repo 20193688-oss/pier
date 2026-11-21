@@ -1,13 +1,15 @@
 /* The payments app (/app/*): its own frame and routes. Signed out, every screen shows the welcome
-   and sign-in first and comes back to where the person was going (a payment link opens the send
-   screen after sign-in). Screens load as their own chunks. */
+   and sign-in first, and so does a session that ended and could not be renewed (straight to the
+   sign-in, never a screen without a session); signed in without an @handle, the handle comes
+   next; then the person lands where they were going (a payment link opens the send screen after
+   both). Screens load as their own chunks. */
 import { lazy, Suspense, useEffect, type ReactNode } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router';
 import { useDocumentMeta, useI18n } from '@/i18n';
-import { useSession } from '@/lib/session';
+import { sessionGate, useSession } from '@/lib/session';
 import { Spinner } from '@/components/ui/controls';
 import { AppDataProvider, useAppData } from '@/features/app/data';
-import { AppFrame } from '@/features/app/shell';
+import { AppFrame, TAB_PATHS } from '@/features/app/shell';
 import { initPwa } from '@/lib/pwa';
 import Welcome from '@/features/app/Welcome';
 import Home from '@/features/app/Home';
@@ -35,59 +37,160 @@ export function Loading() {
   );
 }
 
-/** A screen that needs a signed-in wallet: the welcome otherwise. */
+/* Screens a signed-in person without an @handle may still open: the handle itself and the
+   profile (to sign out). */
+const BEFORE_HANDLE = ['/app/handle', '/app/me'];
+
+/** A screen that needs a signed-in wallet: the welcome first, then the @handle, then the screen.
+    A session that ended waits while it is renewed silently, and is the sign-in if it cannot be. */
 function Signed({ children }: { children: ReactNode }) {
-  const { session } = useSession();
-  if (session === undefined) return <Loading />;
-  if (!session) return <Welcome />;
+  const auth = useSession();
+  const { session } = auth;
+  const { market, profile } = useAppData();
+  const { pathname, search } = useLocation();
+  const gate = sessionGate(auth);
+  if (gate === 'loading') return <Loading />;
+  if (gate === 'signin' || !session) return <Welcome />;
+  if (profile === undefined && market !== null) return <Loading />;
+  const path = pathname.replace(/\/+$/, '') || '/app';
+  if (profile && !profile.handle && !BEFORE_HANDLE.includes(path))
+    return <Navigate to={`/app/handle?next=${encodeURIComponent(path + search)}`} replace />;
   return <>{children}</>;
 }
-
-/** After sign-in, a person with no handle is offered one once per tab. */
-function HomeGate() {
-  const { session } = useSession();
-  const { profile } = useAppData();
-  const offered = (() => {
-    try {
-      return sessionStorage.getItem('midpoint.app.handle-offered') === '1';
-    } catch {
-      return true;
-    }
-  })();
-  if (session === undefined) return <Loading />;
-  if (!session) return <Welcome />;
-  if (profile && !profile.handle && !offered) return <Navigate to="/app/handle" replace />;
-  return <Home />;
-}
-
-const TAB_PATHS = ['/app', '/app/activity', '/app/receive', '/app/me'];
 
 function Frame() {
   const { t } = useI18n();
   useDocumentMeta(t.app.metaTitle, t.app.metaDescription);
   const { pathname } = useLocation();
-  const { session } = useSession();
-  const tabs = !!session && TAB_PATHS.includes(pathname.replace(/\/+$/, '') || '/app');
+  const { session, expired } = useSession();
+  const live = !!session && !expired;
+  const tabs = live && TAB_PATHS.includes(pathname.replace(/\/+$/, '') || '/app');
   useEffect(() => initPwa(), []);
   return (
-    <AppFrame tabs={tabs}>
+    <AppFrame tabs={tabs} nav={live}>
       <Suspense fallback={<Loading />}>
         <Routes>
-          <Route index element={<HomeGate />} />
+          <Route
+            index
+            element={
+              <Signed>
+                <Home />
+              </Signed>
+            }
+          />
           <Route path="welcome" element={<Welcome />} />
-          <Route path="handle" element={<Signed><HandleScreen /></Signed>} />
-          <Route path="scan" element={<Signed><Scan /></Signed>} />
-          <Route path="send" element={<Signed><Send /></Signed>} />
-          <Route path="receive" element={<Signed><Receive /></Signed>} />
-          <Route path="add" element={<Signed><Trade side="BUY" /></Signed>} />
-          <Route path="withdraw" element={<Signed><Trade side="SELL" /></Signed>} />
-          <Route path="order/:id" element={<Signed><OrderScreen /></Signed>} />
-          <Route path="pay-qr" element={<Signed><PayQr /></Signed>} />
-          <Route path="qr/:id" element={<Signed><QrOrder /></Signed>} />
-          <Route path="charge/:id" element={<Signed><PayCharge /></Signed>} />
-          <Route path="activity" element={<Signed><Activity /></Signed>} />
-          <Route path="activity/:type/:id" element={<Signed><ActivityDetail /></Signed>} />
-          <Route path="me" element={<Signed><Me /></Signed>} />
+          <Route
+            path="handle"
+            element={
+              <Signed>
+                <HandleScreen />
+              </Signed>
+            }
+          />
+          <Route
+            path="scan"
+            element={
+              <Signed>
+                <Scan />
+              </Signed>
+            }
+          />
+          <Route
+            path="send"
+            element={
+              <Signed>
+                <Send />
+              </Signed>
+            }
+          />
+          <Route
+            path="send/bank"
+            element={
+              <Signed>
+                <Trade side="SELL" toOther />
+              </Signed>
+            }
+          />
+          <Route
+            path="receive"
+            element={
+              <Signed>
+                <Receive />
+              </Signed>
+            }
+          />
+          <Route
+            path="add"
+            element={
+              <Signed>
+                <Trade side="BUY" />
+              </Signed>
+            }
+          />
+          <Route
+            path="withdraw"
+            element={
+              <Signed>
+                <Trade side="SELL" />
+              </Signed>
+            }
+          />
+          <Route
+            path="order/:id"
+            element={
+              <Signed>
+                <OrderScreen />
+              </Signed>
+            }
+          />
+          <Route
+            path="pay-qr"
+            element={
+              <Signed>
+                <PayQr />
+              </Signed>
+            }
+          />
+          <Route
+            path="qr/:id"
+            element={
+              <Signed>
+                <QrOrder />
+              </Signed>
+            }
+          />
+          <Route
+            path="charge/:id"
+            element={
+              <Signed>
+                <PayCharge />
+              </Signed>
+            }
+          />
+          <Route
+            path="activity"
+            element={
+              <Signed>
+                <Activity />
+              </Signed>
+            }
+          />
+          <Route
+            path="activity/:type/:id"
+            element={
+              <Signed>
+                <ActivityDetail />
+              </Signed>
+            }
+          />
+          <Route
+            path="me"
+            element={
+              <Signed>
+                <Me />
+              </Signed>
+            }
+          />
           <Route path="*" element={<Navigate to="/app" replace />} />
         </Routes>
       </Suspense>

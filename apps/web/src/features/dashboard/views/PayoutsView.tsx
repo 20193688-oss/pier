@@ -33,6 +33,7 @@ import {
   useLoad,
 } from '@/features/dashboard/ui';
 import { batchProgress, payoutFigures } from '@/features/dashboard/views/admin-model';
+import { useGuard } from '@/lib/use-action';
 
 const BATCH_TONE = { processing: 'pend', completed: 'ok', partial: 'ref', failed: 'fail' } as const;
 const MAX_FILE_BYTES = 1_000_000;
@@ -353,25 +354,27 @@ function CreatePayouts({
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
-  const send = async () => {
-    if (!canSend || !file) return;
-    const [network, token] = pick.split(':');
-    setBusy(true);
-    setError('');
-    try {
-      const batch = await payoutsApi.create(
-        scope,
-        { accountId: from, network, token, items: payoutItems(file.parsed.rows) },
-        decimalsFrom(market),
-      );
-      toast(p.created);
-      onCreated(batch.id);
-    } catch (e) {
-      setError(errorMessage(t.common, e, p.createFailed));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const send = () =>
+    guard(async () => {
+      if (!canSend || !file) return;
+      const [network, token] = pick.split(':');
+      setBusy(true);
+      setError('');
+      try {
+        const batch = await payoutsApi.create(
+          scope,
+          { accountId: from, network, token, items: payoutItems(file.parsed.rows) },
+          decimalsFrom(market),
+        );
+        toast(p.created);
+        onCreated(batch.id);
+      } catch (e) {
+        setError(errorMessage(t.common, e, p.createFailed));
+      } finally {
+        setBusy(false);
+      }
+    });
 
   const onDrop = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
@@ -485,12 +488,12 @@ function CreatePayouts({
           </div>
           {fileError && <Notice tone="error">{fileError}</Notice>}
           {file && file.parsed.missing.length > 0 && (
-            <Notice tone="error">
+            <Notice tone="error" stay>
               {fmt(p.form.missing, { columns: file.parsed.missing.join(', ') })}
             </Notice>
           )}
           {file && file.parsed.tooMany && (
-            <Notice tone="error">{fmt(p.form.tooMany, { max })}</Notice>
+            <Notice tone="error" stay>{fmt(p.form.tooMany, { max })}</Notice>
           )}
           {file && !file.parsed.missing.length && (
             <>

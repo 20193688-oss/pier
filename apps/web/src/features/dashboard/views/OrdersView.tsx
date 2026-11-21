@@ -3,8 +3,15 @@
    QR from a banking app and mark paid on a QR payment) and the ones it opened as a client (report
    a transfer, cancel, dispute, release a payout), each with its running deadline. On-chain actions
    are Stellar transactions signed by the order's own wallet of this organization, after the check
-   in SignFlow; the reconciliation helper finds the orders a bank transfer settles. */
+   in SignFlow; the reconciliation helper finds the orders a bank transfer settles. Each order has
+   its chat with the other side (a dot marks a message not read yet). A merchant marks an order
+   paid with the transfer receipt attached (an image or a PDF, previewed): it goes to the customer's
+   chat once the order is paid. Every action goes out once: while the order still reads as it did
+   when an action went through, its buttons give way to "sent, waiting for the network". */
 import { useEffect, useMemo, useState } from 'react';
+import { ReceiptPicker, type PickedFile } from '@/components/p2p/ReceiptFile';
+import { chat } from '@/lib/api/chat';
+import { useAction, useGuard } from '@/lib/use-action';
 import { fmt, useI18n } from '@/i18n';
 import {
   accounts as accountsApi,
@@ -26,10 +33,14 @@ import {
 } from '@/lib/p2p/orders';
 import { explorerLink } from '@/lib/stellar/network';
 import { matchConfidence } from '@/lib/p2p/normalize';
-import { checkHolderName } from '@/lib/p2p/rails';
+import { checkHolderName, defaultCurrency } from '@/lib/p2p/rails';
 import { dateTime, money, percent, units } from '@/lib/format';
 import { Field, Notice, SelectField, Spinner } from '@/components/ui/controls';
-import { ConfirmDialog } from '@/components/ui/Dialog';
+import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
+import { OrderChat } from '@/components/p2p/OrderChat';
+import type { ChatScope } from '@/lib/api/chat';
+import { hasUnseen } from '@/lib/p2p/chat';
+import { seenAt } from '@/lib/p2p/chat-seen';
 import { CopyButton, Empty, Qr, StatusPill, useNow } from '@/components/ui/misc';
 import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/Toast';
@@ -61,6 +72,8 @@ type Signing = {
   order: P2pOrder;
   account: P2pAccount;
   steps: TxStep[];
+  /* A merchant marking the order paid: the transfer receipt goes with it. */
+  withReceipt?: boolean;
 };
 
 const DONE = ['completed', 'resolved'];
@@ -100,8 +113,18 @@ export function OrdersView() {
     action: 'paid' | 'cancel' | 'dispute';
   } | null>(null);
   const [reference, setReference] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [chatFor, setChatFor] = useState<{
+    order: P2pOrder;
+    scope: ChatScope;
+    afterPaid?: boolean;
+  } | null>(null);
   const [error, setError] = useState('');
+  const [receipt, setReceipt] = useState<PickedFile | null>(null);
+  // Orders an action of ours went through on, with the status they had then: while an order still
+  // reads that, the action is under way and its buttons stay off.
+  const [sentAt, setSentAt] = useState<Record<string, string>>({});
+  const waiting = (order: P2pOrder) => sentAt[order.id] === order.status;
+  const markSent = (order: P2pOrder) => setSentAt((m) => ({ ...m, [order.id]: order.status }));
 
   const data = load.data;
   const accounts = data?.accounts ?? [];
@@ -130,6 +153,7 @@ export function OrdersView() {
     const account = accountOf(merchantSells(order.kind) ? order.seller : order.buyer);
     if (!account) return setError(o.noWallet);
     const label = o.actions[action];
+    setReceipt(null);
     setSigning({
       title: label,
       intro:
@@ -145,6 +169,7 @@ export function OrdersView() {
               : undefined,
       order,
       account,
+      withReceipt: action === 'mark_paid',
       steps: [
         accountStep(
           scope,
@@ -191,9 +216,8 @@ export function OrdersView() {
     });
   };
 
-  const runConfirm = async () => {
-    if (!confirm || !market) return;
-    setBusy(true);
+  const confirming = useAction(async () => {
+    if (!confirm || !market) return false;
     setError('');
     try {
       await clientOrders.act(
@@ -203,13 +227,31 @@ export function OrdersView() {
         confirm.action === 'paid' && reference.trim() ? { reference: reference.trim() } : {},
         decimalsFrom(market),
       );
+      markSent(confirm.order);
       toast(o.done[confirm.action]);
       setConfirm(null);
       load.reload();
+      return true;
     } catch (e) {
       setError(errorMessage(t.common, e, o.failed));
-    } finally {
-      setBusy(false);
+      return false;
+    }
+  });
+
+  /* After a mark-paid went through: its receipt to the customer's chat. If that fails the order
+     is still paid (never signed again): the chat opens so the receipt can be attached there. */
+  const sendReceipt = async (order: P2pOrder, file: PickedFile) => {
+    try {
+      await chat.send(
+        'merchant',
+        order.id,
+        { attachment: { name: file.name, contentType: file.contentType, data: file.data } },
+        scope,
+      );
+      toast(o.receiptSent);
+    } catch {
+      toast(o.receiptSendFailed, 'error');
+      setChatFor({ order, scope: 'merchant', afterPaid: true });
     }
   };
 
@@ -315,9 +357,20 @@ export function OrdersView() {
                         {tab === 'merchant' && order.kind === 'QR_PAY' && order.qr?.payload && (
                           <QrToPay qr={order.qr} />
                         )}
-                        {canWrite && actions.length > 0 && (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {tab === 'merchant'
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {canWrite && actions.length > 0 && waiting(order) && (
+                            <span
+                              className="inline-flex items-center gap-2 text-[0.875rem] text-ink-2"
+                              role="status"
+                            >
+                              <Spinner />
+                              {o.waiting}
+                            </span>
+                          )}
+                          {canWrite &&
+                            actions.length > 0 &&
+                            !waiting(order) &&
+                            (tab === 'merchant'
                               ? (actions as MerchantAction[]).map((a) => (
                                   <button
                                     key={a}
@@ -337,9 +390,35 @@ export function OrdersView() {
                                   >
                                     {o.actions[a]}
                                   </button>
-                                ))}
-                          </div>
-                        )}
+                                )))}
+                          {(() => {
+                            const chatScope: ChatScope = tab === 'merchant' ? 'merchant' : 'org';
+                            const fresh =
+                              !!order.chat &&
+                              hasUnseen(
+                                order.chat,
+                                tab === 'merchant' ? 'merchant' : 'creator',
+                                seenAt(chatScope, order.id),
+                              );
+                            return (
+                              <button
+                                type="button"
+                                className="btn btn-line btn-sm relative"
+                                onClick={() => setChatFor({ order, scope: chatScope })}
+                              >
+                                <Icon name="chat" size={16} />
+                                {t.p2p.chat.open}
+                                {fresh && (
+                                  <span
+                                    className="absolute -top-1 -right-1 size-3 rounded-full border-2 border-sheet bg-bad"
+                                    role="img"
+                                    aria-label={t.p2p.chat.unread}
+                                  />
+                                )}
+                              </button>
+                            );
+                          })()}
+                        </div>
                         <details className="mt-3">
                           <summary className="cursor-pointer text-[0.875rem] font-semibold text-ink-2">
                             {fmt(t.trade.order.eyebrow, { id: order.id.slice(-8) })}
@@ -444,12 +523,38 @@ export function OrdersView() {
           signer={signing.account.address}
           steps={signing.steps}
           onClose={() => setSigning(null)}
+          blocked={signing.withReceipt && !receipt ? o.receiptNeeded : undefined}
           onDone={() => {
+            markSent(signing.order);
+            if (signing.withReceipt && receipt) void sendReceipt(signing.order, receipt);
+            else toast(t.dash.liq.sent);
             setSigning(null);
-            toast(t.dash.liq.sent);
             load.reload();
           }}
-        />
+        >
+          {signing.withReceipt && (
+            <ReceiptPicker
+              value={receipt}
+              onChange={setReceipt}
+              label={o.receiptLabel}
+              hint={o.receiptHint}
+            />
+          )}
+        </SignDialog>
+      )}
+      {chatFor && (
+        <Dialog
+          title={fmt(t.trade.order.eyebrow, { id: chatFor.order.id.slice(-8) })}
+          onClose={() => setChatFor(null)}
+          wide
+        >
+          {chatFor.afterPaid && (
+            <div className="mb-3">
+              <Notice tone="info">{t.p2p.chat.afterPaid}</Notice>
+            </div>
+          )}
+          <OrderChat scope={chatFor.scope} orderId={chatFor.order.id} org={scope} />
+        </Dialog>
       )}
       {confirm && (
         <ConfirmDialog
@@ -470,8 +575,8 @@ export function OrdersView() {
           }
           confirmLabel={o.actions[confirm.action]}
           danger={confirm.action === 'cancel'}
-          busy={busy}
-          onConfirm={() => void runConfirm()}
+          busy={confirming.busy}
+          onConfirm={() => void confirming.run()}
           onClose={() => setConfirm(null)}
         />
       )}
@@ -494,7 +599,7 @@ function TransferMatches({
   const m = t.p2p.bots.matches;
   const { scope } = useDash();
   const [form, setForm] = useState({
-    currency: market.currencies[0]?.code ?? 'ARS',
+    currency: defaultCurrency(market.currencies),
     amount: '',
     payerName: '',
     payerDocument: '',
@@ -503,28 +608,30 @@ function TransferMatches({
   const [matches, setMatches] = useState<P2pTransferMatch[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const find = async () => {
-    if (!form.amount.trim()) return;
-    setBusy(true);
-    setError('');
-    try {
-      setMatches(
-        await merchantApi.transferMatches(scope, {
-          currency: form.currency,
-          amount: form.amount.trim().replace(',', '.'),
-          ...(form.payerName.trim() && !checkHolderName(form.payerName)
-            ? { payerName: form.payerName.trim() }
-            : {}),
-          ...(form.payerDocument.trim() ? { payerDocument: form.payerDocument.trim() } : {}),
-          ...(form.reference.trim() ? { reference: form.reference.trim() } : {}),
-        }),
-      );
-    } catch (e) {
-      setError(errorMessage(t.common, e, m.failed));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const find = () =>
+    guard(async () => {
+      if (!form.amount.trim()) return;
+      setBusy(true);
+      setError('');
+      try {
+        setMatches(
+          await merchantApi.transferMatches(scope, {
+            currency: form.currency,
+            amount: form.amount.trim().replace(',', '.'),
+            ...(form.payerName.trim() && !checkHolderName(form.payerName)
+              ? { payerName: form.payerName.trim() }
+              : {}),
+            ...(form.payerDocument.trim() ? { payerDocument: form.payerDocument.trim() } : {}),
+            ...(form.reference.trim() ? { reference: form.reference.trim() } : {}),
+          }),
+        );
+      } catch (e) {
+        setError(errorMessage(t.common, e, m.failed));
+      } finally {
+        setBusy(false);
+      }
+    });
   return (
     <details className="sheet mb-6 p-4">
       <summary className="cursor-pointer font-semibold">{m.title}</summary>

@@ -2,6 +2,7 @@
    purchases, sales, QR payments), a page at a time. */
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/i18n';
+import { Icon } from '@/components/ui/Icon';
 import { Notice, Skeleton, Spinner } from '@/components/ui/controls';
 import { app } from '@/lib/api/app';
 import { decimalsFrom } from '@/lib/p2p/normalize';
@@ -39,7 +40,7 @@ export default function Activity() {
   }, [load]);
 
   return (
-    <Screen title={a.title}>
+    <Screen title={a.title} width="page">
       {items === undefined && (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-14" />
@@ -47,10 +48,17 @@ export default function Activity() {
           <Skeleton className="h-14" />
         </div>
       )}
-      {items === null && <Notice tone="error">{a.loadError}</Notice>}
-      {items && items.length === 0 && <p className="text-ink-3">{a.empty}</p>}
+      {items === null && <Notice tone="error" stay>{a.loadError}</Notice>}
+      {items && items.length === 0 && (
+        <div className="sheet flex flex-col items-center gap-3 px-6 py-12 text-center">
+          <span className="icon-tile" aria-hidden="true">
+            <Icon name="list" size={20} />
+          </span>
+          <p className="max-w-sm text-ink-3">{a.empty}</p>
+        </div>
+      )}
       {items && items.length > 0 && (
-        <div className="sheet px-4 pb-2">
+        <div className="sheet px-5 pb-2 md:px-6 md:pb-4">
           <ActivityList items={items} level={2} />
         </div>
       )}

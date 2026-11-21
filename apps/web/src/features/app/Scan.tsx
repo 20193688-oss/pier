@@ -1,6 +1,8 @@
 /* Scan: the camera (getUserMedia) read by the browser's BarcodeDetector, or by jsQR (Apache-2.0,
-   loaded only when the browser has no detector); the flashlight where the camera has one; paste a
-   code or pick an image instead. What is read goes through @midpoint/payment-qr (routeScan) and
+   loaded only when the browser has no detector); the flashlight where the camera has one. Or paste
+   a QR: the "Paste QR" button reads the clipboard (an image is decoded, text is read as is), and
+   Ctrl+V / the system's paste anywhere on the screen does the same; or type the code, or pick an
+   image. What is read goes through @midpoint/payment-qr (routeScan) and
    opens the right screen. A secret key is never kept: the screen warns and forgets it. */
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
@@ -37,7 +39,9 @@ export function keptQr(): string | null {
   }
 }
 
-async function makeDecoder(): Promise<(src: HTMLVideoElement | HTMLImageElement | ImageBitmap) => Promise<string | null>> {
+async function makeDecoder(): Promise<
+  (src: HTMLVideoElement | HTMLImageElement | ImageBitmap) => Promise<string | null>
+> {
   const Ctor = (globalThis as unknown as { BarcodeDetector?: DetectorCtor }).BarcodeDetector;
   if (Ctor) {
     try {
@@ -167,7 +171,7 @@ export default function Scan() {
     }
   };
 
-  const fromImage = async (file: File | undefined) => {
+  const fromImage = async (file: Blob | undefined | null) => {
     if (!file) return;
     setProblem(null);
     try {
@@ -180,6 +184,54 @@ export default function Scan() {
       setProblem(s.noCodeInImage);
     }
   };
+
+  /** The clipboard's first image (decoded), else its text; nothing usable says so. */
+  const pasteQr = async () => {
+    setProblem(null);
+    const clip = navigator.clipboard;
+    try {
+      if (clip?.read) {
+        for (const item of await clip.read()) {
+          const image = item.types.find((ty) => ty.startsWith('image/'));
+          if (image) return void (await fromImage(await item.getType(image)));
+          if (item.types.includes('text/plain')) {
+            const value = (await (await item.getType('text/plain')).text()).trim();
+            if (value) return go(value);
+          }
+        }
+      } else if (clip?.readText) {
+        const value = (await clip.readText()).trim();
+        if (value) return go(value);
+      }
+    } catch {
+      /* no permission or nothing readable: said below */
+    }
+    setProblem(s.pasteEmpty);
+  };
+
+  // Ctrl+V (or the system's paste) anywhere on the screen: an image is decoded; text outside the
+  // code field is read at once (inside it, it just fills the field).
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const data = e.clipboardData;
+      if (!data) return;
+      const file = Array.from(data.files).find((f) => f.type.startsWith('image/'));
+      if (file) {
+        e.preventDefault();
+        void fromImage(file);
+        return;
+      }
+      if ((e.target as HTMLElement | null)?.closest?.('textarea, input')) return;
+      const value = data.getData('text/plain').trim();
+      if (value) {
+        e.preventDefault();
+        setProblem(null);
+        go(value);
+      }
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  });
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -212,6 +264,7 @@ export default function Scan() {
     <Screen
       back
       title={s.title}
+      width="page"
       action={
         torch !== null && (
           <button
@@ -226,72 +279,91 @@ export default function Scan() {
         )
       }
     >
-      <div className="scan-frame mt-1">
-        <video ref={video} playsInline muted aria-label={s.hint} />
-        {camera === 'on' && <div className="scan-finder" aria-hidden="true" />}
-        {camera === 'starting' && (
-          <p className="absolute inset-0 flex items-center justify-center gap-2 text-white" role="status">
-            <Spinner />
-            {s.starting}
-          </p>
-        )}
-        {(camera === 'denied' || camera === 'none') && (
-          <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-white">
-            {camera === 'denied' ? s.denied : s.noCamera}
-          </p>
-        )}
-        {camera === 'on' && (
-          <p className="absolute inset-x-0 bottom-4 text-center text-[0.9375rem] font-semibold text-white">
-            {s.hint}
-          </p>
-        )}
-      </div>
+      {/* Wide screens: the camera on the left, pasting, uploading and typing on the right. */}
+      <div className="grid gap-5 lg:grid-cols-[minmax(0,460px)_minmax(0,1fr)] lg:items-start lg:gap-10">
+        <div className="flex flex-col gap-4">
+          <div className="scan-frame mt-1">
+            <video ref={video} playsInline muted aria-label={s.hint} />
+            {camera === 'on' && <div className="scan-finder" aria-hidden="true" />}
+            {camera === 'starting' && (
+              <p
+                className="absolute inset-0 flex items-center justify-center gap-2 text-white"
+                role="status"
+              >
+                <Spinner />
+                {s.starting}
+              </p>
+            )}
+            {(camera === 'denied' || camera === 'none') && (
+              <p className="absolute inset-0 flex items-center justify-center p-6 text-center text-white">
+                {camera === 'denied' ? s.denied : s.noCamera}
+              </p>
+            )}
+            {camera === 'on' && (
+              <p className="absolute inset-x-0 bottom-4 text-center text-[0.9375rem] font-semibold text-white">
+                {s.hint}
+              </p>
+            )}
+          </div>
 
-      {problem && (
-        <div className="mt-4 flex flex-col gap-2">
-          <Notice tone="error">{problem}</Notice>
-          <button
-            type="button"
-            className="btn btn-line self-start"
-            onClick={() => {
-              setProblem(null);
-              handled.current = false;
-            }}
-          >
-            {s.again}
-          </button>
+          {problem && (
+            <div className="mt-4 flex flex-col gap-2">
+              <Notice tone="error" stay>{problem}</Notice>
+              <button
+                type="button"
+                className="btn btn-line self-start"
+                onClick={() => {
+                  setProblem(null);
+                  handled.current = false;
+                }}
+              >
+                {s.again}
+              </button>
+            </div>
+          )}
         </div>
-      )}
+        <div className="flex flex-col lg:pt-1">
+          <div className="grid grid-cols-2 gap-2 lg:mt-0">
+            <button
+              type="button"
+              className="btn btn-line btn-lg px-3"
+              onClick={() => void pasteQr()}
+              disabled={!token || !network}
+            >
+              <Icon name="clipboard" size={20} />
+              {s.paste}
+            </button>
+            <label className="btn btn-line btn-lg cursor-pointer px-3">
+              <Icon name="image" size={20} />
+              {s.gallery}
+              <input
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={(e) => void fromImage(e.target.files?.[0])}
+              />
+            </label>
+          </div>
 
-      <form className="mt-5 flex flex-col gap-2" onSubmit={submit}>
-        <TextArea
-          label={s.pasteLabel}
-          rows={2}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="btn btn-ink btn-lg flex-1"
-            disabled={!text.trim() || !token || !network}
-          >
-            {s.read}
-          </button>
-          <label className="btn btn-line btn-lg cursor-pointer">
-            <Icon name="image" size={20} />
-            <span className="sr-only sm:not-sr-only">{s.gallery}</span>
-            <input
-              type="file"
-              accept="image/*"
-              className="sr-only"
-              onChange={(e) => void fromImage(e.target.files?.[0])}
+          <form className="mt-5 flex flex-col gap-3" onSubmit={submit}>
+            <TextArea
+              label={s.pasteLabel}
+              rows={2}
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              autoComplete="off"
+              spellCheck={false}
             />
-          </label>
+            <button
+              type="submit"
+              className="btn btn-ink btn-lg"
+              disabled={!text.trim() || !token || !network}
+            >
+              {s.read}
+            </button>
+          </form>
         </div>
-      </form>
+      </div>
     </Screen>
   );
 }

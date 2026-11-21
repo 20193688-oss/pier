@@ -44,14 +44,22 @@ export class TokenBalanceView {
 
   @ApiProperty({
     example: '125000000',
-    description: 'Base units (7 decimals); 0 without a trustline.',
+    description:
+      'Base units (7 decimals); 0 without a trustline. For the native lumen (`XLM`): the SPENDABLE lumens, the balance less the reserves the account pays itself (sponsored ones excluded) and its selling liabilities.',
   })
   amount!: string;
 
-  @ApiProperty({ example: true, description: 'Whether the account has a trustline to it.' })
+  @ApiProperty({
+    example: true,
+    description:
+      'Whether the account has a trustline to it. Always true for the native lumen, which needs none.',
+  })
   trustline!: boolean;
 
-  @ApiProperty({ example: true, description: 'Whether the issuer authorised that trustline.' })
+  @ApiProperty({
+    example: true,
+    description: 'Whether the issuer authorised that trustline. Always true for the native lumen.',
+  })
   authorized!: boolean;
 }
 
@@ -63,7 +71,11 @@ export class BalancesView {
   @ApiProperty({ type: AccountStateView })
   account!: AccountStateView;
 
-  @ApiProperty({ example: '0', description: 'Lumens, stroops (fees are sponsored: usually 0).' })
+  @ApiProperty({
+    example: '0',
+    description:
+      'The whole lumen balance, stroops, reserves included (fees are sponsored: usually 0). What can be sent is the `XLM` entry of `tokens`, when the market lists it.',
+  })
   xlm!: string;
 
   @ApiProperty({ type: [TokenBalanceView] })
@@ -142,7 +154,7 @@ export class CreatedTransferView {
   @ApiProperty({
     type: TransactionView,
     description:
-      'A classic `payment` to a G or M recipient, a SAC `transfer` to a C recipient; the note is its text memo.',
+      'A classic `payment` to a G or M recipient, a SAC `transfer` to a C recipient; the note is its text memo. The native lumen (`XLM`) always moves through its SAC `transfer` (the note then stays off-chain).',
   })
   transaction!: TransactionView;
 }

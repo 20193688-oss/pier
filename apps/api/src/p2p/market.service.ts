@@ -15,7 +15,7 @@ import {
   P2P_SELL_PAYMENT_WINDOW_SECONDS,
   P2P_SELL_SETTLE_WINDOW_SECONDS,
 } from '@/p2p/domain/constants';
-import { P2P_RAILS, railsFor } from '@/p2p/domain/rails';
+import { P2P_RAILS, beneficiaryRequires, railsFor } from '@/p2p/domain/rails';
 import type { MarketOverviewView, NetworkView } from '@/p2p/entities/market.entity';
 
 /**
@@ -87,8 +87,10 @@ export class MarketService {
             name: f.name,
             description: f.description,
             required: f.required,
+            beneficiaryRequired: beneficiaryRequires(id, f),
             ...(f.options ? { options: [...f.options] } : {}),
           })),
+          beneficiaryIdRequired: P2P_RAILS[id].beneficiaryIdRequired,
         })),
       })),
     };

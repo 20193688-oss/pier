@@ -131,7 +131,7 @@ export interface paths {
         put?: never;
         /**
          * Sponsored activation
-         * @description Creates the account when it is missing and opens the token’s trustline, the sponsor paying the reserves (CAP-33: begin_sponsoring_future_reserves, create_account with 0 XLM, change_trust, end_sponsoring_future_reserves). `transaction: null` when there is nothing to do. Submit it with `POST /v1/app/submit`, which adds the sponsor’s signature; limited per account and per IP, within the sponsor’s budget.
+         * @description Creates the account when it is missing and opens the token’s trustline, the sponsor paying the reserves (CAP-33: begin_sponsoring_future_reserves, create_account with 0 XLM, change_trust, end_sponsoring_future_reserves). The native lumen (`XLM`) needs no trustline: activating for it only creates a missing account. `transaction: null` when there is nothing to do. Submit it with `POST /v1/app/submit`, which adds the sponsor’s signature; limited per account and per IP, within the sponsor’s budget.
          */
         post: operations["appWalletActivate"];
         delete?: never;
@@ -290,7 +290,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Cancel a purchase before paying */
+        /**
+         * Cancel a purchase before paying
+         * @description Idempotent: once the order shows it, it answers the order as it is.
+         */
         post: operations["appCancel"];
         delete?: never;
         options?: never;
@@ -307,8 +310,55 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Dispute a paid purchase the merchant did not release */
+        /**
+         * Dispute a paid purchase the merchant did not release
+         * @description Idempotent: once the order shows it, it answers the order as it is.
+         */
         post: operations["appDispute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/app/orders/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your order’s chat with its merchant
+         * @description Oldest first, the latest 200. A message with an attachment is a transfer receipt; fetch its file from `…/messages/{messageId}/attachment`.
+         */
+        get: operations["appMessages"];
+        put?: never;
+        /**
+         * Write to your order’s merchant
+         * @description A text (trimmed, 1 to 1000 characters), an attachment (an image or a PDF of at most 2 MiB, base64, whose leading bytes match its type), or both. The other side’s organization gets a `P2P_ORDER_MESSAGE` event. Attach your transfer receipt here after paying a purchase.
+         */
+        post: operations["appSendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/app/orders/{id}/messages/{messageId}/attachment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A file sent on your order’s chat
+         * @description Its bytes in base64.
+         */
+        get: operations["appAttachment"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -326,7 +376,7 @@ export interface paths {
         put?: never;
         /**
          * I sent the transfer
-         * @description For a purchase: the matcher marks it paid for you.
+         * @description For a purchase: the matcher marks it paid for you. Idempotent: once the order shows it, it answers the order as it is.
          */
         post: operations["appPaid"];
         delete?: never;
@@ -346,7 +396,7 @@ export interface paths {
         put?: never;
         /**
          * Build a transaction for your wallet on your order
-         * @description Mostly a sale’s `release` once the merchant paid you; also `dispute` and `cancel`.
+         * @description Mostly a sale’s `release` once the merchant paid you; also `dispute` and `cancel`. An action the order already shows answers 409 `already_done` (nothing to sign).
          */
         post: operations["appTransaction"];
         delete?: never;
@@ -976,6 +1026,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/p2p/merchant/orders/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The chat with the side that created an order you take
+         * @description Oldest first, the latest 200. A message with an attachment is a transfer receipt; fetch its file from `…/messages/{messageId}/attachment`.
+         */
+        get: operations["ordersMerchantMessages"];
+        put?: never;
+        /**
+         * Write to the side that created an order you take
+         * @description A text (trimmed, 1 to 1000 characters), an attachment (an image or a PDF of at most 2 MiB, base64, whose leading bytes match its type), or both. The other side’s organization gets a `P2P_ORDER_MESSAGE` event. Send the transfer receipt here once you paid a sale, a QR payment or a payout.
+         */
+        post: operations["ordersMerchantSendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/p2p/merchant/orders/{id}/messages/{messageId}/attachment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A file sent on the chat of an order you take
+         * @description Its bytes in base64.
+         */
+        get: operations["ordersMerchantAttachment"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/p2p/merchant/transfer-matches": {
         parameters: {
             query?: never;
@@ -1090,7 +1184,7 @@ export interface paths {
         put?: never;
         /**
          * Cancel a purchase before paying
-         * @description The matcher cancels for the buyer; a payout is cancelled here only before its merchant accepts it.
+         * @description The matcher cancels for the buyer; a payout is cancelled here only before its merchant accepts it. Idempotent: once the order shows it, it answers the order as it is.
          */
         post: operations["ordersCancel"];
         delete?: never;
@@ -1110,9 +1204,53 @@ export interface paths {
         put?: never;
         /**
          * Dispute a paid purchase
-         * @description The merchant did not release a payment the person made: the arbiter decides.
+         * @description The merchant did not release a payment the person made: the arbiter decides. Idempotent: once the order shows it, it answers the order as it is.
          */
         post: operations["ordersDispute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/p2p/orders/{id}/messages": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your order’s chat with its merchant
+         * @description Oldest first, the latest 200. A message with an attachment is a transfer receipt; fetch its file from `…/messages/{messageId}/attachment`.
+         */
+        get: operations["ordersMessages"];
+        put?: never;
+        /**
+         * Write to your order’s merchant
+         * @description A text (trimmed, 1 to 1000 characters), an attachment (an image or a PDF of at most 2 MiB, base64, whose leading bytes match its type), or both. The other side’s organization gets a `P2P_ORDER_MESSAGE` event.
+         */
+        post: operations["ordersSendMessage"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/p2p/orders/{id}/messages/{messageId}/attachment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * A file sent on your order’s chat
+         * @description Its bytes in base64.
+         */
+        get: operations["ordersAttachment"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1130,7 +1268,7 @@ export interface paths {
         put?: never;
         /**
          * Report a purchase paid
-         * @description The person sent the transfer: the matcher marks the order paid for them (they need no gas).
+         * @description The person sent the transfer: the matcher marks the order paid for them (they need no gas). Idempotent: once the order shows it, it answers the order as it is.
          */
         post: operations["ordersPaid"];
         delete?: never;
@@ -1284,7 +1422,7 @@ export interface paths {
         put?: never;
         /**
          * Build a transaction for your wallet
-         * @description Unsigned calldata for one of your accounts (or a sale’s seller): approve, deposit, withdraw, setOperator, setMatcher, accept, markPaid, release, cancel, dispute. Each is checked against the order or account it names; the contract still decides.
+         * @description Unsigned calldata for one of your accounts (or a sale’s seller): approve, deposit, withdraw, setOperator, setMatcher, accept, markPaid, release, cancel, dispute. Each is checked against the order or account it names; the contract still decides. An order action the order already shows answers 409 `already_done` (nothing to sign).
          */
         post: operations["ordersBuild"];
         delete?: never;
@@ -1607,7 +1745,7 @@ export interface components {
             network: string;
             tokens: components["schemas"]["AppTokenBalance"][];
             /**
-             * @description Lumens, stroops (fees are sponsored: usually 0).
+             * @description The whole lumen balance, stroops, reserves included (fees are sponsored: usually 0). What can be sent is the `XLM` entry of `tokens`, when the market lists it.
              * @example 0
              */
             xlm: string;
@@ -1669,7 +1807,7 @@ export interface components {
         };
         /** @description A transfer and the transaction to sign. */
         AppCreatedTransfer: {
-            /** @description A classic `payment` to a G or M recipient, a SAC `transfer` to a C recipient; the note is its text memo. */
+            /** @description A classic `payment` to a G or M recipient, a SAC `transfer` to a C recipient; the note is its text memo. The native lumen (`XLM`) always moves through its SAC `transfer` (the note then stays off-chain). */
             transaction: components["schemas"]["P2pTransaction"];
             transfer: components["schemas"]["AppTransfer"];
         };
@@ -1738,7 +1876,7 @@ export interface components {
              * @example ARS
              * @enum {string}
              */
-            currency?: "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
+            currency?: "BOB" | "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
             /**
              * @description Local money. A trade: what the person pays (BUY) or receives (SELL). A QR payment: what the shop gets, required when the QR carries no amount and equal to it when it does.
              * @example 125050
@@ -1756,7 +1894,7 @@ export interface components {
              */
             network: "local" | "testnet" | "mainnet";
             /**
-             * @description A QR payment: the scanned merchant QR exactly as read (Argentina’s interoperable QR or PIX). Its CRC must check.
+             * @description A QR payment: the scanned merchant QR exactly as read (Argentina’s interoperable QR, PIX, or Peru’s interoperable QR of Yape, Plin and the banks). Its CRC must check. A static QR carries no amount: give `fiatAmount`.
              * @example 00020101021243650016com.mercadolibre...6304ABCD
              */
             qr?: string;
@@ -1765,7 +1903,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail?: "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr";
+            rail?: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
             /**
              * @description A trade: BUY receives tokens and pays local money; SELL sends tokens and receives local money. Required unless `kind` is `QR_PAY`.
              * @example BUY
@@ -1786,12 +1924,12 @@ export interface components {
         /** @description One token the market lists, as the account holds it. */
         AppTokenBalance: {
             /**
-             * @description Base units (7 decimals); 0 without a trustline.
+             * @description Base units (7 decimals); 0 without a trustline. For the native lumen (`XLM`): the SPENDABLE lumens, the balance less the reserves the account pays itself (sponsored ones excluded) and its selling liabilities.
              * @example 125000000
              */
             amount: string;
             /**
-             * @description Whether the issuer authorised that trustline.
+             * @description Whether the issuer authorised that trustline. Always true for the native lumen.
              * @example true
              */
             authorized: boolean;
@@ -1803,7 +1941,7 @@ export interface components {
             /** @example USDC */
             symbol: string;
             /**
-             * @description Whether the account has a trustline to it.
+             * @description Whether the account has a trustline to it. Always true for the native lumen, which needs none.
              * @example true
              */
             trustline: boolean;
@@ -1811,11 +1949,11 @@ export interface components {
         /** @description An action your own wallet signs on your order. */
         AppTransaction: {
             /**
-             * @description Usually `release` (a sale or QR payment you were paid for), `dispute` or `cancel`; refused when your wallet may not do it now.
+             * @description Usually `release` (a sale or QR payment you were paid for), `dispute` or `cancel`; `open` is a pending sale or QR payment’s `open_with_deposit`, simulated now (ask for it right before signing: one simulated earlier can go stale when another order takes the order id it names). Refused when your wallet may not do it now.
              * @example release
              * @enum {string}
              */
-            action: "accept" | "markPaid" | "release" | "cancel" | "dispute";
+            action: "open" | "accept" | "markPaid" | "release" | "cancel" | "dispute";
         };
         /** @description A token transfer between wallets. */
         AppTransfer: {
@@ -1904,7 +2042,7 @@ export interface components {
              */
             token: string;
         };
-        /** @description Where the merchant pays the local money on a sale or a payout: a holder, their document and the rail’s account details. */
+        /** @description Where the merchant pays the local money on a sale or a payout (to yourself or to someone else): a holder, the rail’s account details and, where the rail’s transfer needs it, the holder’s ID. The ID (`document` and the rail’s ID fields, such as `cuit` or `documentType`/`documentNumber`) is optional on every rail whose `beneficiaryIdRequired` is false (`GET /v1/market`): the holder’s bank already identified them. Chile (`rut`) and Colombia need it. Given, it is checked as always. */
         BeneficiaryDto: {
             /**
              * @description The rail’s fields, checked like a payment method’s.
@@ -1916,8 +2054,11 @@ export interface components {
             details: {
                 [key: string]: string;
             };
-            /** @example 27234567891 */
-            document: string;
+            /**
+             * @description The holder’s ID number. Required only on rails whose `beneficiaryIdRequired` is true (Chile, Colombia).
+             * @example 27234567891
+             */
+            document?: string;
             /** @example Ana López */
             holderName: string;
         };
@@ -1932,8 +2073,11 @@ export interface components {
             details: {
                 [key: string]: string;
             };
-            /** @example 27234567891 */
-            document: string;
+            /**
+             * @description The holder’s ID number; null where the rail’s transfer does not need it and none was given.
+             * @example 27234567891
+             */
+            document: string | null;
             /** @example Ana López */
             holderName: string;
             /** @example ar_bank_transfer */
@@ -2245,7 +2389,7 @@ export interface components {
              * @example ARS
              * @enum {string}
              */
-            currency: "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
+            currency: "BOB" | "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
             /** @example Order #881 */
             description?: string;
             /**
@@ -2292,7 +2436,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail: "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr";
+            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
         };
         /** @description A merchant’s standing price. Its bot refreshes `price` (a PATCH) before `priceTtlSeconds` runs out, or the offer stops matching. */
         CreateOfferDto: {
@@ -2310,7 +2454,7 @@ export interface components {
              * @example ARS
              * @enum {string}
              */
-            currency: "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
+            currency: "BOB" | "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
             /**
              * @description Largest order in local money.
              * @example 500000
@@ -2343,7 +2487,7 @@ export interface components {
              *       "ar_bank_transfer"
              *     ]
              */
-            rails: ("ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr")[];
+            rails: ("bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr")[];
             /**
              * @description SELL_TOKEN: you sell tokens from your balance in the contract (authorise the matcher for it). BUY_TOKEN: you buy tokens, accepting each order with a bond from your balance.
              * @example SELL_TOKEN
@@ -2386,6 +2530,34 @@ export interface components {
              */
             seller?: string;
         };
+        /** @description A message on an order’s chat: a text, an attachment (a transfer receipt), or both. At least one. */
+        CreateOrderMessage: {
+            attachment?: components["schemas"]["CreateOrderMessageAttachment"];
+            /**
+             * @description Trimmed; 1 to 1000 characters.
+             * @example Listo, ya te transferí.
+             */
+            text?: string;
+        };
+        /** @description An image or a PDF (a transfer receipt), at most 2097152 bytes, in base64. Its leading bytes must be those of its type. */
+        CreateOrderMessageAttachment: {
+            /**
+             * @example application/pdf
+             * @enum {string}
+             */
+            contentType: "image/png" | "image/jpeg" | "image/webp" | "application/pdf";
+            /**
+             * Format: byte
+             * @description The file in standard base64 (padded, no line breaks).
+             * @example JVBERi0xLjQK...
+             */
+            data: string;
+            /**
+             * @description Shown to the other side; never used as a path.
+             * @example comprobante.pdf
+             */
+            name: string;
+        };
         CreateOrganization: {
             /** @example Pampa Cambio */
             name: string;
@@ -2401,7 +2573,7 @@ export interface components {
              * @example ARS
              * @enum {string}
              */
-            currency: "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
+            currency: "BOB" | "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
             /**
              * @example {
              *       "alias": "pampa.cambio",
@@ -2419,7 +2591,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail: "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr";
+            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
         };
         /** @description Payouts from your balance in the contract: each item is matched with a merchant and opened by the matcher on your balance. */
         CreatePayoutDto: {
@@ -2443,7 +2615,7 @@ export interface components {
              * @example ARS
              * @enum {string}
              */
-            currency: "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
+            currency: "BOB" | "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
             /**
              * @description BUY: what the person pays. SELL: what the person receives. Up to the currency’s decimals.
              * @example 125050
@@ -2469,7 +2641,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail: "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr";
+            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
             /**
              * @description BUY: the person receives tokens and pays local money. SELL: the person sends tokens and receives local money.
              * @example BUY
@@ -2519,7 +2691,7 @@ export interface components {
             /** @example Order bot */
             description?: string;
             /** @description Events to receive; omitted or empty: every event. */
-            events?: ("P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED")[];
+            events?: ("P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_ORDER_MESSAGE" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED")[];
             /**
              * @description https only; it must resolve to public addresses.
              * @example https://merchant.example/hooks/midpoint
@@ -2567,6 +2739,8 @@ export interface components {
             buyerAddress: string;
             /** @example null */
             chargeId: string | null;
+            /** @description The order’s chat with its merchant (`…/orders/{id}/messages`). */
+            chat: components["schemas"]["OrderChatSummary"];
             /** @example CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7 */
             contract: string;
             /**
@@ -2687,7 +2861,7 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             description?: string | null;
-            events: ("P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED")[];
+            events: ("P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_ORDER_MESSAGE" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED")[];
             id: string;
             /**
              * @description The signing secret, shown once. Verify `midpoint-signature: t=<unix>,v1=<hex HMAC-SHA256(secret, "<t>.<body>")>`.
@@ -2724,7 +2898,7 @@ export interface components {
              * @example validation_failed
              * @enum {string}
              */
-            code: "validation_failed" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "internal_error" | "service_unavailable" | "network_unsupported" | "asset_unsupported" | "no_match" | "quote_not_found" | "quote_expired" | "invalid_state" | "idempotency_conflict" | "operation_in_flight" | "challenge_invalid" | "signature_invalid" | "account_taken" | "charge_closed" | "last_owner" | "account_missing" | "restore_required" | "handle_taken" | "recipient_cannot_receive" | "insufficient_balance" | "qr_invalid" | "submission_refused" | "sponsor_budget_exhausted";
+            code: "validation_failed" | "unauthorized" | "forbidden" | "not_found" | "conflict" | "rate_limited" | "internal_error" | "service_unavailable" | "network_unsupported" | "asset_unsupported" | "no_match" | "quote_not_found" | "quote_expired" | "invalid_state" | "idempotency_conflict" | "operation_in_flight" | "already_done" | "challenge_invalid" | "signature_invalid" | "account_taken" | "charge_closed" | "last_owner" | "account_missing" | "restore_required" | "handle_taken" | "recipient_cannot_receive" | "insufficient_balance" | "qr_invalid" | "submission_refused" | "sponsor_budget_exhausted";
             /**
              * @example [
              *       "fiatAmount must be a positive decimal"
@@ -2835,6 +3009,8 @@ export interface components {
             bond: string;
             /** @example GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ */
             buyerAddress: string;
+            /** @description The order’s chat with the side that created it (`/v1/p2p/merchant/orders/{id}/messages`). */
+            chat: components["schemas"]["OrderChatSummary"];
             /** @example CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7 */
             contract: string;
             /**
@@ -2946,7 +3122,7 @@ export interface components {
              * @example ar-interoperable
              * @enum {string}
              */
-            standard: "pix" | "ar-interoperable";
+            standard: "ar-interoperable" | "pix" | "pe-interoperable";
         };
         /** @description A merchant's track record, as quotes show it. */
         MerchantStatsView: {
@@ -3105,6 +3281,18 @@ export interface components {
              */
             updatedAt: string;
         };
+        /** @description An order’s chat at a glance (an unread badge reads it): how many messages, when the last one came and from which side. */
+        OrderChatSummary: {
+            /** @example 3 */
+            count: number;
+            /** @example 2026-11-20T12:05:00.000Z */
+            lastAt: string | null;
+            /**
+             * @example merchant
+             * @enum {string|null}
+             */
+            lastFrom: "creator" | "merchant" | null;
+        };
         /** @description A page of orders. */
         OrderListView: {
             data: components["schemas"]["OrderView"][];
@@ -3119,6 +3307,77 @@ export interface components {
         OrderMerchantView: {
             /** @example Pampa Cambio */
             displayName: string | null;
+        };
+        /** @description A message’s file, its bytes in base64. */
+        OrderMessageAttachment: {
+            /**
+             * @example application/pdf
+             * @enum {string}
+             */
+            contentType: "image/png" | "image/jpeg" | "image/webp" | "application/pdf";
+            /**
+             * Format: byte
+             * @description The file, base64 (at most 2097152 bytes decoded).
+             * @example JVBERi0xLjQK...
+             */
+            data: string;
+            /**
+             * @description For display only.
+             * @example comprobante.pdf
+             */
+            name: string;
+            /**
+             * @description Bytes.
+             * @example 48213
+             */
+            size: number;
+        };
+        /** @description A message’s file, without its bytes. */
+        OrderMessageAttachmentMeta: {
+            /**
+             * @example application/pdf
+             * @enum {string}
+             */
+            contentType: "image/png" | "image/jpeg" | "image/webp" | "application/pdf";
+            /**
+             * @description For display only.
+             * @example comprobante.pdf
+             */
+            name: string;
+            /**
+             * @description Bytes.
+             * @example 48213
+             */
+            size: number;
+        };
+        /** @description An order’s latest messages (200 at most), oldest first. */
+        OrderMessageList: {
+            data: components["schemas"]["OrderMessageView"][];
+        };
+        /** @description One message of an order’s chat, between the side that created the order (`creator`) and its merchant (`merchant`). A message with an attachment is a transfer receipt (`kind: receipt`); fetch its bytes from `…/messages/{messageId}/attachment`. */
+        OrderMessageView: {
+            attachment: components["schemas"]["OrderMessageAttachmentMeta"] | null;
+            /**
+             * Format: date-time
+             * @example 2026-11-20T12:05:00.000Z
+             */
+            createdAt: string;
+            /**
+             * @example merchant
+             * @enum {string}
+             */
+            from: "creator" | "merchant";
+            /** @example 6c1d0f3a-2b4e-4f6a-9c8d-7e6f5a4b3c2d */
+            id: string;
+            /**
+             * @example receipt
+             * @enum {string}
+             */
+            kind: "text" | "receipt";
+            /** @example 3f1c2b7e-8d4a-4c1e-9b2f-6a5d4c3b2a10 */
+            orderId: string;
+            /** @example Listo, ya te transferí. */
+            text: string | null;
         };
         /** @description What an order paid out when it ended, base units. */
         OrderSettlementView: {
@@ -3175,6 +3434,8 @@ export interface components {
             buyerAddress: string;
             /** @example null */
             chargeId: string | null;
+            /** @description The order’s chat with its merchant (`…/orders/{id}/messages`). */
+            chat: components["schemas"]["OrderChatSummary"];
             /** @example CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7 */
             contract: string;
             /**
@@ -3521,7 +3782,7 @@ export interface components {
              * @example ARS
              * @enum {string}
              */
-            currency: "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
+            currency: "BOB" | "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
             /** @example payroll-2026-11-ana */
             externalReference?: string;
             /**
@@ -3533,7 +3794,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail: "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr";
+            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
         };
         /** @description What a QR payment’s scanned QR reads, for the person who scanned it (never the payload itself). */
         QrSummaryView: {
@@ -3552,7 +3813,7 @@ export interface components {
              * @example ar-interoperable
              * @enum {string}
              */
-            standard: "pix" | "ar-interoperable";
+            standard: "ar-interoperable" | "pix" | "pe-interoperable";
         };
         /** @description The merchant a quote matched, as people see it: a name and a track record, never its address or accounts. */
         QuoteMerchantView: {
@@ -3664,6 +3925,11 @@ export interface components {
         /** @description One field of a payment rail’s account details. */
         RailFieldView: {
             /**
+             * @description Whether an order’s beneficiary (a sale’s, a payout’s) must give it: as `required`, but the holder’s ID only where the rail’s transfer needs it.
+             * @example false
+             */
+            beneficiaryRequired: boolean;
+            /**
              * @description What it holds, in English.
              * @example CBU or CVU, 22 digits (or give alias instead)
              */
@@ -3682,13 +3948,18 @@ export interface components {
              */
             options?: string[];
             /**
-             * @description Whether it must be given.
+             * @description Whether a merchant’s payment method (`/v1/p2p/payment-methods`) must give it.
              * @example false
              */
             required: boolean;
         };
         /** @description A local payment rail and the details it needs. */
         RailView: {
+            /**
+             * @description Whether an order’s beneficiary must give the holder’s ID (the beneficiary’s `document` and the ID fields): true only where the transfer system needs it (Chile, Colombia).
+             * @example false
+             */
+            beneficiaryIdRequired: boolean;
             fields: components["schemas"]["RailFieldView"][];
             /**
              * @description The rail id requests use.
@@ -3801,10 +4072,10 @@ export interface components {
             /** @description The signed inner `TransactionEnvelope` (base64 XDR), exactly as built by this API and signed. Never a fee-bump. */
             xdr: string;
         };
-        /** @description A stablecoin the P2P market trades on one network: a classic Stellar asset, used on-chain through its Stellar Asset Contract. */
+        /** @description A token the P2P market trades on one network, used on-chain through its Stellar Asset Contract: a classic Stellar asset (a stablecoin such as USDC), or the native lumen (`XLM`, `issuer: null`, no trustline needed). */
         TokenView: {
             /**
-             * @description The asset code.
+             * @description The asset code (`XLM` for the native lumen).
              * @example USDC
              */
             code: string;
@@ -3819,10 +4090,10 @@ export interface components {
              */
             decimals: number;
             /**
-             * @description The issuing account (G...).
+             * @description The issuing account (G...); null only for the native lumen (`XLM`).
              * @example GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5
              */
-            issuer: string;
+            issuer: string | null;
             /**
              * @description Its symbol.
              * @example USDC
@@ -3863,7 +4134,7 @@ export interface components {
              * @example ARS
              * @enum {string}
              */
-            currency: "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
+            currency: "BOB" | "ARS" | "BRL" | "MXN" | "COP" | "PEN" | "CLP";
             /** @example 20123456786 */
             payerDocument?: string;
             /** @example Juan Gómez */
@@ -3915,7 +4186,7 @@ export interface components {
              *       "ar_bank_transfer"
              *     ]
              */
-            rails?: ("ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr")[];
+            rails?: ("bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr")[];
         };
         UpdateOrganization: {
             /** @example Pampa Cambio */
@@ -3952,7 +4223,7 @@ export interface components {
             /** @description false pauses deliveries to it. */
             active?: boolean;
             description?: string;
-            events?: ("P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED")[];
+            events?: ("P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_ORDER_MESSAGE" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED")[];
             /** @example https://merchant.example/hooks/midpoint */
             url?: string;
         };
@@ -3976,7 +4247,7 @@ export interface components {
             /** @enum {string} */
             status: "pending" | "delivered" | "failed";
             /** @enum {string} */
-            type: "P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED";
+            type: "P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_ORDER_MESSAGE" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED";
         };
         WebhookDeliveryList: {
             data: components["schemas"]["WebhookDelivery"][];
@@ -3990,7 +4261,7 @@ export interface components {
             /** Format: date-time */
             createdAt: string;
             description?: string | null;
-            events: ("P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED")[];
+            events: ("P2P_ORDER_CREATED" | "P2P_ORDER_ACCEPTED" | "P2P_ORDER_PAID" | "P2P_ORDER_COMPLETED" | "P2P_ORDER_CANCELLED" | "P2P_ORDER_EXPIRED" | "P2P_ORDER_DISPUTED" | "P2P_ORDER_RESOLVED" | "P2P_ORDER_FAILED" | "P2P_ORDER_MESSAGE" | "P2P_CHARGE_SUCCEEDED" | "P2P_PAYOUT_BATCH_COMPLETED")[];
             id: string;
             /** @enum {string} */
             tier: "live" | "test";
@@ -4621,7 +4892,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -4819,7 +5090,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5028,6 +5299,173 @@ export interface operations {
             };
         };
     };
+    appMessages: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageList"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    appSendMessage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrderMessage"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageView"];
+                };
+            };
+            /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `rate_limited`: retry after the `Retry-After` header. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    appAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageAttachment"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
     appPaid: {
         parameters: {
             query?: never;
@@ -5157,6 +5595,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
         };
     };
     appWalletProfile: {
@@ -5244,7 +5691,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5312,7 +5759,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -5977,7 +6424,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6360,7 +6807,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6416,7 +6863,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6487,7 +6934,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6578,7 +7025,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -6862,7 +7309,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -7057,7 +7504,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -7385,7 +7832,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -7478,6 +7925,206 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MerchantOrderView"];
+                };
+            };
+            /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ordersMerchantMessages: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
+                "Midpoint-Organization"?: string;
+                /** @description Wallet sessions only: the tier to act on (default `test`). */
+                "Midpoint-Tier"?: "live" | "test";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageList"];
+                };
+            };
+            /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ordersMerchantSendMessage: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
+                "Midpoint-Organization"?: string;
+                /** @description Wallet sessions only: the tier to act on (default `test`). */
+                "Midpoint-Tier"?: "live" | "test";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrderMessage"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageView"];
+                };
+            };
+            /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `rate_limited`: retry after the `Retry-After` header. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ordersMerchantAttachment: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
+                "Midpoint-Organization"?: string;
+                /** @description Wallet sessions only: the tier to act on (default `test`). */
+                "Midpoint-Tier"?: "live" | "test";
+            };
+            path: {
+                id: string;
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageAttachment"];
                 };
             };
             /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
@@ -7952,7 +8599,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8176,6 +8823,206 @@ export interface operations {
             };
             /** @description `rate_limited`: retry after the `Retry-After` header. */
             429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ordersMessages: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
+                "Midpoint-Organization"?: string;
+                /** @description Wallet sessions only: the tier to act on (default `test`). */
+                "Midpoint-Tier"?: "live" | "test";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageList"];
+                };
+            };
+            /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ordersSendMessage: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
+                "Midpoint-Organization"?: string;
+                /** @description Wallet sessions only: the tier to act on (default `test`). */
+                "Midpoint-Tier"?: "live" | "test";
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrderMessage"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageView"];
+                };
+            };
+            /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `rate_limited`: retry after the `Retry-After` header. */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    ordersAttachment: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Wallet sessions only: the organization to act for (API keys carry theirs). */
+                "Midpoint-Organization"?: string;
+                /** @description Wallet sessions only: the tier to act on (default `test`). */
+                "Midpoint-Tier"?: "live" | "test";
+            };
+            path: {
+                id: string;
+                messageId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrderMessageAttachment"];
+                };
+            };
+            /** @description `validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `unauthorized`: no credentials, or an unknown, revoked or expired key or session. */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `forbidden`: the credentials may not do this (scope, role, tier, cross-site write). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+            /** @description `not_found`: nothing of yours with that id on this tier. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -8770,7 +9617,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;
@@ -8996,6 +9843,15 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
             /** @description `service_unavailable`: the market is not available on that network right now. */
             503: {
                 headers: {
@@ -9102,7 +9958,7 @@ export interface operations {
                     "application/json": components["schemas"]["Error"];
                 };
             };
-            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`. */
+            /** @description `conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`. */
             409: {
                 headers: {
                     [name: string]: unknown;

@@ -10,6 +10,9 @@ export type SealedField =
   | 'order.payer'
   | 'order.beneficiary'
   | 'order.qr'
+  | 'order-message.text'
+  | 'order-message.attachment-name'
+  | 'order-message.attachment'
   | 'webhook-endpoint.secret';
 
 const VERSION = 'v1';
@@ -17,7 +20,8 @@ const IV_BYTES = 12;
 
 /**
  * Encryption at rest for personal data (payment methods, payers,
- * beneficiaries) and webhook signing secrets: AES-256-GCM with a fresh IV per
+ * beneficiaries, order chat messages and their receipts) and webhook signing
+ * secrets: AES-256-GCM with a fresh IV per
  * write, under `DATA_ENCRYPTION_KEY`, with the field and the row's id as
  * associated data, so a value copied to another row or field no longer opens.
  * Stored as `v1:<keyId>:<iv>:<ciphertext>:<tag>` (base64url parts).

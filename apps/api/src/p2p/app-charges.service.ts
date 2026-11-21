@@ -4,7 +4,7 @@ import type { SessionPrincipal } from '@/auth/auth.types';
 import { ChainCallReverted, ChainClient } from '@/chain/chain-client.service';
 import { DeploymentsService, type Deployment } from '@/chain/deployments.service';
 import { MarketReader } from '@/chain/market-reader.service';
-import type { Tier, Token } from '@/chain/networks';
+import { isNativeToken, type Tier, type Token } from '@/chain/networks';
 import { TxBuilder } from '@/chain/tx-builder.service';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { isContractAddress } from '@/common/stellar';
@@ -170,24 +170,26 @@ export class AppChargesService {
     }
     let transaction;
     try {
-      transaction = isContractAddress(charge.recipientAddress)
-        ? await this.builder.sacTransfer(
-            d,
-            session.address,
-            charge.recipientAddress,
-            token,
-            amount,
-            P2P_CHARGE_PAYMENT_TTL_SECONDS,
-          )
-        : await this.builder.payment(
-            d,
-            session.address,
-            charge.recipientAddress,
-            token,
-            amount,
-            null,
-            P2P_CHARGE_PAYMENT_TTL_SECONDS,
-          );
+      // A contract recipient, and the native lumen always, take a SAC `transfer`.
+      transaction =
+        isContractAddress(charge.recipientAddress) || isNativeToken(token)
+          ? await this.builder.sacTransfer(
+              d,
+              session.address,
+              charge.recipientAddress,
+              token,
+              amount,
+              P2P_CHARGE_PAYMENT_TTL_SECONDS,
+            )
+          : await this.builder.payment(
+              d,
+              session.address,
+              charge.recipientAddress,
+              token,
+              amount,
+              null,
+              P2P_CHARGE_PAYMENT_TTL_SECONDS,
+            );
     } catch (err) {
       if (err instanceof ChainCallReverted) {
         throw ApiError.badRequest(

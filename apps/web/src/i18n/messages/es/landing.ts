@@ -9,7 +9,7 @@ const landing = {
     open: 'Crear cuenta',
     merchant: 'Soy comerciante',
     rails:
-      'Transferencia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia, Perú y Chile.',
+      'Transferencia bancaria en Bolivia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia, Perú y Chile.',
   },
   slip: {
     caption: 'Así se ve una orden: el monto exacto, la cuenta y el tiempo que te queda.',
@@ -17,7 +17,7 @@ const landing = {
     transfer: 'Transfiere exactamente',
     to: 'A esta cuenta',
     holder: 'Titular',
-    cbu: 'CBU',
+    account: 'Cuenta',
     receive: 'Recibes',
     left: 'Tiempo para pagar',
     locked: 'Bloqueado en el contrato hasta que el comerciante confirma',

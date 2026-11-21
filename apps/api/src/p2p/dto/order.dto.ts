@@ -126,7 +126,7 @@ export class PayerDto {
 
 @ApiSchema({
   description:
-    'Where the merchant pays the local money on a sale or a payout: a holder, their document and the rail’s account details.',
+    'Where the merchant pays the local money on a sale or a payout (to yourself or to someone else): a holder, the rail’s account details and, where the rail’s transfer needs it, the holder’s ID. The ID (`document` and the rail’s ID fields, such as `cuit` or `documentType`/`documentNumber`) is optional on every rail whose `beneficiaryIdRequired` is false (`GET /v1/market`): the holder’s bank already identified them. Chile (`rut`) and Colombia need it. Given, it is checked as always.',
 })
 export class BeneficiaryDto {
   @ApiProperty({ example: 'Ana López', minLength: 2, maxLength: 100 })
@@ -135,11 +135,18 @@ export class BeneficiaryDto {
   @MaxLength(100)
   holderName!: string;
 
-  @ApiProperty({ example: '27234567891' })
+  @ApiPropertyOptional({
+    example: '27234567891',
+    minLength: 4,
+    maxLength: 20,
+    description:
+      'The holder’s ID number. Required only on rails whose `beneficiaryIdRequired` is true (Chile, Colombia).',
+  })
+  @IsOptional()
   @IsString()
   @MinLength(4)
   @MaxLength(20)
-  document!: string;
+  document?: string;
 
   @ApiProperty({
     type: 'object',

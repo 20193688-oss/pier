@@ -8,6 +8,8 @@ bot that auto-releases purchases when the local money reaches the merchant's ban
 - **Webhooks**: `verifyWebhook` / `parseWebhook` check the `midpoint-signature` header.
 - **Reference bot**: `dist/bot/auto-release.js` matches incoming bank transfers to orders and
   signs their release with the merchant bot's own key.
+- **Simulated merchant** (test tier only): `dist/bot/simulated-merchant.js` plays a merchant's
+  side of every order on testnet, as the dev stack's test merchants do.
 
 Requires Node.js 24.9 or later (ESM only).
 
@@ -73,8 +75,21 @@ try {
   and tier, so the client refuses those options next to one.
 - `fetch` replaces `globalThis.fetch` (tests, proxies, retries).
 - Friendly type names (`Order`, `MerchantOrder`, `Quote`, `TransferMatch`, `Transaction`, `Submission`,
-  `MarketOverview`, `WebhookEnvelope`, `ErrorCode`, ...) are exported next to the raw generated
-  `paths`, `components` and `operations`.
+  `MarketOverview`, `OrderMessage`, `WebhookEnvelope`, `ErrorCode`, ...) are exported next to the raw
+  generated `paths`, `components` and `operations`.
+- **Order chat**: `listOrderMessages`, `sendOrderMessage` and `getOrderMessageAttachment` read and
+  write an order's chat as its creator (`'creator'`, `/v1/p2p/orders/{id}`), its merchant
+  (`'merchant'`, `/v1/p2p/merchant/orders/{id}`) or the public app's wallet (`'app'`, a session).
+  A message is a text (1 to 1000 characters), a file (an image or a PDF of at most 2 MiB, base64:
+  a transfer receipt) or both; every order view carries a `chat` summary (`count`, `lastAt`,
+  `lastFrom`), and the other side's organization gets a `P2P_ORDER_MESSAGE` event.
+
+  ```ts
+  await sendOrderMessage(client, 'merchant', order.id, {
+    text: 'Listo, ya te transferí.',
+    attachment: { name: 'comprobante.pdf', contentType: 'application/pdf', data: pdfBase64 },
+  });
+  ```
 
 ## Webhooks
 
@@ -190,6 +205,36 @@ tail -f bank-feed.jsonl | node node_modules/@midpoint/sdk/dist/bot/auto-release.
 ```
 
 Start with `DRY_RUN=true` and read the log before letting it sign.
+
+## Simulated merchant (test tier only)
+
+`dist/bot/simulated-merchant.js` plays a merchant's side of every order through the public API,
+as if its bank and its staff answered at once: it accepts a sale, a QR payment or a payout at
+once and marks it paid `PAY_DELAY_SECONDS` later (the simulated transfer or QR payment), and
+releases a purchase or a charge `RELEASE_DELAY_SECONDS` after the payer reported it paid (the
+simulated bank feed). `npm run dev:stack` runs one per test merchant.
+
+On the order's chat, right after it marks a sale or a QR payment paid it sends the person the
+transfer receipt: a one-page PDF it writes by hand (`src/bot/receipt.ts`, Helvetica with
+WinAnsiEncoding, no dependency), with the merchant's name (`BOT_NAME`), the time, the amount, the
+rail, the beneficiary and their masked account, the order and a made-up operation number. The
+first time the person writes on an order it answers once, `REPLY_DELAY_SECONDS` later, with one
+line chosen by the order's state. It finds new messages through the `chat` summary of its latest
+50 orders, and reads a chat only when the person wrote last.
+
+It never pays or receives money, so it refuses a `pk_live_` key and any mainnet contract. Every
+transaction the API builds is checked before it signs, like the reference bot's release
+(`orderActionProblem`): exactly one `accept`, `mark_paid` or `release` (its account, the order's
+on-chain id) on its own `MARKET_CONTRACT`, with the passphrase pinned in the bot, a near time
+bound, a capped fee and no sub-invocations.
+
+It reads the reference bot's variables (`MIDPOINT_API_URL`, `MIDPOINT_API_KEY`, `BOT_SECRET`,
+`MARKET_CONTRACT`, `MAX_FEE_STROOPS`, `DRY_RUN`) and `BOT_NAME`, `PAY_DELAY_SECONDS` (5),
+`RELEASE_DELAY_SECONDS` (5), `REPLY_DELAY_SECONDS` (3) and `POLL_SECONDS` (3).
+
+```sh
+MIDPOINT_API_URL=http://localhost:4100 MIDPOINT_API_KEY=pk_test_... BOT_SECRET=S...   MARKET_CONTRACT=testnet=C... npm run bot:simulated -w @midpoint/sdk
+```
 
 ## Development
 

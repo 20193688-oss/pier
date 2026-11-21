@@ -1,7 +1,8 @@
 /**
  * The API's one error shape: `{ error: { code, message, details? } }`. Every
  * refusal is an `ApiError` with a stable snake_case `code` clients branch on;
- * the message is for people. `details` lists field problems on a 400.
+ * the message is for people. `details` lists field problems on a 400 (and
+ * the order's status on a 409 `already_done`).
  */
 
 export const ErrorCode = {
@@ -21,6 +22,7 @@ export const ErrorCode = {
   InvalidState: 'invalid_state',
   IdempotencyConflict: 'idempotency_conflict',
   OperationInFlight: 'operation_in_flight',
+  AlreadyDone: 'already_done',
   ChallengeInvalid: 'challenge_invalid',
   SignatureInvalid: 'signature_invalid',
   AccountTaken: 'account_taken',
@@ -84,8 +86,8 @@ export class ApiError extends Error {
     return new ApiError(404, code, message);
   }
 
-  static conflict(code: ErrorCode, message: string): ApiError {
-    return new ApiError(409, code, message);
+  static conflict(code: ErrorCode, message: string, details?: string[]): ApiError {
+    return new ApiError(409, code, message, details);
   }
 
   static rateLimited(retryAfterSeconds: number): ApiError {

@@ -79,7 +79,15 @@ signature, SSRF guard), rate limits, i18n and the look.
 - The launch token is Circle's USDC:
   - mainnet issuer `GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN`;
   - testnet issuer `GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5`.
-- The dev stack also issues `TUSD` from a dev issuer, so it can mint without a faucet.
+- On testnet the dev stack trades Circle's USDC, bought for its merchants with XLM on the testnet
+  DEX. Only the local network (stellar/quickstart, which has no Circle USDC) issues a dev dollar,
+  `TUSD`, from a dev issuer.
+- The native lumen (`XLM`) can be listed too (testnet and local today, through
+  `P2P_<NET>_TOKENS` `{"native":true}`): it moves through its SAC like the others, has
+  `issuer: null` and needs no trustline. A wallet's XLM balance is what it can SPEND (balance less
+  the reserves it pays itself, sponsorship counted, and its selling liabilities); activating for
+  XLM only creates a missing account (begin, create, end); app transfers and charge payments of
+  XLM are always a SAC `transfer`. Mainnet lists it once `tableTokens` adds `nativeTokenOf`.
 - All of them have 7 decimals. Amounts are base units: `i128` on-chain, a decimal integer string in
   the API.
 
@@ -262,17 +270,17 @@ export type Order, OpenParams, MatcherTerms, MarketConfig; // JS shapes (bigint 
 
 The EVM variables are replaced by these:
 
-| Variable(s)                                          | What                                                                           |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| `STELLAR_<NET>_RPC_URL`, `STELLAR_<NET>_HORIZON_URL` | Per network. Horizon is optional.                                              |
-| `P2P_<NET>_CONTRACT`                                 | The market contract on that network.                                           |
-| (table in code)                                      | Tokens per network: USDC issuers; the dev `TUSD` comes from env.               |
-| `P2P_MATCHER_SECRET`                                 | The matcher account. It opens orders and acts for buyers, paying its own fees. |
-| `P2P_SPONSOR_SECRET`                                 | The fee-bump and reserve sponsor. Holds only XLM.                              |
-| `SEP10_SIGNING_SECRET`                               | Signs auth challenges. Never funded.                                           |
-| `SEP10_HOME_DOMAIN`                                  | The web host.                                                                  |
-| `SPONSOR_*`                                          | Per-address and per-IP rate limits, fee cap, daily XLM budget.                 |
-| `BRAND_NAME`                                         | The product name.                                                              |
+| Variable(s)                                          | What                                                                                                 |
+| ---------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `STELLAR_<NET>_RPC_URL`, `STELLAR_<NET>_HORIZON_URL` | Per network. Horizon is optional.                                                                    |
+| `P2P_<NET>_CONTRACT`                                 | The market contract on that network.                                                                 |
+| (table in code), `P2P_<NET>_TOKENS`                  | Tokens per network: USDC issuers; XLM (`{"native":true}`), and the local network's `TUSD`, from env. |
+| `P2P_MATCHER_SECRET`                                 | The matcher account. It opens orders and acts for buyers, paying its own fees.                       |
+| `P2P_SPONSOR_SECRET`                                 | The fee-bump and reserve sponsor. Holds only XLM.                                                    |
+| `SEP10_SIGNING_SECRET`                               | Signs auth challenges. Never funded.                                                                 |
+| `SEP10_HOME_DOMAIN`                                  | The web host.                                                                                        |
+| `SPONSOR_*`                                          | Per-address and per-IP rate limits, fee cap, daily XLM budget.                                       |
+| `BRAND_NAME`                                         | The product name.                                                                                    |
 
 - Production refuses to start when the matcher, sponsor and SEP-10 secrets are not three distinct
   keys.
@@ -304,7 +312,8 @@ protocolFeeBps, paused, tokens }`. `chainId` and `nativeSymbol` go.
   - `rpcUrl` and `horizonUrl` are public endpoints (`horizonUrl` may be null).
   - `explorerUrl` is stellar.expert-style: append `/tx/<hash>`, `/account/<G>` or `/contract/<C>`.
     Null when there is none.
-- `TokenView` = `{ symbol, code, issuer, contract, decimals }`, where `contract` is the SAC id.
+- `TokenView` = `{ symbol, code, issuer, contract, decimals }`, where `contract` is the SAC id and
+  `issuer` is null only for the native lumen (`XLM`).
 - The market gains `sponsor: { enabled: boolean }`.
 - A deployment is listed only when its wasm hash equals `MARKET_WASM_HASH` and its tokens are
   allowed on-chain.
@@ -443,14 +452,24 @@ constructor arguments and allows the tokens. Mainnet stays behind `--i-understan
 - Stellar `local` (stellar/quickstart through Docker) when a Docker daemon answers; otherwise
   `testnet` with friendbot. Never start Docker Desktop.
 - Creates these accounts and keeps them in `.dev-stack/`: owner, arbiter, treasury, matcher,
-  sponsor, SEP-10 signer, merchant, business, user, and the TUSD issuer.
-- Mints TUSD to merchant, business and user, and deploys the market.
+  sponsor, SEP-10 signer, merchant, business and user (plus a dev-dollar issuer on the local
+  network only).
+- Gives merchant, business and user testnet USDC bought with XLM on the testnet DEX (the local
+  network mints its dev dollar instead), and deploys the market.
 - Seeds through the API:
   - organizations, keys, and accounts proven by SEP-10;
   - payment methods, and offers that include `ar_qr` QR_PAY offers;
   - liquidity, the matcher authorisation, and a charge.
 - Starts the API and the web, then prints the URLs, keys and the dev secret keys (local or testnet
   only).
+- Lists XLM (the owner allows its SAC on a market deployed before it).
+- Sets up three automated test merchants (Andes Cambio, Pampa Pagos, Río Express: their own
+  organizations, keys, payment methods in every listed currency with Bolivia's first, offers in
+  USDC and XLM, liquidity and the matcher), runs the SDK's simulated merchant for each, and
+  reprices all four merchants' offers every minute from live mainnet references (CriptoYa with an
+  FX fallback; the XLM/USDC book on the public Horizon), each with its own spread. A resumed stack
+  syncs its merchants to this (missing methods and offers added, offers in unlisted tokens paused,
+  USDC liquidity topped up).
 - Keeps `--reset`, `--stop`, `--no-web` and `dev:simulate`.
 
 **Tests.**
@@ -507,7 +526,7 @@ never another company's app. It needs:
 
 - a publishable key;
 - allowed origins (`http://localhost:3000` plus production);
-- signing rules that allowlist the market contract's functions and the USDC/TUSD SACs;
+- signing rules that allowlist the market contract's functions and the USDC and XLM SACs;
 - a signature confirmation policy.
 
 ### 7.2 Checks before any signature (port of `tx-verify`; keep every rule)

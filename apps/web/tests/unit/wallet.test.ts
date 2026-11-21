@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, test, vi } from 'vitest';
 import assert from 'node:assert/strict';
 import { Account, Keypair, Operation, TransactionBuilder, hash } from '@stellar/stellar-sdk/base';
 import { fetchTransport, setTransport, type ApiRequest } from '@/lib/api/client';
-import { sep10SignIn } from '@/lib/session';
+import { renewDelay, sep10SignIn, sessionGate } from '@/lib/session';
 import { forgetSigningKey } from '@/lib/stellar/sep10';
 import { keypairWallet } from '@/lib/wallet/keypair';
 import { WalletError, type StellarWallet } from '@/lib/wallet/types';
@@ -163,4 +163,35 @@ describe('Pollar network', () => {
     assert.equal(pollarNetworkFor('pk_other', 'live'), 'mainnet');
     assert.equal(pollarNetworkFor('pk_other', 'test'), 'testnet');
   });
+});
+
+test('the API session is renewed a day before it ends, or halfway when shorter: never at once', () => {
+  const H = 3600 * 1000;
+  assert.equal(renewDelay(7 * 24 * H), 6 * 24 * H);
+  assert.equal(renewDelay(36 * H), 18 * H);
+  assert.equal(renewDelay(H), H / 2);
+  assert.equal(renewDelay(-5), 0);
+});
+
+test('without a session, or with one that ended and could not be renewed, it is the sign-in', () => {
+  const session = { address: 'G', expiresAt: null, organizations: [] } as unknown as Parameters<
+    typeof sessionGate
+  >[0]['session'];
+  const gate = (s: unknown, expired: boolean, renewing: boolean) =>
+    sessionGate({ session: s as typeof session, expired, renewing });
+  assert.equal(gate(undefined, false, false), 'loading', 'still asked');
+  assert.equal(gate(null, false, false), 'signin', 'nobody signed in');
+  assert.equal(gate(session, false, false), 'screen');
+  assert.equal(gate(session, false, true), 'screen', 'a renewal ahead of time keeps the screen');
+  assert.equal(gate(session, true, true), 'loading', 'an ended one being renewed waits');
+  assert.equal(gate(session, true, false), 'signin', 'never a screen without a session');
+  assert.equal(
+    sessionGate({ session: session, expired: false, renewing: false, walletReady: false }),
+    'loading',
+    'the wallet still coming back: the screen waits',
+  );
+  assert.equal(
+    sessionGate({ session: session, expired: false, renewing: false, walletReady: true }),
+    'screen',
+  );
 });

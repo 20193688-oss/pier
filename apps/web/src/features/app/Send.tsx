@@ -1,11 +1,14 @@
 /* Send: who (an @handle, an address, a recent contact or a scan), how much, an optional note, then
    a review that shows the address a handle resolves to; the person signs and the transfer is
    followed until the network settles it. A payment link (/app/send?to=...&amount=...&note=...)
-   opens this screen filled in. The signed transaction must pay exactly the reviewed address, amount
+   opens this screen filled in. A bank account typed in "To" (a CBU, CVU or alias, a CCI, a CLABE)
+   sends to that account in its own currency instead (src/lib/app/bank-recipient.ts), and the
+   screen also leads there for any other country's account. The signed transaction must pay exactly the reviewed address, amount
    and note (src/lib/p2p/tx-verify.ts). */
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { normalizeRecipient } from '@midpoint/payment-qr';
+import { isDollarToken } from '@/lib/app/money';
 import { fmt, useI18n } from '@/i18n';
 import { Icon } from '@/components/ui/Icon';
 import { Field, Notice, Spinner } from '@/components/ui/controls';
@@ -17,10 +20,11 @@ import { dollarsToUnits, unitsToDecimal } from '@/lib/app/money';
 import { parseDecimal } from '@/lib/p2p/amounts';
 import { shortAddress } from '@/lib/format';
 import { isDestination } from '@/lib/stellar/network';
+import { bankRecipient, bankSendPath, maskAccount } from '@/lib/app/bank-recipient';
 import { useSession } from '@/lib/session';
 import { useAppData } from '@/features/app/data';
 import { Screen } from '@/features/app/shell';
-import { Facts, useLocal, useUsd } from '@/features/app/parts';
+import { Facts, useLocal, useUsd, WalletSummary } from '@/features/app/parts';
 
 interface Recipient {
   /* What the person typed or picked: `@handle` or an address. */
@@ -81,8 +85,19 @@ export default function Send() {
     };
   }, [network]);
 
+  // A bank account the market pays in (its currency listed): sent to through a merchant.
+  const bankOf = (input: string) => {
+    const b = bankRecipient(input);
+    return b && market?.currencies.some((c) => c.code === b.currency && c.rails.includes(b.rail))
+      ? b
+      : null;
+  };
+  const bank = bankOf(toText);
+
   const resolve = async (input: string) => {
     setToError('');
+    const typedBank = bankOf(input);
+    if (typedBank) return navigate(bankSendPath(typedBank));
     const r = normalizeRecipient(input);
     if (!r) return setToError(s.invalidTo);
     let next: Recipient;
@@ -121,22 +136,36 @@ export default function Send() {
   const units = dollarsToUnits(amount);
   const tooMuch = !!units && BigInt(units) > BigInt(balance || '0');
   const noteOk = noteBytes(note) <= 28;
-  const label = recipient ? (recipient.handle ? `@${recipient.handle}` : shortAddress(recipient.address)) : '';
+  const label = recipient
+    ? recipient.handle
+      ? `@${recipient.handle}`
+      : shortAddress(recipient.address)
+    : '';
 
-  if (!network || !token || !market) return <Screen back title={s.title}>{null}</Screen>;
+  if (!network || !token || !market)
+    return (
+      <Screen back title={s.title}>
+        {null}
+      </Screen>
+    );
 
   if (step === 'done' && recipient)
     return (
       <Screen>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 pt-10 text-center">
-          <span className="grid size-16 place-items-center rounded-full bg-ok-soft text-ok" aria-hidden="true">
+          <span
+            className="grid size-16 place-items-center rounded-full bg-ok-soft text-ok"
+            aria-hidden="true"
+          >
             <Icon name="check" size={34} strokeWidth={2.4} />
           </span>
           <h1 className="text-[1.75rem]">{s.sentTitle}</h1>
           <p className="figure text-[2.4rem]">
             <span className="marker marker-sweep">{fmtUsd(sentUnits.current)}</span>
           </p>
-          <p className="text-ink-2">{fmt(s.sentBody, { amount: fmtUsd(sentUnits.current), to: label })}</p>
+          <p className="text-ink-2">
+            {fmt(s.sentBody, { amount: fmtUsd(sentUnits.current), to: label })}
+          </p>
         </div>
         <div className="flex flex-col gap-2 pb-4">
           {typeof navigator.share === 'function' && (
@@ -145,7 +174,12 @@ export default function Send() {
               className="btn btn-line btn-lg"
               onClick={() =>
                 void navigator
-                  .share({ text: fmt(s.shareText, { amount: fmtUsd(sentUnits.current), brand: t.common.brand }) })
+                  .share({
+                    text: fmt(s.shareText, {
+                      amount: fmtUsd(sentUnits.current),
+                      brand: t.common.brand,
+                    }),
+                  })
                   .catch(() => {})
               }
             >
@@ -162,11 +196,16 @@ export default function Send() {
 
   if (step === 'review' && recipient && units)
     return (
-      <Screen back={undefined} title={s.review} action={
-        <button type="button" className="btn btn-quiet btn-sm" onClick={() => setStep('amount')}>
-          {t.common.actions.edit}
-        </button>
-      }>
+      <Screen
+        back={undefined}
+        title={s.review}
+        aside={<WalletSummary />}
+        action={
+          <button type="button" className="btn btn-quiet btn-sm" onClick={() => setStep('amount')}>
+            {t.common.actions.edit}
+          </button>
+        }
+      >
         <div className="flex flex-col gap-4 pt-2">
           <div className="text-center">
             <p className="text-ink-3">{s.youSend}</p>
@@ -177,8 +216,16 @@ export default function Send() {
           </div>
           <Facts
             rows={[
-              [s.recipient, recipient.handle ? `@${recipient.handle}` : shortAddress(recipient.address)],
-              [s.address, <span key="a" className="text-[0.8125rem] font-medium break-all">{recipient.address}</span>],
+              [
+                s.recipient,
+                recipient.handle ? `@${recipient.handle}` : shortAddress(recipient.address),
+              ],
+              [
+                s.address,
+                <span key="a" className="text-[0.8125rem] font-medium break-all">
+                  {recipient.address}
+                </span>,
+              ],
               ...(note.trim() ? ([[s.note, note.trim()]] as [string, string][]) : []),
               [s.fee, market.sponsor.enabled ? s.free : '-'],
             ]}
@@ -238,11 +285,16 @@ export default function Send() {
 
   if (step === 'amount' && recipient)
     return (
-      <Screen back={undefined} title={s.amount} action={
-        <button type="button" className="btn btn-quiet btn-sm" onClick={() => setStep('to')}>
-          {t.common.actions.back}
-        </button>
-      }>
+      <Screen
+        back={undefined}
+        title={s.amount}
+        aside={<WalletSummary />}
+        action={
+          <button type="button" className="btn btn-quiet btn-sm" onClick={() => setStep('to')}>
+            {t.common.actions.back}
+          </button>
+        }
+      >
         <form
           className="flex flex-1 flex-col gap-4"
           onSubmit={(e: FormEvent) => {
@@ -256,7 +308,9 @@ export default function Send() {
           </p>
           <div className="rounded-[20px] bg-well px-4 py-6">
             <label htmlFor="send-amount" className="sr-only">
-              {s.amountLabel}
+              {fmt(s.amountLabel, {
+                unit: isDollarToken(token.symbol) ? s.dollars : token.symbol,
+              })}
             </label>
             <input
               id="send-amount"
@@ -271,7 +325,10 @@ export default function Send() {
               aria-describedby="send-amount-msg"
             />
             <p className="mt-1 text-center font-semibold text-ink-3">USDC</p>
-            <p id="send-amount-msg" className={`num mt-2 text-center text-[0.875rem] ${tooMuch || (amount && !units) ? 'text-bad' : 'text-ink-3'}`}>
+            <p
+              id="send-amount-msg"
+              className={`num mt-2 text-center text-[0.875rem] ${tooMuch || (amount && !units) ? 'text-bad' : 'text-ink-3'}`}
+            >
               {tooMuch
                 ? s.tooMuch
                 : amount && !units
@@ -283,7 +340,9 @@ export default function Send() {
             type="button"
             className="btn btn-line btn-sm self-center"
             onClick={() => {
-              const whole = unitsToDecimal((BigInt(balance || '0') / 100000n * 100000n).toString());
+              const whole = unitsToDecimal(
+                ((BigInt(balance || '0') / 100000n) * 100000n).toString(),
+              );
               setAmount(whole);
             }}
           >
@@ -309,7 +368,7 @@ export default function Send() {
     );
 
   return (
-    <Screen back title={s.title}>
+    <Screen back title={s.title} aside={<WalletSummary />}>
       <form
         className="flex flex-1 flex-col gap-4"
         onSubmit={(e: FormEvent) => {
@@ -328,8 +387,35 @@ export default function Send() {
           error={toError || null}
           autoFocus={!params.get('to')}
         />
+        {bank && (
+          <button
+            type="button"
+            className="lift flex items-center gap-3 rounded-[16px] border border-line px-4 py-3 text-left"
+            onClick={() => navigate(bankSendPath(bank))}
+          >
+            <span className="icon-tile" aria-hidden="true">
+              <Icon name="bank" size={19} strokeWidth={2.1} />
+            </span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <b className="font-medium">
+                {fmt(s.bankDetected, {
+                  kind: s.bankKinds[bank.kind],
+                  account: maskAccount(Object.values(bank.details)[0] ?? ''),
+                })}
+              </b>
+              <span className="text-[0.8125rem] text-ink-3">
+                {fmt(s.bankDetectedSub, { currency: bank.currency })}
+              </span>
+            </span>
+            <Icon name="chevronRight" size={18} className="chev" />
+          </button>
+        )}
         <div className="flex gap-2">
-          <button type="submit" className="btn btn-ink btn-lg flex-1" disabled={!toText.trim() || resolving}>
+          <button
+            type="submit"
+            className="btn btn-ink btn-lg flex-1"
+            disabled={!toText.trim() || resolving}
+          >
             {resolving && <Spinner />}
             {resolving ? s.resolving : s.next}
           </button>
@@ -342,9 +428,26 @@ export default function Send() {
             <Icon name="scan" size={22} />
           </button>
         </div>
+        <Link
+          to="/app/send/bank"
+          className="lift flex items-center gap-3 rounded-[16px] bg-well px-4 py-3"
+        >
+          <span className="icon-tile" aria-hidden="true">
+            <Icon name="bank" size={19} strokeWidth={2.1} />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col">
+            <b className="font-medium">{s.toBank}</b>
+            <span className="text-[0.8125rem] text-ink-3">{s.toBankBody}</span>
+          </span>
+          <Icon name="chevronRight" size={18} className="chev" />
+        </Link>
         {recent.length > 0 && (
           <section aria-labelledby="recent-to">
-            <h2 id="recent-to" className="text-[0.9375rem] font-semibold text-ink-3" style={{ fontStretch: '100%' }}>
+            <h2
+              id="recent-to"
+              className="text-[0.9375rem] font-semibold text-ink-3"
+              style={{ fontStretch: '100%' }}
+            >
               {s.recent}
             </h2>
             <ul className="mt-1 flex flex-col" role="list">
@@ -359,12 +462,19 @@ export default function Send() {
                       void resolve(v);
                     }}
                   >
-                    <span className="grid size-10 place-items-center rounded-full bg-well font-bold uppercase" aria-hidden="true">
+                    <span
+                      className="grid size-10 place-items-center rounded-full bg-well font-bold uppercase"
+                      aria-hidden="true"
+                    >
                       {(c.handle ?? c.address).slice(0, 1)}
                     </span>
                     <span className="flex min-w-0 flex-col">
-                      <b className="truncate">{c.handle ? `@${c.handle}` : shortAddress(c.address)}</b>
-                      <span className="truncate text-[0.8125rem] text-ink-3">{shortAddress(c.address)}</span>
+                      <b className="truncate">
+                        {c.handle ? `@${c.handle}` : shortAddress(c.address)}
+                      </b>
+                      <span className="truncate text-[0.8125rem] text-ink-3">
+                        {shortAddress(c.address)}
+                      </span>
                     </span>
                   </button>
                 </li>

@@ -8,17 +8,20 @@ import { TxBuilder, type BuiltTransaction } from '@/chain/tx-builder.service';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { isAccountAddress } from '@/common/stellar';
 import { AccountsService } from '@/p2p/accounts.service';
+import { showsOutcome } from '@/p2p/domain/action-outcome';
 import { isUuid } from '@/p2p/domain/order-ref';
 import { isSelfOpened } from '@/p2p/domain/order-status';
 import {
   buildBalanceAction,
   buildOrderAction,
   isBalanceAction,
+  type P2pBalanceAction,
   type P2pBuiltCall,
   type P2pTransactionAction,
 } from '@/p2p/domain/transaction-actions';
 import type { BuildTransactionDto } from '@/p2p/dto/transaction.dto';
 import { OffersService } from '@/p2p/offers.service';
+import { alreadyDone, onchainOutcome, type OutcomeOrder } from '@/p2p/order-outcome';
 import { tierOf } from '@/p2p/tier';
 import { P2P_ORDER_SELECT, type P2pOrderRow } from '@/p2p/views';
 import { PrismaService } from '@/prisma/prisma.service';
@@ -41,7 +44,9 @@ export function refusedByContract(err: unknown): never {
  * through simulation (`TxBuilder`). `from` is one of the caller's accounts, or
  * the seller of one of the caller's sales (a person's wallet is not an
  * account). An order action names an order the caller is a party to: its
- * client (it created it) or its merchant. Nothing is signed here.
+ * client (it created it) or its merchant; one the order already shows is a
+ * 409 `already_done` (a retry), checked before the chain is reached. Nothing
+ * is signed here.
  */
 @Injectable()
 export class TransactionsService {
@@ -63,14 +68,40 @@ export class TransactionsService {
     }
   }
 
+  /**
+   * An order action's prepared transaction. When the contract refuses it, the
+   * order is read on-chain: one that already shows the action (it went
+   * through and the indexer has not caught up) is a 409 `already_done`;
+   * anything else stays the contract's 400.
+   */
+  async preparedOrderAction(
+    d: Deployment,
+    from: string,
+    call: P2pBuiltCall,
+    order: OutcomeOrder,
+    action: Exclude<P2pTransactionAction, P2pBalanceAction>,
+  ): Promise<BuiltTransaction> {
+    try {
+      return await this.builder.invoke(d, from, call.operation, call.fn, call.description);
+    } catch (err) {
+      if (err instanceof ChainCallReverted) {
+        const shown = await onchainOutcome(this.reader, d, order, action);
+        if (shown) throw alreadyDone(shown);
+      }
+      refusedByContract(err);
+    }
+  }
+
   async build(org: OrgPrincipal, dto: BuildTransactionDto): Promise<BuiltTransaction> {
     const tier = tierOf(org, this.deployments);
     const organizationId = org.organizationId;
-    const deployment = await this.reader.requireLive(tier, dto.network);
+    // The network is checked against configuration here; the chain is reached last.
+    const configured = this.deployments.require(tier, dto.network);
     const action = dto.action as P2pTransactionAction;
     const args = dto.args ?? {};
 
     if (isBalanceAction(action)) {
+      const deployment = await this.reader.requireLive(tier, dto.network);
       const account = await this.accounts.ownedByRef(organizationId, tier, dto.from);
       const built = buildBalanceAction(action, args, {
         contract: deployment.contract,
@@ -89,10 +120,11 @@ export class TransactionsService {
       throw ApiError.validation(['args.orderId must be the id of an order']);
     }
     const order = await this.partyOrder(organizationId, tier, orderId);
-    if (order.network !== deployment.network) {
-      throw ApiError.validation([`the order is on ${order.network}, not ${deployment.network}`]);
+    if (order.network !== configured.network) {
+      throw ApiError.validation([`the order is on ${order.network}, not ${configured.network}`]);
     }
     const from = await this.signer(organizationId, tier, dto.from, order);
+    if (showsOutcome(action, order.status)) throw alreadyDone(order.status);
     const built = buildOrderAction(action, {
       contract: order.contract,
       from,
@@ -100,7 +132,8 @@ export class TransactionsService {
       now: new Date(),
     });
     if (!built.ok) throw ApiError.badRequest(ErrorCode.InvalidState, built.error);
-    return this.prepared(deployment, from, built.value);
+    const deployment = await this.reader.requireLive(tier, dto.network);
+    return this.preparedOrderAction(deployment, from, built.value, order, action);
   }
 
   /** An order the caller created or is the merchant of, on its tier; else a 404. */

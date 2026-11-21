@@ -3,11 +3,16 @@ import { Inject, Injectable, Logger } from '@nestjs/common';
 import { normalizeHandle, normalizeRecipient } from '@midpoint/payment-qr';
 import { Address, nativeToScVal, scValToNative, type rpc } from '@stellar/stellar-sdk';
 import type { SessionPrincipal } from '@/auth/auth.types';
-import { ChainCallReverted, ChainClient } from '@/chain/chain-client.service';
+import {
+  ChainCallReverted,
+  ChainClient,
+  type AccountState,
+  type TrustlineState,
+} from '@/chain/chain-client.service';
 import { DeploymentsService, type Deployment } from '@/chain/deployments.service';
 import { eventNameTopic } from '@/chain/market-codec';
 import { MarketReader } from '@/chain/market-reader.service';
-import type { Token } from '@/chain/networks';
+import { isNativeToken, type Token } from '@/chain/networks';
 import { TxBuilder, type BuiltTransaction } from '@/chain/tx-builder.service';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { baseAccountOf, isContractAddress } from '@/common/stellar';
@@ -29,6 +34,34 @@ import { OrdersService } from '@/p2p/orders.service';
 import { APP_ORGANIZATION_ID } from '@/p2p/p2p-events';
 import { P2P_ORDER_SELECT } from '@/p2p/views';
 import { PrismaService } from '@/prisma/prisma.service';
+
+/**
+ * The balances answer: every listed token as the account holds it. A missing
+ * account holds nothing; the native lumen's line is its spendable lumens and
+ * is always "trusted" and authorised (it needs no trustline). Pure.
+ */
+export function balancesView(
+  network: string,
+  state: AccountState | null,
+  tokens: readonly Token[],
+  lines: readonly (TrustlineState | null)[],
+): BalancesView {
+  return {
+    network,
+    account: { exists: state !== null },
+    xlm: (state?.balance ?? 0n).toString(),
+    tokens: tokens.map((t, i) => {
+      const native = isNativeToken(t);
+      return {
+        symbol: t.symbol,
+        contract: t.contract,
+        amount: (native ? (state?.spendable ?? 0n) : (lines[i]?.balance ?? 0n)).toString(),
+        trustline: native || Boolean(lines[i]),
+        authorized: native || (lines[i]?.authorized ?? false),
+      };
+    }),
+  };
+}
 
 /** Handles nobody may claim. */
 export const RESERVED_HANDLES = new Set([
@@ -164,22 +197,16 @@ export class AppWalletService {
 
   // --- balances and activation ---------------------------------------------------
 
+  /**
+   * The account's balances: each listed token as it holds it. The native
+   * lumen, when listed, is its SPENDABLE lumens (what reserves and offers do
+   * not lock), always with `trustline` and `authorized` true: it needs none.
+   */
   async balances(session: SessionPrincipal, network?: string): Promise<BalancesView> {
     const d = await this.deployment(network);
     const state = await this.chain.account(d, session.address);
     const lines = state ? await this.chain.trustlines(d, session.address, d.tokens) : [];
-    return {
-      network: d.network,
-      account: { exists: state !== null },
-      xlm: (state?.balance ?? 0n).toString(),
-      tokens: d.tokens.map((t, i) => ({
-        symbol: t.symbol,
-        contract: t.contract,
-        amount: (lines[i]?.balance ?? 0n).toString(),
-        trustline: Boolean(lines[i]),
-        authorized: lines[i]?.authorized ?? false,
-      })),
-    };
+    return balancesView(d.network, state, d.tokens, lines);
   }
 
   async activate(
@@ -231,7 +258,10 @@ export class AppWalletService {
       );
     }
     let transaction: BuiltTransaction;
-    if (isContractAddress(to.address)) {
+    // The native lumen always moves through its Stellar Asset Contract (`transfer`).
+    const viaContract = isContractAddress(to.address) || isNativeToken(token);
+    if (viaContract && !isContractAddress(to.address)) await this.canReceive(d, toAccount, token);
+    if (viaContract) {
       try {
         transaction = await this.builder.sacTransfer(d, session.address, to.address, token, amount);
       } catch (err) {
@@ -266,9 +296,18 @@ export class AppWalletService {
     return { transfer: await this.transferView(row, session.address), transaction };
   }
 
-  /** A G account that can receive the token: it exists and holds an authorised trustline. */
+  /**
+   * A G account that can receive the token: it exists and holds an authorised
+   * trustline (the native lumen needs only the account).
+   */
   private async canReceive(d: Deployment, account: string, token: Token): Promise<void> {
     const state = await this.chain.account(d, account);
+    if (!state && isNativeToken(token)) {
+      throw ApiError.badRequest(
+        ErrorCode.RecipientCannotReceive,
+        `${account} cannot receive ${token.symbol} yet: it needs an account.`,
+      );
+    }
     const [line] = state ? await this.chain.trustlines(d, account, [token]) : [null];
     if (!state || !line || !line.authorized) {
       throw ApiError.badRequest(
@@ -441,8 +480,9 @@ export class AppWalletService {
     const token = d.tokens.find((t) => t.contract === ev.contractId?.contractId());
     if (!token || ev.topic.length < 3) return;
     const name = scValToNative(ev.topic[0]) as unknown;
+    // The native lumen is never minted: only an issued asset's `mint` comes from its issuer.
     const from = name === 'mint' ? token.issuer : Address.fromScVal(ev.topic[1]).toString();
-    if (from === d.contract || from === address) return;
+    if (from === null || from === d.contract || from === address) return;
     const raw = scValToNative(ev.value) as unknown;
     const amount =
       typeof raw === 'bigint'

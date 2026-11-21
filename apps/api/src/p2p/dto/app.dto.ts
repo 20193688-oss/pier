@@ -81,7 +81,7 @@ export class AppQuoteDto {
   @ApiPropertyOptional({
     example: '00020101021243650016com.mercadolibre...6304ABCD',
     description:
-      'A QR payment: the scanned merchant QR exactly as read (Argentina’s interoperable QR or PIX). Its CRC must check.',
+      'A QR payment: the scanned merchant QR exactly as read (Argentina’s interoperable QR, PIX, or Peru’s interoperable QR of Yape, Plin and the banks). Its CRC must check. A static QR carries no amount: give `fiatAmount`.',
   })
   @IsOptional()
   @IsString()
@@ -122,6 +122,7 @@ export class AppOrderDto extends OmitType(CreateOrderDto, [
 }
 
 export const APP_TRANSACTION_ACTIONS = [
+  'open',
   'accept',
   'markPaid',
   'release',
@@ -138,7 +139,7 @@ export class AppTransactionDto {
     enum: APP_TRANSACTION_ACTIONS,
     example: 'release',
     description:
-      'Usually `release` (a sale or QR payment you were paid for), `dispute` or `cancel`; refused when your wallet may not do it now.',
+      'Usually `release` (a sale or QR payment you were paid for), `dispute` or `cancel`; `open` is a pending sale or QR payment’s `open_with_deposit`, simulated now (ask for it right before signing: one simulated earlier can go stale when another order takes the order id it names). Refused when your wallet may not do it now.',
   })
   @IsIn(APP_TRANSACTION_ACTIONS)
   action!: (typeof APP_TRANSACTION_ACTIONS)[number];

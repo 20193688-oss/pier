@@ -128,7 +128,10 @@ export class DeploymentsService {
     ]);
   }
 
-  /** A token of a deployment by contract, symbol or `CODE:ISSUER` (any case), or `400 asset_unsupported`. */
+  /**
+   * A token of a deployment by contract, symbol or `CODE:ISSUER` (any case;
+   * the native lumen also as `native`), or `400 asset_unsupported`.
+   */
   token(deployment: Deployment, ref: string): Token {
     const found = this.findToken(deployment, ref);
     if (found) return found;
@@ -146,7 +149,9 @@ export class DeploymentsService {
         (t) =>
           t.contract === wanted ||
           t.symbol.toUpperCase() === upper ||
-          `${t.code}:${t.issuer}`.toUpperCase() === upper,
+          (t.issuer === null
+            ? upper === 'NATIVE'
+            : `${t.code}:${t.issuer}`.toUpperCase() === upper),
       ) ?? null
     );
   }

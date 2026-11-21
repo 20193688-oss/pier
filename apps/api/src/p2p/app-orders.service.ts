@@ -8,8 +8,9 @@ import { ApiError, ErrorCode } from '@/common/api-error';
 import { page, type Page } from '@/common/pagination';
 import { APP_CONFIG } from '@/config/config.module';
 import type { AppConfig } from '@/config/env';
+import { showsOutcome } from '@/p2p/domain/action-outcome';
 import { isUuid } from '@/p2p/domain/order-ref';
-import { P2P_LIVE_STATUSES } from '@/p2p/domain/order-status';
+import { isSelfOpened, P2P_LIVE_STATUSES } from '@/p2p/domain/order-status';
 import { readQrPayment } from '@/p2p/domain/qr-pay';
 import { buildOrderAction, type P2pTransactionAction } from '@/p2p/domain/transaction-actions';
 import type { AppOrderDto, AppQuoteDto, AppTransactionDto } from '@/p2p/dto/app.dto';
@@ -17,6 +18,7 @@ import type { CreateQuoteDto, QueryOrdersDto, ReportPaidDto } from '@/p2p/dto/or
 import type { QuoteView } from '@/p2p/entities/offer.entity';
 import type { CreatedOrderView, OrderView } from '@/p2p/entities/order.entity';
 import { OrdersService } from '@/p2p/orders.service';
+import { alreadyDone, onchainOutcome } from '@/p2p/order-outcome';
 import { APP_ORGANIZATION_ID } from '@/p2p/p2p-events';
 import { QuotesService } from '@/p2p/quotes.service';
 import { TransactionsService } from '@/p2p/transactions.service';
@@ -200,22 +202,55 @@ export class AppOrdersService implements OnModuleInit {
     );
   }
 
-  /** A transaction for the person's own wallet on their order (release, cancel, dispute a sale...). */
+  /**
+   * A transaction for the person's own wallet on their order (release, cancel,
+   * dispute a sale...). One the order already shows (a retry, or a second
+   * press) is a 409 `already_done` naming its status: nothing to sign.
+   */
   async transaction(
     session: SessionPrincipal,
     id: string,
     dto: AppTransactionDto,
   ): Promise<BuiltTransaction> {
     const row = await this.own(session, id);
-    const built = buildOrderAction(
-      dto.action as Exclude<
-        P2pTransactionAction,
-        'deposit' | 'withdraw' | 'setOperator' | 'setMatcher'
-      >,
-      { contract: row.contract, from: session.address, order: row, now: new Date() },
-    );
+    if (dto.action === 'open') {
+      // A sale or QR payment still waiting for its seller's signature: its open_with_deposit,
+      // simulated now. One simulated at creation can go stale: its footprint names the next order
+      // id, and another order may take that id before the seller signs (the contract then traps
+      // writing outside the footprint).
+      const ownSale = isSelfOpened(row.kind) && row.sellerAddress === session.address;
+      if (ownSale && showsOutcome('open', row.status)) throw alreadyDone(row.status);
+      if (!ownSale || row.status !== 'pending') {
+        throw ApiError.badRequest(
+          ErrorCode.InvalidState,
+          'Only a sale or QR payment waiting for your signature can be opened.',
+        );
+      }
+      const d = await this.reader.requireLive(row.tier as Tier, row.network);
+      try {
+        return await this.orders.sellTransaction(d, row);
+      } catch (err) {
+        // Refused because it is open already (signed, the indexer not caught up yet)?
+        if (err instanceof ApiError && err.code === ErrorCode.InvalidState) {
+          const shown = await onchainOutcome(this.reader, d, row, 'open');
+          if (shown) throw alreadyDone(shown);
+        }
+        throw err;
+      }
+    }
+    const action = dto.action as Exclude<
+      P2pTransactionAction,
+      'deposit' | 'withdraw' | 'setOperator' | 'setMatcher'
+    >;
+    if (showsOutcome(action, row.status)) throw alreadyDone(row.status);
+    const built = buildOrderAction(action, {
+      contract: row.contract,
+      from: session.address,
+      order: row,
+      now: new Date(),
+    });
     if (!built.ok) throw ApiError.badRequest(ErrorCode.InvalidState, built.error);
     const d = await this.reader.requireLive(row.tier as Tier, row.network);
-    return this.transactions.prepared(d, session.address, built.value);
+    return this.transactions.preparedOrderAction(d, session.address, built.value, row, action);
   }
 }

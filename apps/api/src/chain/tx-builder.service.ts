@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   Account,
-  Asset,
   BASE_FEE,
   Keypair,
   Memo,
@@ -15,7 +14,7 @@ import {
 import { ChainCallReverted, ChainClient } from '@/chain/chain-client.service';
 import { DeploymentsService, type StellarNetwork } from '@/chain/deployments.service';
 import { refusalName } from '@/chain/market-codec';
-import type { Token } from '@/chain/networks';
+import { assetOf, isNativeToken, type Token } from '@/chain/networks';
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { formatUnits } from '@/p2p/domain/pricing';
 
@@ -225,7 +224,7 @@ export class TxBuilder {
     ).addOperation(
       Operation.payment({
         destination,
-        asset: new Asset(token.code, token.issuer),
+        asset: assetOf(token),
         amount: formatUnits(amount, token.decimals),
       }),
     );
@@ -268,6 +267,8 @@ export class TxBuilder {
    * trustline. Null when there is nothing to do. When the account is missing
    * the transaction's source is the SPONSOR (a missing account has no
    * sequence number), and the API adds the sponsor's signature at submit.
+   * The native lumen needs no trustline: activating for XLM only creates a
+   * missing account (and is null for an existing one); never a trustline.
    */
   async activation(
     n: StellarNetwork,
@@ -281,8 +282,10 @@ export class TxBuilder {
         'P2P_SPONSOR_SECRET is not set.',
       );
     }
+    const native = isNativeToken(token);
     const state = await this.chain.account(n, user);
     if (state) {
+      if (native) return null;
       const [trustline] = await this.chain.trustlines(n, user, [token]);
       if (trustline) return null;
     }
@@ -295,7 +298,7 @@ export class TxBuilder {
       ...(state
         ? []
         : [Operation.createAccount({ destination: user, startingBalance: '0', source: sponsor })]),
-      Operation.changeTrust({ asset: new Asset(token.code, token.issuer), source: user }),
+      ...(native ? [] : [Operation.changeTrust({ asset: assetOf(token), source: user })]),
       Operation.endSponsoringFutureReserves({ source: user }),
     ];
     const builder = this.builder(n, source, (Number(BASE_FEE) * ops.length).toString());
@@ -304,9 +307,11 @@ export class TxBuilder {
       n,
       builder.build(),
       'activate',
-      state
-        ? `Open your ${token.symbol} trustline (the reserve is sponsored)`
-        : `Create your account and open your ${token.symbol} trustline (the reserves are sponsored)`,
+      native
+        ? 'Create your account (the reserves are sponsored)'
+        : state
+          ? `Open your ${token.symbol} trustline (the reserve is sponsored)`
+          : `Create your account and open your ${token.symbol} trustline (the reserves are sponsored)`,
     );
   }
 }

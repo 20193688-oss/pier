@@ -1,7 +1,10 @@
 /* Pay a shop's local-money QR (Argentina's interoperable QR, Brazil's PIX) through a market
-   merchant: the shop's name and city, the amount in local money (typed when the QR is static), the
-   USDC it costs from the quote; one signature locks the USDC (`open_with_deposit`, pinned to the
-   quote and the QR payment's fixed windows), then the order's own screen follows the merchant. */
+   merchant: the shop's name and city, the amount in local money (the QR's own when it carries one,
+   typed when it is static), the USDC it costs from the quote; one signature locks the USDC
+   (`open_with_deposit`, pinned to the quote and the QR payment's fixed windows), then the order's
+   own screen follows the merchant. A balance that cannot cover the payment at the market's
+   approximate price is said up front, with "add money" already filled with what is missing, and
+   no quote is asked for. */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { parseEmv } from '@midpoint/payment-qr';
@@ -20,9 +23,9 @@ import { QR_PAY_WINDOWS, qrRail, trustQrQuote } from '@/lib/p2p/qr-pay';
 import { saleTerms } from '@/lib/p2p/tx-verify';
 import { saveQuoteTerms, saveSteps } from '@/lib/p2p/steps';
 import { useSession } from '@/lib/session';
-import { useAppData } from '@/features/app/data';
+import { useAppData, usePrice } from '@/features/app/data';
 import { Screen } from '@/features/app/shell';
-import { Facts, useUsd } from '@/features/app/parts';
+import { Facts, useUsd, WalletSummary } from '@/features/app/parts';
 import { keptQr } from '@/features/app/Scan';
 import type { AcceptedQuote } from '@/lib/p2p/fees';
 import type { P2pOrder, P2pQuote } from '@/lib/p2p/types';
@@ -50,11 +53,23 @@ export default function PayQr() {
     return parsed?.ok ? parsed.qr : null;
   }, [payload]);
   const [typed, setTyped] = useState('');
-  const [quote, setQuote] = useState<{ q: P2pQuote; accepted: AcceptedQuote } | null | 'loading' | 'none' | 'untrusted'>(null);
+  const [quote, setQuote] = useState<
+    { q: P2pQuote; accepted: AcceptedQuote } | null | 'loading' | 'none' | 'untrusted'
+  >(null);
   const [error, setError] = useState('');
   const order = useRef<P2pOrder | null>(null);
   const fiat = qr?.amount ?? (qr?.currency ? parseFiat(typed, qr.currency) : null);
   const now = useNow(!!quote && typeof quote === 'object');
+
+  // Up front, before any quote: what the payment costs at the market's approximate price.
+  const approx = usePrice(qr?.currency ?? null);
+  const decimals = token?.decimals ?? 7;
+  const have = BigInt(balance || '0');
+  const approxUnits =
+    fiat && approx
+      ? toBaseUnits((Number(fiat) / approx).toFixed(Math.min(decimals, 6)), decimals)
+      : null;
+  const shortUpFront = !!fiat && (have === 0n || (!!approxUnits && BigInt(approxUnits) > have));
 
   const ask = useCallback(() => {
     if (!qr || !fiat || !network || !token) return;
@@ -83,10 +98,10 @@ export default function PayQr() {
 
   useEffect(() => {
     order.current = null;
-    if (!fiat) return setQuote(null);
+    if (!fiat || shortUpFront) return setQuote(null);
     const h = setTimeout(ask, qr?.amount ? 0 : 500);
     return () => clearTimeout(h);
-  }, [fiat, ask, qr?.amount]);
+  }, [fiat, ask, qr?.amount, shortUpFront]);
 
   const live = quote && typeof quote === 'object' ? quote : null;
   const expired = !!live && Date.parse(live.q.expiresAt) <= now;
@@ -113,14 +128,42 @@ export default function PayQr() {
 
   const rail = qrRail(qr);
   const units = live ? (toBaseUnits(live.q.tokenAmount, token.decimals) ?? '0') : null;
-  const short = !!units && BigInt(units) > BigInt(balance || '0');
+  const short = !!units && BigInt(units) > have;
   const currency = qr.currency ?? '';
 
+  /** "Add money" filled with what is missing, in the QR's currency (2 % over, for the spread). */
+  const topUp = (needUnits: string | null, price: number | null) => {
+    const missing = needUnits ? Number(BigInt(needUnits) - have) / 10 ** token.decimals : 0;
+    const amount = price && missing > 0 ? Math.ceil(missing * price * 1.02) : null;
+    const params = new URLSearchParams({ currency, ...(amount ? { amount: String(amount) } : {}) });
+    return (
+      <section className="sheet flex flex-col gap-3 p-4" aria-labelledby="topup-h" role="status">
+        <h2 id="topup-h" className="text-[1.0625rem]">
+          {q.topUpTitle}
+        </h2>
+        <p className="text-ink-2">
+          {needUnits
+            ? fmt(q.topUpBody, {
+                need: `${needUnits === units ? '' : `${q.topUpApprox} `}${fmtUsd(needUnits)}`,
+                have: fmtUsd(have),
+              })
+            : fmt(q.topUpEmpty, { have: fmtUsd(have) })}
+        </p>
+        <Link to={`/app/add?${params}`} className="btn btn-ink btn-lg">
+          {q.topUp}
+        </Link>
+      </section>
+    );
+  };
+
   return (
-    <Screen back title={q.title}>
+    <Screen back title={q.title} aside={<WalletSummary />}>
       <div className="flex flex-col gap-4 pb-4">
         <div className="flex items-center gap-3 rounded-[18px] border border-line bg-sheet p-4">
-          <span className="grid size-12 shrink-0 place-items-center rounded-full bg-well" aria-hidden="true">
+          <span
+            className="grid size-12 shrink-0 place-items-center rounded-full bg-well"
+            aria-hidden="true"
+          >
             <Icon name="store" size={24} />
           </span>
           <span className="flex min-w-0 flex-col">
@@ -133,7 +176,7 @@ export default function PayQr() {
           </span>
         </div>
 
-        {!rail && <Notice tone="error">{t.app.scan.qrNotTaken}</Notice>}
+        {!rail && <Notice tone="error" stay>{t.app.scan.qrNotTaken}</Notice>}
 
         {rail && (
           <div className="rounded-[20px] bg-well px-4 py-5 text-center">
@@ -167,9 +210,10 @@ export default function PayQr() {
           </div>
         )}
 
+        {rail && shortUpFront && topUp(approxUnits, approx ?? null)}
         {quote === 'loading' && <Skeleton className="h-32" />}
         {quote === 'none' && <Notice tone="warn">{q.noQuote}</Notice>}
-        {quote === 'untrusted' && <Notice tone="error">{q.untrusted}</Notice>}
+        {quote === 'untrusted' && <Notice tone="error" stay>{q.untrusted}</Notice>}
         {live && units && (
           <>
             <Facts
@@ -189,12 +233,7 @@ export default function PayQr() {
               <p className="mt-2 text-[0.9375rem] text-ink-2">{q.how}</p>
             </details>
             {short ? (
-              <>
-                <Notice tone="warn">{q.insufficient}</Notice>
-                <Link to="/app/add" className="btn btn-line btn-lg">
-                  {t.app.home.actions.add}
-                </Link>
-              </>
+              topUp(units, Number(live.q.price) || null)
             ) : (
               <SignFlow
                 network={network}
@@ -214,7 +253,10 @@ export default function PayQr() {
                         );
                         saveSteps(order.current.id, order.current.transactions);
                         saveQuoteTerms(order.current.id, live.accepted);
-                        keepQrOrder(order.current.id, { name: qr.merchantName, city: qr.merchantCity });
+                        keepQrOrder(order.current.id, {
+                          name: qr.merchantName,
+                          city: qr.merchantCity,
+                        });
                       }
                       const open = order.current.transactions?.[0];
                       if (!open) throw new ApiError(502, 'bad_response', 'no transaction');
@@ -238,7 +280,8 @@ export default function PayQr() {
                   },
                 ]}
                 onError={(e) => {
-                  if (e instanceof ApiError && e.code === 'insufficient_balance') setError(q.insufficient);
+                  if (e instanceof ApiError && e.code === 'insufficient_balance')
+                    setError(q.insufficient);
                   else if (e instanceof ApiError && e.code === 'quote_expired') {
                     order.current = null;
                     ask();

@@ -13,6 +13,7 @@ import type {
   MerchantQrView,
 } from '@/p2p/entities/order.entity';
 import { completionRate } from '@/p2p/domain/matching';
+import { chatSummaryOf } from '@/p2p/domain/order-chat';
 import {
   P2P_LIVE_STATUSES,
   P2P_MERCHANT_SIDE,
@@ -217,6 +218,9 @@ export const P2P_ORDER_SELECT = {
   chargeId: true,
   payoutBatchId: true,
   externalReference: true,
+  chatCount: true,
+  chatLastAt: true,
+  chatLastFrom: true,
   createdAt: true,
   updatedAt: true,
 } as const satisfies Prisma.P2pOrderSelect;
@@ -307,6 +311,7 @@ export function toOrderView(
     externalReference: row.externalReference,
     paymentDetails,
     qr,
+    chat: chatSummaryOf(row),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -354,6 +359,7 @@ export function toMerchantOrderView(
     payer: isLive(row.status) ? counterparty.payer : null,
     beneficiary: isLive(row.status) ? counterparty.beneficiary : null,
     qr: isLive(row.status) ? (counterparty.qr ?? null) : null,
+    chat: chatSummaryOf(row),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };

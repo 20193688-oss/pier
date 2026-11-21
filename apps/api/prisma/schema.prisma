@@ -317,11 +317,11 @@ model P2pQuote {
 }
 
 model P2pOrder {
-  id                      String          @id
+  id                      String            @id
   // SHA-256 of the uuid's 16 bytes, hex: the order's on-chain `ref_id`.
-  ref                     String          @unique
+  ref                     String            @unique
   organizationId          String
-  organization            Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization            Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   tier                    String
   // BUY | SELL | QR_PAY | CHARGE | PAYOUT
   kind                    String
@@ -333,7 +333,7 @@ model P2pOrder {
   tokenSymbol             String
   tokenDecimals           Int
   merchantAccountId       String?
-  merchantAccount         P2pAccount?     @relation("P2pOrderMerchant", fields: [merchantAccountId], references: [id], onDelete: SetNull)
+  merchantAccount         P2pAccount?       @relation("P2pOrderMerchant", fields: [merchantAccountId], references: [id], onDelete: SetNull)
   // The merchant's organization, for its own views and webhooks.
   merchantOrganizationId  String
   merchantAddress         String
@@ -341,7 +341,7 @@ model P2pOrder {
   merchantPaymentMethodId String?
   offerId                 String?
   offerSnapshot           Json
-  quoteId                 String?         @unique
+  quoteId                 String?           @unique
   price                   String
   fiatAmount              String
   currency                String
@@ -362,7 +362,7 @@ model P2pOrder {
   openerAddress           String
   onchainId               String?
   chainStatus             String?
-  status                  String          @default("pending")
+  status                  String            @default("pending")
   acceptDeadline          DateTime?
   paymentDeadline         DateTime?
   paidAt                  DateTime?
@@ -387,15 +387,22 @@ model P2pOrder {
   paidReference           String?
   failureReason           String?
   chargeId                String?
-  charge                  P2pCharge?      @relation(fields: [chargeId], references: [id], onDelete: SetNull)
+  charge                  P2pCharge?        @relation(fields: [chargeId], references: [id], onDelete: SetNull)
   payoutBatchId           String?
-  payoutBatch             P2pPayoutBatch? @relation(fields: [payoutBatchId], references: [id], onDelete: SetNull)
+  payoutBatch             P2pPayoutBatch?   @relation(fields: [payoutBatchId], references: [id], onDelete: SetNull)
   externalReference       String?
   // A checkout order's payer session: SHA-256 of its token, and its client (HMAC).
-  payerTokenHash          String?         @unique
+  payerTokenHash          String?           @unique
   clientKey               String?
-  createdAt               DateTime        @default(now())
-  updatedAt               DateTime        @updatedAt
+  // The order's chat, summarised for its views (written with each message):
+  // how many messages, when the last one came and from which side.
+  chatCount               Int               @default(0)
+  chatLastAt              DateTime?
+  // creator | merchant
+  chatLastFrom            String?
+  messages                P2pOrderMessage[]
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
 
   @@unique([tier, network, contract, onchainId])
   @@index([organizationId, tier, createdAt])
@@ -406,6 +413,33 @@ model P2pOrder {
   @@index([chargeId, status])
   @@index([payoutBatchId])
   @@map("p2p_order")
+}
+
+// A message in an order's chat, between the side that created the order
+// (`creator`: an organization, or the public app's wallet) and its merchant.
+// A message with an attachment is a transfer receipt. The text, the
+// attachment's name and its bytes are sealed at rest (DATA_ENCRYPTION_KEY);
+// its type and size are not, so lists never open the bytes.
+model P2pOrderMessage {
+  id                   String   @id
+  orderId              String
+  order                P2pOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  // creator | merchant
+  sender               String
+  // Who wrote it: the organization, and the wallet for the public app's orders.
+  senderOrganizationId String
+  senderAddress        String?
+  text                 String?
+  attachmentName       String?
+  // image/png | image/jpeg | image/webp | application/pdf
+  attachmentType       String?
+  // Decoded bytes.
+  attachmentSize       Int?
+  attachmentData       String?
+  createdAt            DateTime @default(now())
+
+  @@index([orderId, createdAt])
+  @@map("p2p_order_message")
 }
 
 model P2pCharge {

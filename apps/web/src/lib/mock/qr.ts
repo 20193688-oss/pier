@@ -42,9 +42,27 @@ export function pixQr(input: { merchant: string; city: string; amount: string | 
   );
 }
 
-/** The QRs the demo uses: a café's dynamic QR in Salta and a kiosk's static one. */
+/** Peru's interoperable QR the way Yape makes one: the account is an opaque token in field 39
+    (not a TLV template); static unless it carries an amount. */
+export function peQr(input: { merchant: string; city: string; amount: string | null }): string {
+  return withCrc(
+    tlv('00', '01') +
+      tlv('01', input.amount ? '12' : '11') +
+      tlv('39', 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo=') +
+      tlv('52', '5611') +
+      tlv('53', '604') +
+      (input.amount ? tlv('54', input.amount) : '') +
+      tlv('58', 'PE') +
+      tlv('59', input.merchant) +
+      tlv('60', input.city),
+  );
+}
+
+/** The QRs the demo uses: a café's dynamic QR in Salta and a kiosk's static one, a PIX, and a
+    Yape QR in Lima. */
 export const DEMO_QRS = {
   cafe: arQr({ merchant: 'Cafe El Molino', city: 'Salta', amount: '12500.00', reference: 'MESA-4' }),
   kiosk: arQr({ merchant: 'Kiosco La Esquina', city: 'Salta', amount: null }),
   pix: pixQr({ merchant: 'Padaria Boa Vista', city: 'SAO PAULO', amount: '32.50' }),
+  yape: peQr({ merchant: 'BODEGA LUCHO', city: 'Lima', amount: null }),
 };

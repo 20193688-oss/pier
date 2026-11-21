@@ -40,6 +40,7 @@ import {
 } from '@/features/dashboard/ui';
 import { accountStep } from '@/features/dashboard/tx';
 import type { P2pAccount, P2pAccountChain, P2pMarket, P2pNetwork } from '@/lib/p2p/types';
+import { useGuard } from '@/lib/use-action';
 
 type Action =
   | {
@@ -88,28 +89,31 @@ export function LiquidityView() {
 
   const merchants = (load.data ?? []).filter((a) => a.merchant).length;
 
-  const setStatus = async (a: P2pAccount, active: boolean) => {
-    setError('');
-    try {
-      await accountsApi.update(scope, a.id, { merchantStatus: active ? 'ACTIVE' : 'PAUSED' });
-      toast(active ? d.resumed : d.paused);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e, l.saveFailed));
-    }
-  };
+  const guard = useGuard();
+  const setStatus = (a: P2pAccount, active: boolean) =>
+    guard(async () => {
+      setError('');
+      try {
+        await accountsApi.update(scope, a.id, { merchantStatus: active ? 'ACTIVE' : 'PAUSED' });
+        toast(active ? d.resumed : d.paused);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e, l.saveFailed));
+      }
+    });
 
-  const remove = async (a: P2pAccount) => {
-    setError('');
-    try {
-      await accountsApi.remove(scope, a.id);
-      toast(l.removed);
-      setRemoving(null);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e, l.removeFailed));
-    }
-  };
+  const remove = (a: P2pAccount) =>
+    guard(async () => {
+      setError('');
+      try {
+        await accountsApi.remove(scope, a.id);
+        toast(l.removed);
+        setRemoving(null);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e, l.removeFailed));
+      }
+    });
 
   return (
     <>
@@ -248,7 +252,7 @@ export function LiquidityView() {
                   )}
                 </div>
                 {a.merchant?.status === 'SUSPENDED' && (
-                  <Notice tone="error" className="mt-3">
+                  <Notice tone="error" stay className="mt-3">
                     {l.suspended}
                   </Notice>
                 )}
@@ -697,43 +701,45 @@ function RegisterDialog({ onClose, onDone }: { onClose: () => void; onDone: () =
   const [signingIn, setSigningIn] = useState(false);
   const nameMissing = merchant && displayName.trim().length < 2;
 
-  const register = async () => {
-    if (!wallet || nameMissing) return;
-    setError('');
-    try {
-      setProgress(r.challenge);
-      const ch = await accountsApi.challenge(scope, wallet.address);
-      // Pinned to this app's home domain, web_auth_domain and stellar.toml SIGNING_KEY.
-      const domains = await assertChallenge(ch.transaction, ch.networkPassphrase, wallet.address);
-      setProgress(fmt(t.common.wallet.signing, { wallet: wallet.label }));
-      const signed = await wallet.signAuthChallenge(ch.transaction, ch.networkPassphrase, domains);
-      assertSameTransaction(ch.transaction, signed, ch.networkPassphrase);
-      setProgress(r.checking);
-      await accountsApi.register(scope, {
-        address: wallet.address,
-        transaction: signed,
-        ...(label.trim() ? { label: label.trim() } : {}),
-        ...(merchant ? { displayName: displayName.trim() } : {}),
-      });
-      onDone();
-    } catch (e) {
-      setProgress('');
-      if (e instanceof WalletError)
-        setError(
-          e.message.startsWith('challenge:')
-            ? t.common.wallet.badChallenge
-            : e.kind === 'rejected'
-              ? t.common.wallet.rejected
-              : e.kind === 'mismatch'
-                ? t.common.wallet.mismatch
-                : e.kind === 'unsupported'
-                  ? t.common.wallet.unsupported
-                  : t.common.wallet.failed,
-        );
-      else if (e instanceof ApiError && e.status === 409) setError(d.alreadyRegistered);
-      else setError(errorMessage(t.common, e));
-    }
-  };
+  const guard = useGuard();
+  const register = () =>
+    guard(async () => {
+      if (!wallet || nameMissing) return;
+      setError('');
+      try {
+        setProgress(r.challenge);
+        const ch = await accountsApi.challenge(scope, wallet.address);
+        // Pinned to this app's home domain, web_auth_domain and stellar.toml SIGNING_KEY.
+        const domains = await assertChallenge(ch.transaction, ch.networkPassphrase, wallet.address);
+        setProgress(fmt(t.common.wallet.signing, { wallet: wallet.label }));
+        const signed = await wallet.signAuthChallenge(ch.transaction, ch.networkPassphrase, domains);
+        assertSameTransaction(ch.transaction, signed, ch.networkPassphrase);
+        setProgress(r.checking);
+        await accountsApi.register(scope, {
+          address: wallet.address,
+          transaction: signed,
+          ...(label.trim() ? { label: label.trim() } : {}),
+          ...(merchant ? { displayName: displayName.trim() } : {}),
+        });
+        onDone();
+      } catch (e) {
+        setProgress('');
+        if (e instanceof WalletError)
+          setError(
+            e.message.startsWith('challenge:')
+              ? t.common.wallet.badChallenge
+              : e.kind === 'rejected'
+                ? t.common.wallet.rejected
+                : e.kind === 'mismatch'
+                  ? t.common.wallet.mismatch
+                  : e.kind === 'unsupported'
+                    ? t.common.wallet.unsupported
+                    : t.common.wallet.failed,
+          );
+        else if (e instanceof ApiError && e.status === 409) setError(d.alreadyRegistered);
+        else setError(errorMessage(t.common, e));
+      }
+    });
 
   return (
     <Dialog title={r.title} onClose={onClose}>

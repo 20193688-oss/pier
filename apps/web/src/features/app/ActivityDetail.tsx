@@ -1,11 +1,12 @@
 /* One movement in detail: a transfer (who, how much, the note, its status timeline and the
-   transaction on the explorer) or an order (its kind, amounts, status timeline, and a link to
-   follow it while it is live). */
+   transaction on the explorer) or an order (its kind, amounts, status timeline, its chat with the
+   merchant and the receipts sent in it, and a link to follow it while it is live). */
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { fmt, useI18n } from '@/i18n';
 import { Icon } from '@/components/ui/Icon';
 import { Notice, Skeleton } from '@/components/ui/controls';
+import { OrderChat } from '@/components/p2p/OrderChat';
 import { app } from '@/lib/api/app';
 import { trade } from '@/lib/api/endpoints';
 import { dateTime, money, shortAddress } from '@/lib/format';
@@ -79,8 +80,14 @@ export default function ActivityDetail() {
           <div className="text-center">
             <p className="text-ink-3">
               {transfer.direction === 'in'
-                ? fmt(a.received, { who: transfer.fromHandle ? `@${transfer.fromHandle}` : shortAddress(transfer.from) || a.outside })
-                : fmt(a.sent, { who: transfer.toHandle ? `@${transfer.toHandle}` : shortAddress(transfer.to) })}
+                ? fmt(a.received, {
+                    who: transfer.fromHandle
+                      ? `@${transfer.fromHandle}`
+                      : shortAddress(transfer.from) || a.outside,
+                  })
+                : fmt(a.sent, {
+                    who: transfer.toHandle ? `@${transfer.toHandle}` : shortAddress(transfer.to),
+                  })}
             </p>
             <p className="figure mt-1 text-[2.4rem]">
               {transfer.direction === 'in' ? '+' : '−'}
@@ -89,7 +96,10 @@ export default function ActivityDetail() {
           </div>
           <Facts
             rows={[
-              [a.from, transfer.fromHandle ? `@${transfer.fromHandle}` : shortAddress(transfer.from)],
+              [
+                a.from,
+                transfer.fromHandle ? `@${transfer.fromHandle}` : shortAddress(transfer.from),
+              ],
               [a.to, transfer.toHandle ? `@${transfer.toHandle}` : shortAddress(transfer.to)],
               ...(transfer.note ? ([[a.note, transfer.note]] as [string, string][]) : []),
               [a.date, dateTime(lang, transfer.createdAt)],
@@ -111,7 +121,12 @@ export default function ActivityDetail() {
             />
           </section>
           {explorerLink(network, 'tx', transfer.hash) && (
-            <a className="btn btn-line" href={explorerLink(network, 'tx', transfer.hash)!} target="_blank" rel="noopener noreferrer">
+            <a
+              className="btn btn-line"
+              href={explorerLink(network, 'tx', transfer.hash)!}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               {a.explorer}
               <Icon name="external" size={16} />
             </a>
@@ -121,15 +136,24 @@ export default function ActivityDetail() {
       {order && (
         <div className="flex flex-col gap-4 pb-4">
           <div className="text-center">
-            <p className="text-ink-3">{(a.kinds as Record<string, string>)[order.kind] ?? order.kind}</p>
-            <p className="figure mt-1 text-[2.2rem]">{money(lang, order.fiatAmount, order.currency)}</p>
-            <p className="num text-ink-3">{fmtUsd(toBaseUnits(order.tokenAmount, token?.decimals ?? 7) ?? '0')}</p>
+            <p className="text-ink-3">
+              {(a.kinds as Record<string, string>)[order.kind] ?? order.kind}
+            </p>
+            <p className="figure mt-1 text-[2.2rem]">
+              {money(lang, order.fiatAmount, order.currency)}
+            </p>
+            <p className="num text-ink-3">
+              {fmtUsd(toBaseUnits(order.tokenAmount, token?.decimals ?? 7) ?? '0')}
+            </p>
           </div>
           <Facts
             rows={[
               [t.trade.summary.merchant, order.merchant?.displayName || '-'],
               [a.date, dateTime(lang, order.createdAt)],
-              [t.trade.summary.method, (t.p2p.rails as Record<string, string>)[order.rail] ?? order.rail],
+              [
+                t.trade.summary.method,
+                (t.p2p.rails as Record<string, string>)[order.rail] ?? order.rail,
+              ],
             ]}
           />
           <section aria-labelledby="tl-h">
@@ -138,8 +162,12 @@ export default function ActivityDetail() {
             </h2>
             <Timeline words={a.steps} steps={orderSteps(order)} />
           </section>
+          <OrderChat scope="app" orderId={order.id} />
           {!isTerminal(order.status) && (
-            <Link className="btn btn-ink btn-lg" to={order.kind === 'QR_PAY' ? `/app/qr/${order.id}` : `/app/order/${order.id}`}>
+            <Link
+              className="btn btn-ink btn-lg"
+              to={order.kind === 'QR_PAY' ? `/app/qr/${order.id}` : `/app/order/${order.id}`}
+            >
               {a.follow}
             </Link>
           )}
@@ -164,7 +192,8 @@ function orderSteps(o: P2pOrder): Step[] {
   const reached = (statuses: string[]) => statuses.includes(o.status);
   const after = {
     opened: !reached(['pending']),
-    accepted: reached(['awaiting_payment', 'paid', 'disputed', 'completed', 'resolved']) ||
+    accepted:
+      reached(['awaiting_payment', 'paid', 'disputed', 'completed', 'resolved']) ||
       (o.kind === 'BUY' && !reached(['pending'])),
     paid: reached(['paid', 'disputed', 'completed', 'resolved']),
     released: reached(['completed']),
@@ -175,7 +204,8 @@ function orderSteps(o: P2pOrder): Step[] {
     { key: 'paid', done: after.paid },
   ];
   if (o.status === 'cancelled' || o.status === 'expired' || o.status === 'failed')
-    steps.push({ key: o.status === 'failed' ? 'failed' : o.status, done: true, bad: true });
+    // An order that never opened reads as cancelled: nothing moved.
+    steps.push({ key: o.status === 'failed' ? 'cancelled' : o.status, done: true, bad: true });
   else if (o.status === 'disputed') steps.push({ key: 'disputed', done: true, bad: true });
   else if (o.status === 'resolved') steps.push({ key: 'resolved', done: true });
   else steps.push({ key: 'released', done: after.released });

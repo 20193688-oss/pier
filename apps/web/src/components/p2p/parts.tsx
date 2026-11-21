@@ -1,37 +1,46 @@
-/* Market pieces the buy/sell app, the charge page and the dashboard share: a token's and a
-   currency's mark, an account's rows labelled from the shared vocabulary, a field problem in
+/* Market pieces the buy/sell app, the charge page and the dashboard share: a token's mark and a
+   currency's flag, an account's rows labelled from the shared vocabulary, a field problem in
    words, the form for an account someone is paid into, and a picker sheet. */
 import { useMemo, useState, type ReactNode } from 'react';
+import { AR, BO, BR, CL, CO, MX, PE, US } from 'country-flag-icons/react/1x1';
 import { fmt, useT, type Messages } from '@/i18n';
 import { Field, SelectField } from '@/components/ui/controls';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon } from '@/components/ui/Icon';
-import { RAILS, isRailId, type FieldError, type RailField } from '@/lib/p2p/rails';
+import { RAILS, isRailId, oneOfKey, type FieldError, type RailField } from '@/lib/p2p/rails';
 
 type P2pWords = Messages['p2p'];
 
-/* The colour each currency's mark is drawn in: a quiet tint per country, never a flag emoji. */
-const CURRENCY_TINT: Record<string, string> = {
-  ARS: '#6fa8dc',
-  BRL: '#3d9a5f',
-  MXN: '#2f7d5b',
-  COP: '#e2b23b',
-  PEN: '#c8453b',
-  CLP: '#3b5ba5',
+/* Each local currency's country, whose flag marks it (round, from country-flag-icons). */
+const CURRENCY_FLAG: Record<string, typeof BO> = {
+  BOB: BO,
+  ARS: AR,
+  BRL: BR,
+  CLP: CL,
+  COP: CO,
+  MXN: MX,
+  PEN: PE,
+  USD: US,
 };
 
+/* A currency without a flag here gets its first two letters on a quiet disc. */
 export function CurrencyMark({ code, size = 30 }: { code: string; size?: number }) {
+  const Flag = CURRENCY_FLAG[code];
+  if (Flag)
+    return (
+      <span
+        aria-hidden="true"
+        className="inline-block shrink-0 overflow-hidden rounded-full ring-1 ring-line"
+        style={{ width: size, height: size }}
+      >
+        <Flag className="block size-full" />
+      </span>
+    );
   return (
     <span
       aria-hidden="true"
-      className="grid shrink-0 place-items-center rounded-full font-bold text-white"
-      style={{
-        width: size,
-        height: size,
-        background: CURRENCY_TINT[code] ?? 'var(--ink-3)',
-        fontSize: size * 0.3,
-        fontStretch: '115%',
-      }}
+      className="grid shrink-0 place-items-center rounded-full bg-ink-3 font-bold text-white"
+      style={{ width: size, height: size, fontSize: size * 0.3, fontStretch: '115%' }}
     >
       {code.slice(0, 2)}
     </span>
@@ -149,7 +158,9 @@ export function needsDocument(rail: string, details: Record<string, string>): bo
 }
 
 /** The account someone is paid into, per rail, each field checked as typed; a problem shows once
-    the field was left (or every problem, after the form's button was pressed). */
+    the field was left (or every problem, after the form's button was pressed). The details a rail
+    takes one of (an Argentine CBU or CVU, or an alias) are one field: what is typed goes to the
+    detail it is (`oneOfKey`), the other is emptied. */
 export function AccountFields({
   rail,
   value,
@@ -157,6 +168,7 @@ export function AccountFields({
   errors,
   showAll = false,
   withDocument = true,
+  withId = true,
 }: {
   rail: string;
   value: AccountDraft;
@@ -164,6 +176,8 @@ export function AccountFields({
   errors: Record<string, FieldError>;
   showAll?: boolean;
   withDocument?: boolean;
+  /* False for a third party on a rail that does not need their ID: those fields are not asked. */
+  withId?: boolean;
 }) {
   const t = useT();
   const p = t.p2p;
@@ -171,8 +185,9 @@ export function AccountFields({
   const leave = (key: string) => () => setTouched((x) => ({ ...x, [key]: true }));
   const show = (key: string) => (touched[key] || showAll ? errors[key] : undefined);
   const known = isRailId(rail) ? RAILS[rail] : null;
+  const hidden = new Set(!withId && known && !known.idRequired ? (known.idFields ?? []) : []);
   const fields: RailField[] = known
-    ? [...known.fields]
+    ? known.fields.filter((f) => !hidden.has(f.key))
     : Object.keys(value.details).map((key) => ({ key, kind: 'text' as const }));
   const set = (key: string, v: string) =>
     onChange({ ...value, details: { ...value.details, [key]: v } });
@@ -189,8 +204,45 @@ export function AccountFields({
         onBlur={leave('holderName')}
         error={errorText(p, 'holderName', show('holderName'))}
       />
-      {fields.map((f, i) =>
-        f.options ? (
+      {fields.map((f, i) => {
+        if (f.oneOf) {
+          // The group's one field, where its first member stands; the others are not drawn.
+          if (i !== fields.findIndex((x) => x.oneOf === f.oneOf)) return null;
+          const members = fields.filter((x) => x.oneOf === f.oneOf);
+          const filled = members.find((m) => String(value.details[m.key] ?? '').trim());
+          const failing = members.find((m) => errors[m.key]);
+          const group = f.oneOf;
+          return (
+            <Field
+              key={`group-${group}`}
+              label={(p.fields as Record<string, string>)[group] ?? labelOf(p, f.kind, f.key)}
+              value={filled ? value.details[filled.key] : ''}
+              autoComplete="off"
+              spellCheck={false}
+              autoCapitalize="none"
+              placeholder={placeholders[group] ?? ''}
+              onChange={(e) => {
+                const v = e.target.value;
+                const to = oneOfKey(members, v);
+                onChange({
+                  ...value,
+                  details: {
+                    ...value.details,
+                    ...Object.fromEntries(members.map((m) => [m.key, m.key === to ? v : ''])),
+                  },
+                });
+              }}
+              onBlur={leave(group)}
+              error={
+                failing && (touched[group] || showAll)
+                  ? errorText(p, failing.kind, errors[failing.key])
+                  : undefined
+              }
+              hint={hints.oneOf}
+            />
+          );
+        }
+        return f.options ? (
           <SelectField
             key={f.key}
             label={labelOf(p, f.kind, f.key)}
@@ -217,15 +269,11 @@ export function AccountFields({
             onChange={(e) => set(f.key, e.target.value)}
             onBlur={leave(f.key)}
             error={errorText(p, f.kind, show(f.key))}
-            hint={
-              f.oneOf && i === fields.findIndex((x) => x.oneOf === f.oneOf)
-                ? hints.oneOf
-                : hints[f.kind]
-            }
+            hint={hints[f.kind]}
           />
-        ),
-      )}
-      {withDocument && needsDocument(rail, value.details) && (
+        );
+      })}
+      {withDocument && (withId || known?.idRequired) && needsDocument(rail, value.details) && (
         <Field
           label={p.fields.document}
           value={value.document}

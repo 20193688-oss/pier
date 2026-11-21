@@ -51,7 +51,8 @@ export interface P2pNewOrder {
   qr?: Record<string, unknown>;
   beneficiary?: {
     holderName: string;
-    document: string;
+    /** Null where the rail's transfer does not need the holder's ID. */
+    document: string | null;
     rail: string;
     details: Record<string, string>;
   };

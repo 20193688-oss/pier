@@ -75,7 +75,7 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
 }
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-[10px] px-3 py-2 font-semibold transition-colors ${isActive ? 'text-ink bg-well' : 'text-ink-2 hover:text-ink'}`;
+  `rounded-full px-3.5 py-2 font-semibold transition-colors duration-200 ${isActive ? 'text-ink bg-well' : 'text-ink-2 hover:text-ink'}`;
 
 export function SiteHeader() {
   const { t } = useI18n();
@@ -92,7 +92,7 @@ export function SiteHeader() {
   ];
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-[color-mix(in_oklab,var(--paper)_88%,transparent)] backdrop-blur-md">
-      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4">
+      <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-6 sm:px-8">
         <Link to="/" aria-label={n.home} className="mr-2 rounded-[10px]">
           <Logo />
         </Link>
@@ -102,7 +102,7 @@ export function SiteHeader() {
               <a
                 key={l.to}
                 href={l.to}
-                className="rounded-[10px] px-3 py-2 font-semibold text-ink-2 hover:text-ink"
+                className="rounded-full px-3.5 py-2 font-semibold text-ink-2 transition-colors duration-200 hover:bg-well hover:text-ink"
               >
                 {l.label}
               </a>
@@ -135,7 +135,7 @@ export function SiteHeader() {
         <nav
           id="site-menu"
           aria-label={n.label}
-          className="border-t border-line px-4 pb-4 lg:hidden"
+          className="border-t border-line px-6 pb-4 lg:hidden"
         >
           <ul className="flex flex-col py-2" role="list">
             {links.map((l) => (
@@ -175,7 +175,7 @@ export function SiteFooter() {
   const f = t.common.footer;
   return (
     <footer className="mt-24 border-t border-line">
-      <div className="mx-auto grid max-w-6xl gap-10 px-4 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
+      <div className="mx-auto grid max-w-6xl gap-10 px-6 sm:px-8 py-12 md:grid-cols-[1.4fr_1fr_1fr]">
         <div className="flex max-w-sm flex-col gap-4">
           <Logo />
           <p className="text-[0.9375rem] text-ink-3">{f.about}</p>

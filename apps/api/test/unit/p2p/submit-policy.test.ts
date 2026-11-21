@@ -12,7 +12,7 @@ import {
 } from '@stellar/stellar-sdk';
 import { describe, expect, it } from 'vitest';
 import { p2pCall } from '@/chain/market-codec';
-import { tokenOf } from '@/chain/networks';
+import { assetOf, nativeTokenOf, tokenOf } from '@/chain/networks';
 import { sacTransferOperation } from '@/chain/tx-builder.service';
 import { checkSubmission, type SubmitContext } from '@/p2p/domain/submit-policy';
 
@@ -21,6 +21,7 @@ const OTHER = Keypair.random().publicKey();
 const SPONSOR = Keypair.random().publicKey();
 const CONTRACT = StrKey.encodeContract(Buffer.alloc(32, 5));
 const USDC = tokenOf('testnet', 'USDC', 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5');
+const XLM = nativeTokenOf('testnet');
 const NOW = 1_800_000_000;
 
 const ctx = (overrides: Partial<SubmitContext> = {}): SubmitContext => ({
@@ -47,7 +48,7 @@ function tx(
   return TransactionBuilder.fromXDR(builder.build().toXDR(), Networks.TESTNET) as Transaction;
 }
 
-const payment = (asset = new Asset(USDC.code, USDC.issuer)) =>
+const payment = (asset = assetOf(USDC)) =>
   Operation.payment({ destination: OTHER, asset, amount: '1' });
 
 describe('the gasless submission policy', () => {
@@ -83,7 +84,7 @@ describe('the gasless submission policy', () => {
     );
     const forOther = Operation.payment({
       destination: USER,
-      asset: new Asset(USDC.code, USDC.issuer),
+      asset: assetOf(USDC),
       amount: '1',
       source: OTHER,
     });
@@ -107,8 +108,7 @@ describe('the gasless submission policy', () => {
   });
 
   describe('the sponsored activation', () => {
-    const trust = (source = USER) =>
-      Operation.changeTrust({ asset: new Asset(USDC.code, USDC.issuer), source });
+    const trust = (source = USER) => Operation.changeTrust({ asset: assetOf(USDC), source });
     const begin = (source = SPONSOR) =>
       Operation.beginSponsoringFutureReserves({ sponsoredId: USER, source });
     const end = (source = USER) => Operation.endSponsoringFutureReserves({ source });
@@ -138,6 +138,56 @@ describe('the gasless submission policy', () => {
       expect(checkSubmission(tx([begin(), trust(OTHER), end()]), ctx()).ok).toBe(false);
       // Creating the account needs the sponsor as the transaction's source.
       expect(checkSubmission(tx([begin(), create(), trust(), end()]), ctx()).ok).toBe(false);
+    });
+
+    it('creates a missing account with no trustline only when the native lumen is listed', () => {
+      const createOnly = tx([begin(), create(), end()], { source: SPONSOR });
+      expect(checkSubmission(createOnly, ctx()).ok).toBe(false);
+      expect(checkSubmission(createOnly, ctx({ tokens: [USDC, XLM] }))).toMatchObject({
+        ok: true,
+        kind: 'activation',
+        account: USER,
+        reserveStroops: 10_000_000n,
+      });
+      // Still from the sponsor, with no lumens, for the sponsored account.
+      expect(checkSubmission(tx([begin(), create(), end()]), ctx({ tokens: [USDC, XLM] })).ok).toBe(
+        false,
+      );
+      expect(
+        checkSubmission(
+          tx([begin(), create('1'), end()], { source: SPONSOR }),
+          ctx({ tokens: [USDC, XLM] }),
+        ).ok,
+      ).toBe(false);
+    });
+
+    it('never opens a trustline for the lumen', () => {
+      const lumenLine = Operation.changeTrust({ asset: Asset.native(), source: USER });
+      expect(
+        checkSubmission(tx([begin(), lumenLine, end()]), ctx({ tokens: [USDC, XLM] })).ok,
+      ).toBe(false);
+    });
+  });
+
+  describe('the native lumen', () => {
+    const XLM_CTX = ctx({ tokens: [USDC, XLM] });
+
+    it('takes a lumen payment and a native SAC transfer only when XLM is listed', () => {
+      expect(checkSubmission(tx([payment(Asset.native())]), XLM_CTX)).toMatchObject({
+        ok: true,
+        kind: 'payment',
+      });
+      expect(checkSubmission(tx([payment(Asset.native())]), ctx()).ok).toBe(false);
+      expect(
+        checkSubmission(tx([sacTransferOperation(XLM, USER, OTHER, 5n)]), XLM_CTX),
+      ).toMatchObject({ ok: true, kind: 'sac_transfer' });
+      expect(checkSubmission(tx([sacTransferOperation(XLM, USER, OTHER, 5n)]), ctx()).ok).toBe(
+        false,
+      );
+    });
+
+    it('still refuses a classic asset that only shares the lumen’s code', () => {
+      expect(checkSubmission(tx([payment(new Asset('XLM', OTHER))]), XLM_CTX).ok).toBe(false);
     });
   });
 });

@@ -99,7 +99,7 @@ export class AppWalletController {
   @ApiOperation({
     summary: 'Sponsored activation',
     description:
-      'Creates the account when it is missing and opens the token’s trustline, the sponsor paying the reserves (CAP-33: begin_sponsoring_future_reserves, create_account with 0 XLM, change_trust, end_sponsoring_future_reserves). `transaction: null` when there is nothing to do. Submit it with `POST /v1/app/submit`, which adds the sponsor’s signature; limited per account and per IP, within the sponsor’s budget.',
+      'Creates the account when it is missing and opens the token’s trustline, the sponsor paying the reserves (CAP-33: begin_sponsoring_future_reserves, create_account with 0 XLM, change_trust, end_sponsoring_future_reserves). The native lumen (`XLM`) needs no trustline: activating for it only creates a missing account. `transaction: null` when there is nothing to do. Submit it with `POST /v1/app/submit`, which adds the sponsor’s signature; limited per account and per IP, within the sponsor’s budget.',
   })
   @ApiOkResponse({ type: ActivationView })
   @ApiErrors(400, 429, 503)

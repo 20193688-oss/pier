@@ -859,6 +859,62 @@ describe('the sponsored activation', () => {
   test('the trust limit is the classic maximum', () => assert.equal(MAX_TRUST_LIMIT, '922337203685.4775807'));
 });
 
+describe('the native coin (XLM): moved through its asset contract, activated by creating the account', () => {
+  const XLM: P2pToken = { symbol: 'XLM', code: 'XLM', issuer: null, contract: contract('xlm sac'), decimals: 7 };
+  const ctx: VerifyContext = { ...CTX, network: { ...NETWORK, tokens: [USDC, TUSD, XLM] } };
+  const pay = { action: 'payment' as const, to: BUYER, token: 'XLM', amountUnits: '50000000', memo: 'pizza' };
+  const send = (to: string, token: P2pToken, amount: string, memo: string | null = null) =>
+    build([contractTransfer(SELLER, to, token, amount)], { memo });
+  test("a transfer to an account passes, the person's note kept off chain", () => {
+    assert.equal(verifyTransaction(send(BUYER, XLM, '50000000'), ctx, pay), null);
+    assert.equal(verifyTransaction(send(BUYER, XLM, '50000000'), ctx, { ...pay, memo: null }), null);
+  });
+  test('refused: a memo on chain', () => {
+    // The SDK will not build a contract call with a memo; a compromised API could still send one.
+    const t = send(BUYER, XLM, '50000000');
+    const wire = xdr.TransactionEnvelope.fromXdr(t.xdr, 'base64').toXdrObject() as {
+      v1: { tx: { memo: unknown } };
+    };
+    wire.v1.tx.memo = { type: 1, text: 'pizza' };
+    const env = xdr.TransactionEnvelope.fromXdrObject(wire as never);
+    const tx = TransactionBuilder.fromXDR(env.toXdr('base64'), PASSPHRASE) as Transaction;
+    assert.equal(verifyTransaction({ ...t, xdr: env.toXdr('base64'), hash: toHex(tx.hash()) }, ctx, pay), 'memo');
+  });
+  test('refused: a classic payment of the native coin', () =>
+    assert.equal(
+      verifyTransaction(
+        build([Operation.payment({ destination: BUYER, asset: Asset.native(), amount: '5' })]),
+        ctx,
+        pay,
+      ),
+      'function',
+    ));
+  test('refused: another token contract, recipient or amount', () => {
+    assert.equal(verifyTransaction(send(BUYER, USDC, '50000000'), ctx, pay), 'target');
+    assert.equal(verifyTransaction(send(OTHER, XLM, '50000000'), ctx, pay), 'args');
+    assert.equal(verifyTransaction(send(BUYER, XLM, '50000001'), ctx, pay), 'args');
+  });
+
+  const e = { action: 'activate' as const, token: 'XLM' };
+  const begin = Operation.beginSponsoringFutureReserves({ sponsoredId: SELLER, source: SPONSOR });
+  const create = Operation.createAccount({ destination: SELLER, startingBalance: '0', source: SPONSOR });
+  const end = Operation.endSponsoringFutureReserves({ source: SELLER });
+  const trust = Operation.changeTrust({ asset: new Asset('USDC', ISSUER), limit: MAX_TRUST_LIMIT, source: SELLER });
+  test("creating the missing account passes as the sponsor's transaction", () =>
+    assert.equal(verifyTransaction(build([begin, create, end], { source: SPONSOR }), ctx, e), null));
+  test("refused: as the wallet's own transaction", () =>
+    assert.equal(verifyTransaction(build([begin, create, end], { source: SELLER }), ctx, e), 'source'));
+  test('refused: a trustline, or no account to create', () => {
+    assert.equal(verifyTransaction(build([begin, create, trust, end], { source: SPONSOR }), ctx, e), 'operations');
+    assert.equal(verifyTransaction(build([begin, trust, end], { source: SPONSOR }), ctx, e), 'operations');
+    assert.equal(verifyTransaction(build([begin, end], { source: SPONSOR }), ctx, e), 'operations');
+  });
+  test('refused: a starting balance', () => {
+    const funded = Operation.createAccount({ destination: SELLER, startingBalance: '5', source: SPONSOR });
+    assert.equal(verifyTransaction(build([begin, funded, end], { source: SPONSOR }), ctx, e), 'args');
+  });
+});
+
 test("an order's on-chain ref is derived from its uuid as the API derives it", () => {
   const id = '0b5e8f1c-2d3a-4b5c-8d9e-0f1a2b3c4d5e';
   const bytes = new Uint8Array(id.replace(/-/g, '').match(/../g)!.map((h) => Number.parseInt(h, 16)));

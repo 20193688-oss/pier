@@ -6,7 +6,7 @@ import { fmt, useI18n } from '@/i18n';
 import { accounts as accountsApi, charges as chargesApi } from '@/lib/api/endpoints';
 import { errorMessage } from '@/lib/api/messages';
 import { parseFiat } from '@/lib/p2p/amounts';
-import { fiatDecimals } from '@/lib/p2p/rails';
+import { defaultCurrency, fiatDecimals } from '@/lib/p2p/rails';
 import { currencyName, dateTime, money, shortAddress } from '@/lib/format';
 import type { P2pAccount, P2pCharge } from '@/lib/p2p/types';
 import { Check, Field, Notice, SelectField, Spinner } from '@/components/ui/controls';
@@ -22,6 +22,7 @@ import {
   expiryIso,
   type ChargeExpiry,
 } from '@/features/dashboard/views/admin-model';
+import { useGuard } from '@/lib/use-action';
 
 const STATUS_TONE = { open: 'ref', paid: 'ok', expired: 'off', cancelled: 'fail' } as const;
 
@@ -38,20 +39,22 @@ export function ChargesView() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const cancel = async (charge: P2pCharge) => {
-    setBusy(true);
-    setError('');
-    try {
-      await chargesApi.remove(scope, charge.id);
-      toast(a.cancelled);
-      setCancelling(null);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const cancel = (charge: P2pCharge) =>
+    guard(async () => {
+      setBusy(true);
+      setError('');
+      try {
+        await chargesApi.remove(scope, charge.id);
+        toast(a.cancelled);
+        setCancelling(null);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+      } finally {
+        setBusy(false);
+      }
+    });
 
   const figures = load.data ? chargeFigures(load.data) : null;
   return (
@@ -219,10 +222,7 @@ function CreateCharge({
       ),
     [market, t],
   );
-  const [currency, setCurrency] = useState(
-    () =>
-      market?.currencies.find((x) => x.code === 'ARS')?.code ?? market?.currencies[0]?.code ?? '',
-  );
+  const [currency, setCurrency] = useState(() => defaultCurrency(market?.currencies ?? []));
   const [pair, setPair] = useState(() => pairs[0]?.value ?? '');
   const [amount, setAmount] = useState('');
   const [recipient, setRecipient] = useState('');
@@ -242,33 +242,35 @@ function CreateCharge({
   const amountError = touched && !fiat ? a.amountError : null;
   const payeeError = touched && !payeeName.trim() ? a.payeeError : null;
 
-  const submit = async () => {
-    setTouched(true);
-    if (!fiat || !payeeName.trim() || !to || !pick) return;
-    const [network, token] = pick.split(':');
-    setBusy(true);
-    setError('');
-    try {
-      const expiresAt = expiryIso(expiry);
-      onCreated(
-        await chargesApi.create(scope, {
-          currency: cur,
-          fiatAmount: fiat,
-          network,
-          token,
-          recipient: to,
-          payeeName: payeeName.trim(),
-          ...(description.trim() ? { description: description.trim() } : {}),
-          ...(expiresAt ? { expiresAt } : {}),
-          multiUse,
-        }),
-      );
-    } catch (e) {
-      setError(errorMessage(t.common, e, c.createFailed));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const submit = () =>
+    guard(async () => {
+      setTouched(true);
+      if (!fiat || !payeeName.trim() || !to || !pick) return;
+      const [network, token] = pick.split(':');
+      setBusy(true);
+      setError('');
+      try {
+        const expiresAt = expiryIso(expiry);
+        onCreated(
+          await chargesApi.create(scope, {
+            currency: cur,
+            fiatAmount: fiat,
+            network,
+            token,
+            recipient: to,
+            payeeName: payeeName.trim(),
+            ...(description.trim() ? { description: description.trim() } : {}),
+            ...(expiresAt ? { expiresAt } : {}),
+            multiUse,
+          }),
+        );
+      } catch (e) {
+        setError(errorMessage(t.common, e, c.createFailed));
+      } finally {
+        setBusy(false);
+      }
+    });
 
   const ready = !!market && wallets.data !== undefined;
   return (

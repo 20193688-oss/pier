@@ -135,6 +135,13 @@ Order kinds: `BUY`, `SELL`, `QR_PAY`, `CHARGE`, `PAYOUT`. Statuses: `pending`,
 `awaiting_acceptance`, `awaiting_payment`, `paid`, `disputed`, then `completed`, `cancelled`,
 `expired`, `resolved` or `failed`.
 
+Order actions are safe to retry (`src/p2p/domain/action-outcome.ts` says which statuses show each
+one). A buyer act (`paid`, `cancel`, `dispute`) the order already shows answers the order as it is
+(200, nothing sent); a transaction for an order action it already shows is `409 already_done` with
+`details: ["status: <status>"]` (nothing to sign). The same holds when the contract refuses a
+second call because the first went through before the indexer caught up: the order is read
+on-chain first.
+
 ### Transactions
 
 Every transaction a wallet signs is a `P2pTransaction`
@@ -282,11 +289,26 @@ a QR payment and a charge paid from the balance.
 `npm run dev:stack` (repo root) starts Postgres (docker compose when a Docker daemon answers, else
 embedded), Stellar (`stellar container start local` when a Docker daemon answers, else testnet with
 friendbot; Docker is never started), creates the dev accounts (owner, arbiter, treasury, matcher,
-sponsor, SEP-10 signer, merchant, business, user, TUSD issuer), issues and mints TUSD, deploys the
-market, seeds it through the API (organizations, keys, SEP-10-proven accounts, payment methods,
-offers including `ar_qr` and `br_pix_qr` QR offers, liquidity, the matcher, a charge, the user's
-sponsored activation), starts the API and the web, and prints the URLs, keys and the dev secrets
-(test networks only). State persists in `.dev-stack/`.
+sponsor, SEP-10 signer, merchant, business, user, TUSD issuer), deploys the market, seeds it
+through the API (organizations, keys, SEP-10-proven accounts, payment methods with Bolivia first,
+offers including `ar_qr` and `br_pix_qr` QR offers, liquidity, the matcher, a charge in
+bolivianos, the user's sponsored activation), starts the API and the web, and prints the URLs, keys
+and the dev secrets (test networks only). State persists in `.dev-stack/`; a restart syncs an
+existing seed and the merchants idempotently (`src/dev/merchant-sync.ts`: missing payment methods
+and offers added, offers in a token no longer listed deactivated, dollar liquidity topped up).
+
+The testnet market lists Circle's USDC and the native lumen only (`P2P_TESTNET_TOKENS` is
+`[{"native":true}]`: XLM through its SAC, `issuer: null`, no trustline); the stack buys its USDC
+with test lumens on the testnet DEX (`src/dev/dev-dollars.ts`). The local network, which has no
+Circle, lists the dev dollar TUSD (minted by the stack's issuer) and XLM. On top of the seeded
+merchant the stack sets up
+three automated test merchants (`src/dev/bot-merchants.ts`, kept in `.dev-stack/merchants.json`
+and reused across restarts) and runs the SDK's simulated merchant for each (`[bot-<name>]` in the
+log: it accepts sales and QR payments and marks them paid, and releases paid purchases, a few
+seconds later, checking every transaction before it signs). Every minute the four merchants'
+offers are repriced from live mainnet references (`src/dev/price-feed.ts`: CriptoYa USDT quotes
+with an open.er-api FX fallback, and the XLM/USDC order book on the public Horizon), each with its
+own spread; a failing source keeps its last good price.
 
 | Flag / variable                                            | Default | What                                                                     |
 | ---------------------------------------------------------- | ------- | ------------------------------------------------------------------------ |

@@ -31,6 +31,7 @@ import { MatcherFollowerJob } from '@/p2p/matcher-follower.job';
 import { MatcherService } from '@/p2p/matcher.service';
 import { OffersService } from '@/p2p/offers.service';
 import { OrderOpener } from '@/p2p/order-opener.service';
+import { OrderMessagesService } from '@/p2p/order-messages.service';
 import { OrdersService } from '@/p2p/orders.service';
 import { PaymentMethodsService } from '@/p2p/payment-methods.service';
 import { PayoutsService } from '@/p2p/payouts.service';
@@ -48,6 +49,7 @@ const SERVICES: Provider[] = [
   MatcherService,
   OrderOpener,
   OrdersService,
+  OrderMessagesService,
   TransactionsService,
   TransferMatchesService,
   ChargesService,

@@ -69,7 +69,7 @@ export default function DocsApp() {
   const next = at >= 0 && at < DOC_PAGES.length - 1 ? DOC_PAGES[at + 1] : null;
 
   return (
-    <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-6 px-4 pt-6 pb-10 md:pt-10 lg:grid-cols-[14.5rem_minmax(0,1fr)] lg:gap-12">
+    <div className="mx-auto grid max-w-6xl grid-cols-[minmax(0,1fr)] gap-6 px-6 sm:px-8 pt-6 pb-10 md:pt-10 lg:grid-cols-[14.5rem_minmax(0,1fr)] lg:gap-12">
       <aside className="lg:sticky lg:top-24 lg:self-start">
         <button
           type="button"

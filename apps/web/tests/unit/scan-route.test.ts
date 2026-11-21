@@ -5,7 +5,15 @@ import { describe, test } from 'vitest';
 import assert from 'node:assert/strict';
 import { buildPaymentLink, buildSep7Pay, emvCrc } from '@midpoint/payment-qr';
 import { routeScan, sendPath, type ScanContext } from '@/lib/app/scan-route';
-import { dollarsToUnits, localValue, unitsToDecimal, usd, usdNumber } from '@/lib/app/money';
+import {
+  dollarsToUnits,
+  isDollarToken,
+  localValue,
+  tokensForLocal,
+  unitsToDecimal,
+  usd,
+  usdNumber,
+} from '@/lib/app/money';
 import { QR_PAY_WINDOWS, qrRail, trustQrQuote } from '@/lib/p2p/qr-pay';
 import { arQr, pixQr } from '@/lib/mock/qr';
 import { normalizeQuote } from '@/lib/p2p/normalize';
@@ -35,7 +43,12 @@ describe('a scan opens the right screen', () => {
     });
   });
   test("this app's payment link, with its amount and note", () => {
-    const link = buildPaymentLink(ORIGIN, { to: '@lucia', amount: '12.5', asset: 'USDC', note: 'Café' });
+    const link = buildPaymentLink(ORIGIN, {
+      to: '@lucia',
+      amount: '12.5',
+      asset: 'USDC',
+      note: 'Café',
+    });
     const r = routeScan(link, CTX);
     assert.deepEqual(r, { to: 'send', recipient: '@lucia', amount: '12.5', note: 'Café' });
     assert.equal(
@@ -81,7 +94,10 @@ describe('a scan opens the right screen', () => {
     );
     assert.deepEqual(routeScan(mx, CTX), { to: 'problem', problem: 'qr-not-taken' });
     const ar = arQr({ merchant: 'Cafe', city: 'Salta', amount: '100.00' });
-    assert.deepEqual(routeScan(`${ar.slice(0, -1)}0`, CTX), { to: 'problem', problem: 'emv-invalid' });
+    assert.deepEqual(routeScan(`${ar.slice(0, -1)}0`, CTX), {
+      to: 'problem',
+      problem: 'emv-invalid',
+    });
   });
   test('a secret key: a warning, never a payment', () =>
     assert.deepEqual(routeScan(SECRET, CTX), { to: 'secret' }));
@@ -108,10 +124,9 @@ describe('a scan opens the right screen', () => {
     });
     assert.equal(
       (
-        routeScan(
-          buildSep7Pay({ destination: G, assetCode: 'USDC', assetIssuer: G }),
-          CTX,
-        ) as { problem?: string }
+        routeScan(buildSep7Pay({ destination: G, assetCode: 'USDC', assetIssuer: G }), CTX) as {
+          problem?: string;
+        }
       ).problem,
       'other-asset',
     );
@@ -134,7 +149,10 @@ describe('a scan opens the right screen', () => {
       ),
       { to: 'problem', problem: 'other-network' },
     );
-    assert.deepEqual(routeScan('web+stellar:tx?xdr=AAAA', CTX), { to: 'problem', problem: 'sep7-tx' });
+    assert.deepEqual(routeScan('web+stellar:tx?xdr=AAAA', CTX), {
+      to: 'problem',
+      problem: 'sep7-tx',
+    });
   });
   test('anything else is unknown', () => {
     assert.deepEqual(routeScan('hola', CTX), { to: 'problem', problem: 'unknown' });
@@ -167,6 +185,16 @@ describe('dollars as the app shows them', () => {
     assert.equal(localValue('x', 1452, 'ARS'), null);
     assert.equal(localValue('1', 0, 'ARS'), null);
   });
+  test('an amount asked in local money, in tokens', () => {
+    assert.equal(tokensForLocal('74', 3.7), '20.00', 'float noise adds no cent');
+    assert.equal(tokensForLocal('100', 6.92), '14.46', 'rounded up: never less than asked');
+    assert.equal(tokensForLocal('14520', 1452), '10.00');
+    assert.equal(tokensForLocal('0.01', 1452), '0.01', 'a cent at least');
+    assert.equal(tokensForLocal('0', 3.7), null);
+    assert.equal(tokensForLocal('abc', 3.7), null);
+    assert.equal(tokensForLocal('10', null), null);
+    assert.equal(tokensForLocal('10', 0), null);
+  });
 });
 
 describe('a QR payment quote is trusted only for the QR it was asked for', () => {
@@ -192,9 +220,15 @@ describe('a QR payment quote is trusted only for the QR it was asked for', () =>
   test('the rail follows the QR', () => {
     assert.equal(qrRail(ar), 'ar_qr');
     assert.equal(qrRail({ standard: 'pix', currency: 'BRL' }), 'br_pix_qr');
+    assert.equal(qrRail({ standard: 'pe-interoperable', currency: 'PEN' }), 'pe_qr');
+    assert.equal(qrRail({ standard: 'pe-interoperable', currency: 'USD' }), null);
     assert.equal(qrRail({ standard: 'pix', currency: 'ARS' }), null);
     assert.equal(qrRail({ standard: 'emv', currency: 'MXN' }), null);
-    assert.deepEqual(QR_PAY_WINDOWS, { acceptSeconds: 120, paymentSeconds: 600, settleSeconds: 3600 });
+    assert.deepEqual(QR_PAY_WINDOWS, {
+      acceptSeconds: 120,
+      paymentSeconds: 600,
+      settleSeconds: 3600,
+    });
   });
   test('a quote for the QR passes; with no merchant named the order pins it later', () =>
     assert.deepEqual(trustQrQuote(q, asked, 7), {
@@ -221,7 +255,13 @@ describe('a QR payment quote is trusted only for the QR it was asked for', () =>
 });
 
 describe("the app's token", () => {
-  const tok = (symbol: string, contract: string) => ({ symbol, code: symbol, issuer: null, contract, decimals: 7 });
+  const tok = (symbol: string, contract: string, issuer: string | null = ISSUER) => ({
+    symbol,
+    code: symbol,
+    issuer,
+    contract,
+    decimals: 7,
+  });
   const net = { tokens: [tok('USDC', 'CU'), tok('TUSD', 'CT')] };
   const bal = (usdc: string, tusd: string, trust = true) => ({
     tokens: [
@@ -229,19 +269,55 @@ describe("the app's token", () => {
       { symbol: 'TUSD', contract: 'CT', amount: tusd, trustline: true, authorized: true },
     ],
   });
-  test('a configured token wins when the market lists it', () => {
+  test('a configured token wins when the market lists it and the wallet holds some', () => {
     assert.equal(pickToken(net, bal('5', '9'), 'TUSD')?.symbol, 'TUSD');
+    assert.equal(pickToken(net, bal('50', '1'), 'TUSD')?.symbol, 'TUSD');
     assert.equal(pickToken(net, bal('5', '0'), 'EURC')?.symbol, 'USDC', 'not listed: ignored');
+  });
+  test('a balance always shows: held tokens before a configured one the wallet lacks', () => {
+    assert.equal(pickToken(net, bal('10000000000', '0'), 'TUSD')?.symbol, 'USDC');
+    assert.equal(pickToken(net, bal('0', '0'), 'TUSD')?.symbol, 'TUSD', 'nothing held yet');
+    assert.equal(pickToken(net, null, 'TUSD')?.symbol, 'TUSD', 'balances not known yet');
   });
   test('else the token the wallet holds, the largest holding first', () => {
     assert.equal(pickToken(net, bal('0', '50000000000'), '')?.symbol, 'TUSD');
     assert.equal(pickToken(net, bal('10', '5'), '')?.symbol, 'USDC');
     assert.equal(pickToken(net, bal('10', '50'), '')?.symbol, 'TUSD');
-    assert.equal(pickToken(net, bal('99', '0', false), '')?.symbol, 'USDC', 'no trustline: not held');
+    assert.equal(
+      pickToken(net, bal('99', '0', false), '')?.symbol,
+      'USDC',
+      'no trustline: not held',
+    );
+  });
+  test('the token the person picked comes first, when the market lists it', () => {
+    assert.equal(pickToken(net, bal('5', '9'), 'TUSD', 'USDC')?.symbol, 'USDC');
+    assert.equal(pickToken(net, bal('0', '9'), '', 'USDC')?.symbol, 'USDC', 'even with none held');
+    assert.equal(pickToken(net, bal('5', '0'), '', 'EURC')?.symbol, 'USDC', 'not listed: ignored');
+  });
+  test('a dollar token before the native coin, whatever the unit counts', () => {
+    const withXlm = { tokens: [tok('USDC', 'CU'), tok('XLM', 'CX', null)] };
+    const held = (usdc: string, xlm: string) => ({
+      tokens: [
+        { symbol: 'USDC', contract: 'CU', amount: usdc, trustline: true, authorized: true },
+        { symbol: 'XLM', contract: 'CX', amount: xlm, trustline: true, authorized: true },
+      ],
+    });
+    assert.equal(pickToken(withXlm, held('50000000', '90000000000'), '')?.symbol, 'USDC');
+    assert.equal(pickToken(withXlm, held('0', '90000000000'), '')?.symbol, 'XLM', 'only XLM held');
+    assert.equal(pickToken(withXlm, held('50000000', '9'), '', 'XLM')?.symbol, 'XLM', 'picked');
   });
   test('else USDC, else the first listed', () => {
     assert.equal(pickToken(net, null, '')?.symbol, 'USDC');
     assert.equal(pickToken({ tokens: [tok('TUSD', 'CT')] }, null, '')?.symbol, 'TUSD');
     assert.equal(pickToken(null, null, ''), null);
+  });
+});
+
+describe('which tokens read as dollars', () => {
+  test('dollar stablecoins show as US$, the native coin in its own unit', () => {
+    for (const s of ['USDC', 'usdc', 'TUSD', 'USDT', 'PYUSD'])
+      assert.equal(isDollarToken(s), true, s);
+    for (const s of ['XLM', 'EURC', '', null, undefined])
+      assert.equal(isDollarToken(s), false, String(s));
   });
 });

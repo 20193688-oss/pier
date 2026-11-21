@@ -1,6 +1,6 @@
-import { Address, type Transaction } from '@stellar/stellar-sdk';
+import { Address, type Asset, type Transaction } from '@stellar/stellar-sdk';
 import { MARKET_USER_FUNCTIONS } from '@/chain/market-codec';
-import type { Token } from '@/chain/networks';
+import { isAssetOf, isNativeToken, type Token } from '@/chain/networks';
 import { STELLAR_BASE_RESERVE_STROOPS } from '@/p2p/domain/constants';
 
 /**
@@ -14,11 +14,15 @@ import { STELLAR_BASE_RESERVE_STROOPS } from '@/p2p/domain/constants';
  *     wallet calls (never an owner function), with only source-account auth;
  *   - `sac_transfer`: a SAC `transfer(from = source, to, amount)` of a listed
  *     token, with only source-account auth;
- *   - `payment`: a classic payment of a listed token, from the source;
+ *   - `payment`: a classic payment of a listed token (lumens only when the
+ *     native token is listed), from the source;
  *   - `activation`: `begin_sponsoring_future_reserves` (source = sponsor,
  *     for the account), `create_account` with 0 XLM (source = sponsor; only
- *     for a missing account), `change_trust` of a listed token (source = the
- *     account), `end_sponsoring_future_reserves` (source = the account).
+ *     for a missing account), `change_trust` of a listed CLASSIC token
+ *     (source = the account), `end_sponsoring_future_reserves` (source = the
+ *     account). When the native lumen is listed, creating a missing account
+ *     with no trustline (begin, create, end) is an activation too: the lumen
+ *     needs none. A trustline is never opened for the lumen.
  */
 
 export type SubmissionKind = 'invoke' | 'sac_transfer' | 'payment' | 'activation';
@@ -58,8 +62,9 @@ function onlySourceAuth(op: Extract<Op, { type: 'invokeHostFunction' }>): boolea
   return (op.auth ?? []).every((a) => a.credentials.type === 'sorobanCredentialsSourceAccount');
 }
 
-function listedAsset(tokens: readonly Token[], asset: { code: string; issuer?: string }): boolean {
-  return tokens.some((t) => t.code === asset.code && t.issuer === asset.issuer);
+/** Whether a classic asset is a listed token (the lumen only when the native token is listed). */
+function listedAsset(tokens: readonly Token[], asset: Asset): boolean {
+  return tokens.some((t) => isAssetOf(t, asset));
 }
 
 /** Checks the shape, time bounds and fee of a parsed inner transaction. */
@@ -123,7 +128,7 @@ function single(tx: Transaction, op: Op, ctx: SubmitContext, maxTime: number): S
       return ok('sac_transfer');
     }
     case 'payment':
-      if (op.asset.isNative() || !listedAsset(ctx.tokens, op.asset)) {
+      if (!listedAsset(ctx.tokens, op.asset)) {
         return refuse('only payments of a listed token are submitted');
       }
       return ok('payment');
@@ -141,8 +146,13 @@ function activation(tx: Transaction, ctx: SubmitContext, maxTime: number): Submi
     return refuse('exactly one operation, unless it is a sponsored activation');
   }
   const account = begin.sponsoredId;
-  const create = ops.length === 4 ? rest.shift() : null;
-  const [trust, end] = rest;
+  // begin, create, end: a missing account for the native lumen, which needs no trustline.
+  const createOnly = ops.length === 3 && rest[0]?.type === 'createAccount';
+  if (createOnly && !ctx.tokens.some(isNativeToken)) {
+    return refuse('the activation must open a trustline of a listed token, for the account');
+  }
+  const create = ops.length === 4 || createOnly ? rest.shift() : null;
+  const [trust, end] = createOnly ? [null, rest[0]] : rest;
   if (create) {
     if (
       create.type !== 'createAccount' ||
@@ -159,11 +169,15 @@ function activation(tx: Transaction, ctx: SubmitContext, maxTime: number): Submi
     return refuse('the activation of an existing account has that account as source');
   }
   if (
-    trust?.type !== 'changeTrust' ||
-    trust.source !== account ||
-    !('code' in trust.line) ||
-    trust.line.isNative() ||
-    !listedAsset(ctx.tokens, trust.line)
+    !createOnly &&
+    (trust?.type !== 'changeTrust' ||
+      trust.source !== account ||
+      !('code' in trust.line) ||
+      trust.line.isNative() ||
+      !listedAsset(
+        ctx.tokens.filter((t) => !isNativeToken(t)),
+        trust.line,
+      ))
   ) {
     return refuse('the activation must open a trustline of a listed token, for the account');
   }
@@ -174,7 +188,8 @@ function activation(tx: Transaction, ctx: SubmitContext, maxTime: number): Submi
     ok: true,
     kind: 'activation',
     account,
-    reserveStroops: STELLAR_BASE_RESERVE_STROOPS * (create ? 3n : 1n),
+    // An account takes two base reserves, a trustline one.
+    reserveStroops: STELLAR_BASE_RESERVE_STROOPS * ((create ? 2n : 0n) + (createOnly ? 0n : 1n)),
     maxTime,
   };
 }

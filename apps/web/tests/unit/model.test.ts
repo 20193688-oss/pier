@@ -23,6 +23,7 @@ import {
   orderPill,
   orderTone,
   pollDelay,
+  showsOutcome,
   userActions,
 } from '@/lib/p2p/orders';
 import {
@@ -295,4 +296,20 @@ test("a QR payment is the user's own sale: the client only follows it", () => {
     ['mark_paid', 'cancel'],
     'the merchant pays the QR, then marks it paid',
   );
+});
+
+test('an action already done is read as done, not as an error', () => {
+  assert.equal(showsOutcome('release', 'completed'), true);
+  assert.equal(showsOutcome('release', 'paid'), false, 'still to release');
+  assert.equal(showsOutcome('paid', 'paid'), true);
+  assert.equal(showsOutcome('mark_paid', 'completed'), true, 'the contract name too');
+  assert.equal(showsOutcome('markPaid', 'awaiting_payment'), false);
+  assert.equal(showsOutcome('accept', 'awaiting_payment'), true);
+  assert.equal(showsOutcome('cancel', 'cancelled'), true);
+  assert.equal(showsOutcome('cancel', 'expired'), false, 'expired is not a cancel');
+  assert.equal(showsOutcome('dispute', 'resolved'), true);
+  assert.equal(showsOutcome('open_with_deposit', 'awaiting_acceptance'), true);
+  assert.equal(showsOutcome('open', 'pending'), false);
+  assert.equal(showsOutcome('open', 'failed'), false);
+  assert.equal(showsOutcome('withdraw', 'completed'), false, 'not an order action');
 });

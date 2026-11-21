@@ -14,7 +14,19 @@ import {
   PRICES,
   RULES,
 } from '@/lib/mock/fixtures';
-import { db, iso, makeOrder, now, pub, rid, save, tick, units, type Wire } from '@/lib/mock/db';
+import {
+  addMessage,
+  db,
+  iso,
+  makeOrder,
+  now,
+  pub,
+  rid,
+  save,
+  tick,
+  units,
+  type Wire,
+} from '@/lib/mock/db';
 import {
   buildTransaction,
   chainAccount,
@@ -26,10 +38,10 @@ import {
 import { appRoutes, qrQuote, qrOrder, sep10Challenge, sep10Verify } from '@/lib/mock/app-api';
 import { myAppOrders, orderView } from '@/lib/mock/views';
 import { isAccount } from '@/lib/stellar/network';
+import { showsOutcome } from '@/lib/p2p/orders';
 import { byNewest, fail, list, none, ok, session, type Ctx, type Handler } from '@/lib/mock/http';
 
 const MERCHANT_SELLER = OTHER_MERCHANT;
-
 
 /** The organization a dashboard call names, if the signed-in wallet belongs to it. */
 function orgOf(ctx: Ctx): string | ApiResponse {
@@ -88,7 +100,126 @@ function checkoutView(o: Wire) {
 
 /* --- Routes --- */
 
+/* --- An order's chat, on each side: the app wallet's and an integrator's orders (creator), the
+   merchant's (merchant). The mock merchant answers the first message of an order a few seconds
+   later; its receipts arrive when it pays (src/lib/mock/db.ts, merchantReceipt). --- */
+
+const ATTACHMENT_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'];
+
+function messageView(m: Wire) {
+  return pub({ ...m, _data: undefined });
+}
+
+function chatRoutes(
+  prefix: string,
+  from: 'creator' | 'merchant',
+  find: (ctx: Ctx) => Wire | ApiResponse,
+): [ApiRequest['method'], string, Handler][] {
+  const order = find;
+  const visible = (o: Wire) =>
+    db()
+      .messages.filter((m) => m.orderId === o.id && Date.parse(m.createdAt) <= Date.now())
+      .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  return [
+    [
+      'GET',
+      `${prefix}/:id/messages`,
+      (ctx) => {
+        const o = order(ctx);
+        return isResp(o) ? o : ok({ data: visible(o).slice(-200).map(messageView) });
+      },
+    ],
+    [
+      'POST',
+      `${prefix}/:id/messages`,
+      (ctx) => {
+        const o = order(ctx);
+        if (isResp(o)) return o;
+        const text = typeof ctx.body.text === 'string' ? ctx.body.text.trim() : '';
+        const a = ctx.body.attachment as Wire | undefined;
+        if (!text && !a) return fail(400, 'invalid_request', 'Send a text or an attachment.');
+        if (text.length > 1000)
+          return fail(400, 'invalid_request', 'text is over 1000 characters.');
+        if (
+          a &&
+          (typeof a.name !== 'string' ||
+            !ATTACHMENT_TYPES.includes(String(a.contentType)) ||
+            typeof a.data !== 'string' ||
+            a.data.length > 2_800_000)
+        )
+          return fail(
+            400,
+            'invalid_request',
+            'attachment must be an image or a PDF of 2 MB at most.',
+          );
+        const first = !visible(o).some((m) => m.from === from);
+        const m = addMessage(o, from, {
+          ...(text ? { text } : {}),
+          ...(a
+            ? {
+                attachment: {
+                  name: String(a.name).slice(0, 120),
+                  contentType: String(a.contentType),
+                  data: String(a.data),
+                },
+              }
+            : {}),
+        });
+        // The mock merchant answers the person's first message on the order, once.
+        if (from === 'creator' && first)
+          addMessage(
+            o,
+            'merchant',
+            {
+              text:
+                (o.kind === 'BUY' || o.kind === 'CHARGE') && o.status === 'awaiting_payment'
+                  ? 'Hola. Cuando hagas la transferencia, avisame acá y adjuntá el comprobante.'
+                  : ['paid', 'completed', 'resolved'].includes(String(o.status))
+                    ? 'De nada. Si necesitás algo más, escribime acá.'
+                    : 'Hola, ya estoy con tu orden. Te aviso apenas esté.',
+            },
+            Date.now() + 2500,
+          );
+        return ok(messageView(m), 201);
+      },
+    ],
+    [
+      'GET',
+      `${prefix}/:id/messages/:messageId/attachment`,
+      (ctx) => {
+        const o = order(ctx);
+        if (isResp(o)) return o;
+        const m = visible(o).find((x) => x.id === ctx.params.messageId);
+        if (!m?.attachment || !m._data) return fail(404, 'not_found', 'No attachment.');
+        const at = m.attachment as Wire;
+        return ok({ name: at.name, contentType: at.contentType, size: at.size, data: m._data });
+      },
+    ],
+  ];
+}
+
+const orderOr404 = (o: Wire | undefined) => o ?? fail(404, 'not_found', 'Order not found.');
+
+const chatRouteTable = [
+  ...chatRoutes('/v1/app/orders', 'creator', (ctx) => {
+    const s = session();
+    if (!s) return fail(401, 'unauthenticated', 'Sign in first.');
+    return orderOr404(myAppOrders(s.address).find((x) => x.id === ctx.params.id));
+  }),
+  ...chatRoutes('/v1/p2p/orders', 'creator', (ctx) => {
+    const org = orgOf(ctx);
+    if (isResp(org)) return org;
+    return orderOr404(db().orders.find((x) => x.id === ctx.params.id && x._owner === org));
+  }),
+  ...chatRoutes('/v1/p2p/merchant/orders', 'merchant', (ctx) => {
+    const org = orgOf(ctx);
+    if (isResp(org)) return org;
+    return orderOr404(db().orders.find((x) => x.id === ctx.params.id && x._merchantOrg === org));
+  }),
+];
+
 const routes: [ApiRequest['method'], string, Handler][] = [
+  ...chatRouteTable,
   // Sign-in with a Stellar wallet (SEP-10)
   [
     'GET',
@@ -371,7 +502,14 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       if (!o) return fail(404, 'not_found', 'Order not found.');
       if ((o.kind !== 'SELL' && o.kind !== 'QR_PAY') || o.sellerAddress !== s.address)
         return fail(409, 'not_seller', "Only a sale's seller signs its actions.");
-      const tx = orderCall(tick(o), fnOf(String(body.action)), s.address);
+      // An action the order already shows (a retry) is answered as done, as the API does.
+      if (showsOutcome(String(body.action), tick(o).status))
+        return fail(409, 'already_done', `This order is already ${o.status}.`);
+      if (body.action === 'open')
+        return o.status === 'pending'
+          ? ok(saleOpen(o))
+          : fail(400, 'invalid_state', 'Only a sale waiting for your signature can be opened.');
+      const tx = orderCall(o, fnOf(String(body.action)), s.address);
       return tx ? ok(tx) : fail(409, 'invalid_state', 'This order has no on-chain id yet.');
     },
   ],
@@ -446,7 +584,11 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       if (db().accounts.some((a) => a.address === address))
         return fail(409, 'address_taken', 'This wallet is already registered.');
       const c = sep10Challenge(address, org);
-      return ok({ ...c, networkPassphrase: c.network_passphrase, expiresAt: iso(now() + 5 * 60_000) });
+      return ok({
+        ...c,
+        networkPassphrase: c.network_passphrase,
+        expiresAt: iso(now() + 5 * 60_000),
+      });
     }),
   ],
   [
@@ -455,7 +597,8 @@ const routes: [ApiRequest['method'], string, Handler][] = [
     withOrg(({ body }, org) => {
       // The address is the one the signed challenge proves; the body names none.
       const address = sep10Verify(String(body.transaction ?? ''), org);
-      if (!address) return fail(401, 'invalid_signature', 'The challenge is not signed by this wallet.');
+      if (!address)
+        return fail(401, 'invalid_signature', 'The challenge is not signed by this wallet.');
       if (db().accounts.some((a) => a.address === address))
         return fail(409, 'address_taken', 'This wallet is already registered.');
       const displayName = body.displayName ? String(body.displayName) : null;
@@ -715,9 +858,7 @@ const routes: [ApiRequest['method'], string, Handler][] = [
       const t = tokenOf(String(body.network), String(body.token));
       if (!t) return fail(422, 'unknown_token', 'Unknown token on this network.');
       const recipient = db().accounts.find(
-        (a) =>
-          a._org === org &&
-          (a.id === body.recipient || a.address === String(body.recipient)),
+        (a) => a._org === org && (a.id === body.recipient || a.address === String(body.recipient)),
       );
       if (!recipient)
         return fail(
@@ -882,7 +1023,6 @@ const routes: [ApiRequest['method'], string, Handler][] = [
 
 /* --- Handlers with more to them --- */
 
-
 function myOrgs() {
   const s = session();
   if (!s) return [];
@@ -916,6 +1056,10 @@ function quote(body: Wire): ApiResponse {
   if (buy) {
     fiat = Number(body.fiatAmount);
     tokenUnits = BigInt(Math.floor((fiat / price) * 1e7));
+  } else if (body.fiatAmount !== undefined) {
+    // A sale named by the local money that arrives: the tokens that pay for it, rounded up.
+    fiat = Number(body.fiatAmount);
+    tokenUnits = BigInt(Math.ceil((fiat / price) * 1e7));
   } else {
     tokenUnits = BigInt(String(body.tokenAmount ?? '0'));
     fiat = Math.floor((Number(tokenUnits) / 1e7) * price * 10 ** dec) / 10 ** dec;
@@ -974,11 +1118,15 @@ function createOrder(body: Wire): ApiResponse {
     if (have < BigInt(q.tokenAmount))
       return fail(422, 'insufficient_balance', 'Not enough USDC in this wallet.');
     const b = body.beneficiary ?? {};
-    const errors = checkBeneficiary(q.rail, {
-      holderName: String(b.holderName ?? ''),
-      document: String(b.document ?? ''),
-      details: b.details ?? {},
-    });
+    const errors = checkBeneficiary(
+      q.rail,
+      {
+        holderName: String(b.holderName ?? ''),
+        document: String(b.document ?? ''),
+        details: b.details ?? {},
+      },
+      { idOptional: true },
+    );
     if (Object.keys(errors).length)
       return fail(422, 'invalid_beneficiary', `Check: ${Object.keys(errors).join(', ')}.`);
   }
@@ -1023,6 +1171,8 @@ function buyerAction(id: string, action: 'paid' | 'cancel' | 'dispute', body: Wi
   const buyLike = o.kind === 'BUY' || o.kind === 'CHARGE';
   if (!buyLike)
     return fail(409, 'sign_in_wallet', "A sale's actions are its seller's own transactions.");
+  // Asked again once it is done (a retry): the order as it is, as the API answers.
+  if (showsOutcome(action, o.status)) return ok(orderView(o, 'client'));
   const t = now();
   if (action === 'paid') {
     if (o.status !== 'awaiting_payment')

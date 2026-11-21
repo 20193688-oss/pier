@@ -25,7 +25,7 @@ const DESCRIPTIONS: Record<number, string> = {
   401: '`unauthorized`: no credentials, or an unknown, revoked or expired key or session.',
   403: '`forbidden`: the credentials may not do this (scope, role, tier, cross-site write).',
   404: '`not_found`: nothing of yours with that id on this tier.',
-  409: '`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`.',
+  409: '`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`.',
   429: '`rate_limited`: retry after the `Retry-After` header.',
   503: '`service_unavailable`: the market is not available on that network right now.',
 };

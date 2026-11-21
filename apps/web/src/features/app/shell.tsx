@@ -1,18 +1,54 @@
-/* The payments app's frame: a phone-width column (centred on a desktop), safe-area insets, the
-   floating dock with the scan button in the middle, a screen header with a back button, and the
-   banners for no connection and a new version. */
-import type { ReactNode } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router';
+/* The payments app's frame. On a phone: one column, safe-area insets and the floating dock with
+   the scan button in the middle. From a tablet up (768px): a side navigation with the logo, and the
+   screens in a wider centred column. Every screen comes in with a short motion (forward from the
+   right, back from the left, a tab switch fades); the banners for no connection and a new
+   version. Also the screen header with a back button, and the home's action tiles. */
+import { useEffect, useRef, type ReactNode } from 'react';
+import { Link, NavLink, useLocation, useNavigate, useNavigationType } from 'react-router';
 import { useI18n } from '@/i18n';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { Logo } from '@/components/ui/Logo';
 import { applyUpdate, usePwa } from '@/lib/pwa';
 
-export function AppFrame({ children, tabs }: { children: ReactNode; tabs: boolean }) {
+export const TAB_PATHS = ['/app', '/app/activity', '/app/receive', '/app/me'];
+const clean = (path: string) => path.replace(/\/+$/, '') || '/app';
+
+/** How the new screen moves in: between tabs it fades, going back it comes from the left, any
+    other step forward from the right. */
+function useScreenMotion(pathname: string): 'fade' | 'forward' | 'back' {
+  const type = useNavigationType();
+  const prev = useRef(pathname);
+  const from = prev.current;
+  useEffect(() => {
+    prev.current = pathname;
+  }, [pathname]);
+  if (from === pathname) return 'fade';
+  if (TAB_PATHS.includes(clean(from)) && TAB_PATHS.includes(clean(pathname))) return 'fade';
+  if (type === 'POP') return 'back';
+  return type === 'REPLACE' ? 'fade' : 'forward';
+}
+
+export function AppFrame({
+  children,
+  tabs,
+  nav,
+}: {
+  children: ReactNode;
+  /* The phone's dock (the four tab screens). */
+  tabs: boolean;
+  /* Signed in: the side navigation on every screen from a tablet up. */
+  nav: boolean;
+}) {
   const { t } = useI18n();
   const pwa = usePwa();
+  const { pathname } = useLocation();
+  const motion = useScreenMotion(pathname);
   return (
     <div className="app-backdrop min-h-dvh">
-      <div className="app-column relative mx-auto flex min-h-dvh w-full max-w-[460px] flex-col bg-paper">
+      {nav && <SideNav />}
+      <div
+        className={`app-column relative mx-auto flex min-h-dvh w-full max-w-[460px] flex-col bg-paper md:w-auto md:max-w-none ${nav ? 'md:ml-[260px]' : 'md:mx-0'}`}
+      >
         <div className="app-top-inset" />
         {!pwa.online && (
           <p
@@ -37,7 +73,13 @@ export function AppFrame({ children, tabs }: { children: ReactNode; tabs: boolea
           id="main"
           className={`flex flex-1 flex-col ${tabs ? 'app-with-tabs' : 'app-without-tabs'}`}
         >
-          {children}
+          <div
+            key={pathname}
+            data-motion={motion}
+            className="screen flex w-full flex-1 flex-col"
+          >
+            {children}
+          </div>
         </main>
         {tabs && <TabBar />}
       </div>
@@ -63,7 +105,7 @@ function Tab({
       aria-label={label}
       title={label}
       className={({ isActive }) =>
-        `grid size-12 place-items-center rounded-full transition-colors ${isActive ? 'bg-well text-ink' : 'text-ink-3 hover:text-ink'}`
+        `grid size-12 place-items-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-90 ${isActive ? 'tab-on bg-well text-ink' : 'text-ink-3 hover:text-ink'}`
       }
     >
       {({ isActive }) => <Icon name={icon} size={22} strokeWidth={isActive ? 2.3 : 1.9} />}
@@ -71,14 +113,14 @@ function Tab({
   );
 }
 
-/** The tabs: one floating pill, the scan button at its centre. */
+/** The tabs on a phone: one floating pill, the scan button at its centre. */
 export function TabBar() {
   const { t } = useI18n();
   const tb = t.app.tabs;
   return (
     <nav
       aria-label={tb.label}
-      className="app-dock fixed left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full p-1.5"
+      className="app-dock fixed left-1/2 z-20 flex -translate-x-1/2 items-center gap-1 rounded-full p-1.5 md:hidden"
     >
       <Tab to="/app" end icon="home" label={tb.home} />
       <Tab to="/app/activity" icon="list" label={tb.activity} />
@@ -87,7 +129,7 @@ export function TabBar() {
         to="/app/scan"
         aria-label={tb.scan}
         title={tb.scan}
-        className="grid size-[52px] place-items-center rounded-full bg-ink text-on-ink transition-transform active:scale-95"
+        className="grid size-[52px] place-items-center rounded-full bg-ink text-on-ink transition-transform duration-150 active:scale-90"
       >
         <Icon name="scan" size={24} strokeWidth={2.2} />
       </NavLink>
@@ -98,13 +140,67 @@ export function TabBar() {
   );
 }
 
-/** A screen: its header (back, title, an optional action) and its body. */
+function SideLink({
+  to,
+  icon,
+  label,
+  end,
+}: {
+  to: string;
+  icon: IconName;
+  label: string;
+  end?: boolean;
+}) {
+  return (
+    <NavLink
+      to={to}
+      end={end}
+      className={({ isActive }) =>
+        `flex min-h-12 items-center gap-3 rounded-full px-4 font-semibold transition-[background-color,color,transform] duration-200 active:scale-[0.98] ${isActive ? 'tab-on bg-well text-ink' : 'text-ink-2 hover:bg-well hover:text-ink'}`
+      }
+    >
+      <Icon name={icon} size={20} />
+      {label}
+    </NavLink>
+  );
+}
+
+/** The tabs from a tablet up: a side navigation with the logo, the scan button below. */
+function SideNav() {
+  const { t } = useI18n();
+  const tb = t.app.tabs;
+  return (
+    <nav
+      aria-label={tb.label}
+      className="fixed inset-y-0 left-0 z-20 hidden w-[260px] flex-col gap-1 border-r border-line bg-sheet px-4 py-6 md:flex"
+    >
+      <Link to="/app" className="mb-8 self-start rounded-[10px] px-3" aria-label={tb.home}>
+        <Logo size={22} />
+      </Link>
+      <SideLink to="/app" end icon="home" label={tb.home} />
+      <SideLink to="/app/activity" icon="list" label={tb.activity} />
+      <SideLink to="/app/receive" icon="qr" label={tb.receive} />
+      <SideLink to="/app/me" icon="user" label={tb.me} />
+      <NavLink to="/app/scan" className="btn btn-ink btn-lg mt-6">
+        <Icon name="scan" size={20} strokeWidth={2.2} />
+        {tb.scan}
+      </NavLink>
+    </nav>
+  );
+}
+
+/** A screen: its header (back, title, an optional action) and its body. On a phone it spans the
+    column inside 24px gutters; from a tablet up it is a page with 40px gutters, up to 720px wide
+    for a form (`width="form"`, the default) or 1180px for a page with columns (`width="page"`).
+    A form with an `aside` (the wallet's balance, say) shows it beside the form from 1280px. */
 export function Screen({
   title,
   back,
   action,
   children,
   wide = false,
+  width = 'form',
+  aside,
 }: {
   title?: ReactNode;
   /* Where back goes: a path, or true for the previous screen. */
@@ -112,6 +208,8 @@ export function Screen({
   action?: ReactNode;
   children: ReactNode;
   wide?: boolean;
+  width?: 'form' | 'page';
+  aside?: ReactNode;
 }) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -123,9 +221,13 @@ export function Screen({
     } else if (back) navigate(back);
   };
   return (
-    <div className={`flex flex-1 flex-col ${wide ? '' : 'px-4'}`}>
+    <div
+      className={`flex flex-1 flex-col md:mx-auto md:w-full md:pb-6 ${width === 'page' ? 'md:max-w-[1180px]' : aside ? 'md:max-w-[720px] xl:max-w-[1120px]' : 'md:max-w-[720px]'} ${wide ? '' : 'px-6 md:px-10'}`}
+    >
       {(title || back || action) && (
-        <header className={`flex min-h-[60px] items-center gap-2 pt-1 ${wide ? 'px-4' : ''}`}>
+        <header
+          className={`flex min-h-[64px] items-center gap-3 pt-2 pb-2 md:min-h-[72px] md:pt-8 md:pb-4 ${wide ? 'px-6 md:px-10' : ''}`}
+        >
           {back && (
             <button
               type="button"
@@ -136,12 +238,19 @@ export function Screen({
               <Icon name="back" size={20} />
             </button>
           )}
-          {title && <h1 className="flex-1 truncate text-[1.375rem]">{title}</h1>}
+          {title && <h1 className="flex-1 truncate text-[1.375rem] md:text-[2rem]">{title}</h1>}
           {!title && <span className="flex-1" />}
           {action}
         </header>
       )}
-      {children}
+      {aside ? (
+        <div className="flex flex-1 flex-col xl:grid xl:grid-cols-[minmax(0,1fr)_340px] xl:items-start xl:gap-10">
+          <div className="flex min-w-0 flex-1 flex-col">{children}</div>
+          <aside className="hidden xl:sticky xl:top-8 xl:block">{aside}</aside>
+        </div>
+      ) : (
+        children
+      )}
     </div>
   );
 }
@@ -150,7 +259,7 @@ export function Screen({
     black icon tile and a tracked capital label. */
 export function ActionTile({ to, icon, label }: { to: string; icon: IconName; label: string }) {
   return (
-    <NavLink to={to} className="tile">
+    <NavLink to={to} className="tile md:min-h-[108px] md:p-4">
       <span className="tile-icon" aria-hidden="true">
         <Icon name={icon} size={16} strokeWidth={2.3} />
       </span>

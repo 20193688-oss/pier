@@ -20,6 +20,7 @@ import {
   USER,
 } from '@/lib/mock/fixtures';
 import { DEMO_QRS } from '@/lib/mock/qr';
+import { receiptPdf } from '@/lib/mock/receipt';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export type Wire = Record<string, any>;
@@ -59,9 +60,11 @@ export interface MockState {
   deliveries: Wire[];
   payerTokens: Record<string, string>;
   nextOnchainId: number;
+  /* Orders' chat messages (`_data`: an attachment's base64, never in a list). */
+  messages: Wire[];
 }
 
-const VERSION = 6;
+const VERSION = 8;
 const STORAGE_KEY = 'midpoint.mock';
 
 export const now = () => Date.now();
@@ -71,7 +74,9 @@ export const rid = (prefix: string, n = 12) => {
   return `${prefix}_${[...bytes].map((b) => (b % 36).toString(36)).join('')}`;
 };
 export const hash32 = () =>
-  [...crypto.getRandomValues(new Uint8Array(32))].map((b) => b.toString(16).padStart(2, '0')).join('');
+  [...crypto.getRandomValues(new Uint8Array(32))]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('');
 export const refOf = (id: string) => orderRef(id)!;
 export const units = (decimal: number, decimals = 7) =>
   BigInt(Math.round(decimal * 10 ** decimals)).toString();
@@ -260,6 +265,26 @@ function seed(): MockState {
     ],
     challenges: {},
     methods: [
+      {
+        id: 'pm_bob_main',
+        _org: 'org_nortecambios',
+        accountId: 'acc_norte_treasury',
+        currency: 'BOB',
+        rail: 'bo_bank_transfer',
+        label: 'Banco Unión',
+        holderName: 'Norte Cambios SRL',
+        document: '1020304025',
+        details: {
+          bank: 'Banco Unión',
+          accountType: 'checking',
+          accountNumber: '1000023456789',
+          documentType: 'NIT',
+          documentNumber: '1020304025',
+        },
+        active: true,
+        createdAt: '2026-09-01T14:00:00.000Z',
+        summary: 'Banco Unión ••••6789',
+      },
       {
         id: 'pm_ars_main',
         _org: 'org_nortecambios',
@@ -581,11 +606,17 @@ function seed(): MockState {
     ],
     payerTokens: {},
     nextOnchainId: 4100,
+    messages: [],
     chain: {
       accounts: {
         [USER]: { exists: true, seq: '100', xlm: '0', trust: { USDC: units(248.35) } },
         [FRIEND]: { exists: true, seq: '100', xlm: '0', trust: { USDC: units(40) } },
-        [MERCHANT_WALLET]: { exists: true, seq: '100', xlm: units(5), trust: { USDC: units(3100) } },
+        [MERCHANT_WALLET]: {
+          exists: true,
+          seq: '100',
+          xlm: units(5),
+          trust: { USDC: units(3100) },
+        },
         [BUSINESS_WALLET]: { exists: true, seq: '100', xlm: '0', trust: { USDC: units(900) } },
         [OTHER_MERCHANT]: { exists: true, seq: '100', xlm: '0', trust: { USDC: units(50000) } },
       },
@@ -866,8 +897,22 @@ function seed(): MockState {
       completedAt: at,
     });
   };
-  transfer({ from: FRIEND, to: USER, amount: 35, note: 'Asado del sábado', agoMin: 50, fromHandle: 'lucia' });
-  transfer({ from: USER, to: FRIEND, amount: 12.5, note: 'Café', agoMin: 26 * 60, toHandle: 'lucia' });
+  transfer({
+    from: FRIEND,
+    to: USER,
+    amount: 35,
+    note: 'Asado del sábado',
+    agoMin: 50,
+    fromHandle: 'lucia',
+  });
+  transfer({
+    from: USER,
+    to: FRIEND,
+    amount: 12.5,
+    note: 'Café',
+    agoMin: 26 * 60,
+    toHandle: 'lucia',
+  });
   // A payment from outside the app: no handle.
   transfer({ from: OTHER_MERCHANT, to: USER, amount: 100, note: null, agoMin: 3 * 24 * 60 });
   const app = (o: Omit<Parameters<typeof makeOrder>[0], 'owner' | 'merchantOrg'>) => {
@@ -900,6 +945,20 @@ function seed(): MockState {
     seller: USER,
     createdAgoMin: 5 * 24 * 60,
   });
+  // A send that never opened (its signature never landed): nothing moved, the row is struck out.
+  const never = app({
+    kind: 'SELL',
+    status: 'failed',
+    fiat: 37,
+    currency: 'PEN',
+    rail: 'pe_bank_transfer',
+    price: 3.7,
+    buyer: OTHER_MERCHANT,
+    seller: USER,
+    createdAgoMin: 3 * 60,
+  });
+  never.onchainId = null;
+  never.txHashes = {};
   return s;
 }
 
@@ -1005,8 +1064,87 @@ export function tick(o: Wire): Wire {
           : null;
     o.txHashes = { ...o.txHashes, paid: hash32() };
     touch();
+    merchantReceipt(o, t);
   }
   return o;
+}
+
+/* --- The chat: what the merchant sends on its own. --- */
+
+const RAIL_NAMES: Record<string, string> = {
+  bo_bank_transfer: 'Transferencia bancaria',
+  ar_bank_transfer: 'Transferencia (CBU, CVU o alias)',
+  ar_qr: 'QR interoperable',
+  br_pix: 'PIX',
+  br_pix_qr: 'QR de PIX',
+};
+
+/** A chat message on order `o`, `at` milliseconds (a reply shows a few seconds later). */
+export function addMessage(
+  o: Wire,
+  from: 'creator' | 'merchant',
+  input: { text?: string; attachment?: { name: string; contentType: string; data: string } },
+  at = now(),
+): Wire {
+  const a = input.attachment;
+  const m: Wire = {
+    id: `msg_${Math.random().toString(36).slice(2, 12)}`,
+    orderId: o.id,
+    from,
+    kind: a ? 'receipt' : 'text',
+    text: input.text?.trim() || null,
+    attachment: a
+      ? { name: a.name, contentType: a.contentType, size: Math.floor((a.data.length * 3) / 4) }
+      : null,
+    _data: a?.data,
+    createdAt: iso(at),
+  };
+  db().messages.push(m);
+  return m;
+}
+
+/** The mock merchant's receipt once it paid the person (a sale) or the shop (a QR payment). */
+function merchantReceipt(o: Wire, t: number) {
+  const ben = (o.beneficiary ?? {}) as Wire;
+  const account = Object.values((ben.details ?? {}) as Record<string, string>).find((v) =>
+    /\d{6,}/.test(v),
+  );
+  const data = receiptPdf([
+    'Comprobante de transferencia',
+    'Norte Cambios SRL',
+    `Fecha: ${new Date(t).toLocaleString('es-BO')}`,
+    `Monto: ${o.fiatAmount} ${o.currency}`,
+    `Medio: ${RAIL_NAMES[o.rail] ?? o.rail}`,
+    ...(o.kind === 'QR_PAY'
+      ? [`Comercio: ${(o._shopName as string) ?? 'QR del comercio'}`]
+      : [
+          `Beneficiario: ${ben.holderName ?? '-'}${account ? ` (cuenta ****${account.slice(-4)})` : ''}`,
+        ]),
+    `Referencia: ${String(o.id).slice(-8)}`,
+    `Operación: ${o.paidReference ?? '-'}`,
+  ]);
+  addMessage(
+    o,
+    'merchant',
+    {
+      text: 'Listo, ya te transferí. Te dejo el comprobante.',
+      attachment: {
+        name: `comprobante-${String(o.id).slice(-8)}.pdf`,
+        contentType: 'application/pdf',
+        data,
+      },
+    },
+    t,
+  );
+}
+
+/** An order's chat as its views carry it. */
+export function chatSummary(orderId: string) {
+  const list = db()
+    .messages.filter((m) => m.orderId === orderId && Date.parse(m.createdAt) <= now())
+    .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  const last = list[list.length - 1];
+  return { count: list.length, lastAt: last?.createdAt ?? null, lastFrom: last?.from ?? null };
 }
 
 /** A token balance on the mock network, moved by `delta` base units (a missing trustline takes

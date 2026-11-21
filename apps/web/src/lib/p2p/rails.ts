@@ -6,13 +6,14 @@
 
    One entry per rail. A field is `{ key, kind }`; `kind` names the check and the label the
    screens use (the `p2p.fields` translations). The QR rails (`ar_qr`, Argentina's interoperable
-   QR, and `br_pix_qr`, a PIX BR Code) take no account at all: the destination is the merchant QR
+   QR, `br_pix_qr`, a PIX BR Code, and `pe_qr`, Peru's interoperable QR) take no account at all: the destination is the merchant QR
    the person scanned, which the market merchant pays from its own banking app (QR_PAY orders). A rail the market lists that this table does not
    know is still offered: its fields come from the market and are checked as plain required text.
 
    Pure (no DOM): tests/unit/rails.test.ts covers every check. */
 
 export type RailId =
+  | 'bo_bank_transfer'
   | 'ar_bank_transfer'
   | 'br_pix'
   | 'mx_spei'
@@ -20,7 +21,8 @@ export type RailId =
   | 'pe_bank_transfer'
   | 'cl_bank_transfer'
   | 'ar_qr'
-  | 'br_pix_qr';
+  | 'br_pix_qr'
+  | 'pe_qr';
 
 /** What a field holds, which also picks its check and its label. */
 export type FieldKind =
@@ -33,11 +35,15 @@ export type FieldKind =
   | 'clabe'
   | 'rfc'
   | 'bank'
+  | 'accountTypeBo'
   | 'accountTypeCo'
   | 'accountTypeCl'
+  | 'documentTypeBo'
   | 'documentTypeCo'
   | 'documentTypePe'
   | 'documentNumber'
+  | 'documentNumberBo'
+  | 'ciNit'
   | 'accountNumber'
   | 'cci'
   | 'dniRuc'
@@ -67,18 +73,39 @@ export interface Rail {
   fields: readonly RailField[];
   /* The detail that holds the holder's document, when the rail has one. */
   documentKey?: string;
+  /* The details that are the holder's ID (a CUIT, a document type and number, a RUT). */
+  idFields?: readonly string[];
+  /* The rail's transfers need the recipient's ID (Chile's RUT, Colombia's document): it is asked
+     even of someone else. Elsewhere a third party's ID is optional and the app does not ask. */
+  idRequired?: boolean;
   /* A QR rail: no account fields, paid by scanning a merchant QR (QR_PAY orders only). */
   qr?: boolean;
 }
 
 export const PIX_KEY_TYPES = ['cpf', 'cnpj', 'email', 'phone', 'evp'] as const;
 export type PixKeyType = (typeof PIX_KEY_TYPES)[number];
+export const BO_ACCOUNT_TYPES = ['savings', 'checking'] as const;
+export const BO_DOCUMENT_TYPES = ['CI', 'NIT', 'CE', 'PP'] as const;
 export const CO_ACCOUNT_TYPES = ['savings', 'checking'] as const;
 export const CL_ACCOUNT_TYPES = ['checking', 'vista', 'savings'] as const;
 export const CO_DOCUMENT_TYPES = ['CC', 'CE', 'NIT', 'PP'] as const;
 export const PE_DOCUMENT_TYPES = ['DNI', 'CE', 'RUC', 'PP'] as const;
 
 export const RAILS: Record<RailId, Rail> = {
+  bo_bank_transfer: {
+    id: 'bo_bank_transfer',
+    currency: 'BOB',
+    country: 'bo',
+    fields: [
+      { key: 'bank', kind: 'bank' },
+      { key: 'accountType', kind: 'accountTypeBo', options: BO_ACCOUNT_TYPES },
+      { key: 'accountNumber', kind: 'accountNumber', minDigits: 6 },
+      { key: 'documentType', kind: 'documentTypeBo', options: BO_DOCUMENT_TYPES },
+      { key: 'documentNumber', kind: 'documentNumberBo' },
+    ],
+    documentKey: 'documentNumber',
+    idFields: ['documentType', 'documentNumber'],
+  },
   ar_bank_transfer: {
     id: 'ar_bank_transfer',
     currency: 'ARS',
@@ -89,6 +116,7 @@ export const RAILS: Record<RailId, Rail> = {
       { key: 'cuit', kind: 'cuit' },
     ],
     documentKey: 'cuit',
+    idFields: ['cuit'],
   },
   br_pix: {
     id: 'br_pix',
@@ -117,6 +145,8 @@ export const RAILS: Record<RailId, Rail> = {
       { key: 'documentNumber', kind: 'documentNumber' },
     ],
     documentKey: 'documentNumber',
+    idFields: ['documentType', 'documentNumber'],
+    idRequired: true,
   },
   pe_bank_transfer: {
     id: 'pe_bank_transfer',
@@ -128,6 +158,7 @@ export const RAILS: Record<RailId, Rail> = {
       { key: 'documentNumber', kind: 'documentNumber' },
     ],
     documentKey: 'documentNumber',
+    idFields: ['documentType', 'documentNumber'],
   },
   cl_bank_transfer: {
     id: 'cl_bank_transfer',
@@ -140,9 +171,12 @@ export const RAILS: Record<RailId, Rail> = {
       { key: 'rut', kind: 'rut' },
     ],
     documentKey: 'rut',
+    idFields: ['rut'],
+    idRequired: true,
   },
   ar_qr: { id: 'ar_qr', currency: 'ARS', country: 'ar', fields: [], qr: true },
   br_pix_qr: { id: 'br_pix_qr', currency: 'BRL', country: 'br', fields: [], qr: true },
+  pe_qr: { id: 'pe_qr', currency: 'PEN', country: 'pe', fields: [], qr: true },
 };
 
 export const RAIL_IDS = Object.keys(RAILS) as RailId[];
@@ -160,9 +194,38 @@ export function isRailId(value: unknown): value is RailId {
   return typeof value === 'string' && Object.hasOwn(RAILS, value);
 }
 
+/** Whether a third party's ID may be left out on `rail` (its transfers do not need it). */
+export function idOptional(rail: string): boolean {
+  return isRailId(rail) && !RAILS[rail].idRequired;
+}
+
+/** The details without the holder's ID fields (what is sent for a third party who is not asked). */
+export function withoutId(rail: string, details: Record<string, string>): Record<string, string> {
+  const id = new Set(isRailId(rail) ? (RAILS[rail].idFields ?? []) : []);
+  return Object.fromEntries(Object.entries(details).filter(([k]) => !id.has(k)));
+}
+
+/** The member of a `oneOf` group a typed value belongs to, for the group's one field: digits
+    (spaces, dots and hyphens aside) are the account number (an Argentine CBU or CVU), anything
+    else the alias. The server still gets the detail under its own key. */
+export function oneOfKey(members: readonly RailField[], value: string): string {
+  const numeric = members.find((m) => ['cbu', 'clabe', 'cci', 'accountNumber'].includes(m.kind));
+  const other = members.find((m) => m !== numeric);
+  const digits = /^[\d\s.-]*\d[\d\s.-]*$/.test(value.trim());
+  return (digits ? numeric : other)?.key ?? members[0].key;
+}
+
 /** The rails a currency is paid on, in the table's order. */
 export function railsFor(currency: string): Rail[] {
   return RAIL_IDS.map((id) => RAILS[id]).filter((r) => r.currency === currency);
+}
+
+/** The market's main currency, Bolivia's boliviano: preselected wherever a currency is. */
+export const HOME_CURRENCY = 'BOB';
+
+/** The currency to preselect among `currencies`: the main one when listed, else the first. */
+export function defaultCurrency(currencies: readonly { code: string }[]): string {
+  return (currencies.find((c) => c.code === HOME_CURRENCY) ?? currencies[0])?.code ?? '';
 }
 
 /** Local money's decimals: Chilean pesos have none, the rest two. */
@@ -342,6 +405,15 @@ export function checkNitCc(value: string): FieldError | null {
   return /^\d{6,10}$/.test(digitsOf(value)) ? null : 'format';
 }
 
+/** A Bolivian document number as the API keeps it: no spaces, dots or hyphens, upper case. */
+export const boDocument = (value: string) => value.replace(/[\s.-]/g, '').toUpperCase();
+
+/** A Bolivian CI (5 to 10 digits, with its complement or issuing department when it has one:
+    `1234567-1A`, `1234567 LP`) or NIT (up to 13 digits). */
+export function checkCiNit(value: string): FieldError | null {
+  return /^\d{5,13}[A-Z]{0,2}$/.test(boDocument(value)) ? null : 'format';
+}
+
 /** A bank account number: `min` (4 unless said) to 20 digits. */
 export function checkAccountNumber(value: string, min = 4): FieldError | null {
   const d = digitsOf(value);
@@ -372,8 +444,10 @@ export function checkField(
     case 'cuit':
       return checkCuit(v);
     case 'pixKeyType':
+    case 'accountTypeBo':
     case 'accountTypeCo':
     case 'accountTypeCl':
+    case 'documentTypeBo':
     case 'documentTypeCo':
     case 'documentTypePe':
       return options && !options.includes(v) ? 'format' : null;
@@ -381,6 +455,10 @@ export function checkField(
       return checkPixKey(context.keyType ?? context.pixKeyType ?? '', v);
     case 'documentNumber':
       return checkDocumentNumber(v);
+    case 'documentNumberBo':
+      return checkDocumentNumber(boDocument(v));
+    case 'ciNit':
+      return checkCiNit(v);
     case 'cpfCnpj':
       return checkCpfCnpj(v);
     case 'clabe':
@@ -422,8 +500,17 @@ export interface AccountInput {
 /** Every problem with an account on `rail`, by field key ("holderName" or a detail key); empty
     when it can be sent. In a `oneOf` group exactly one member is filled (the server refuses a CBU
     and an alias together), and it must be valid. */
-export function checkAccount(railId: string, input: AccountInput): Record<string, FieldError> {
+export function checkAccount(
+  railId: string,
+  input: AccountInput,
+  opts: { idOptional?: boolean } = {},
+): Record<string, FieldError> {
   const errors: Record<string, FieldError> = {};
+  const id = new Set(
+    opts.idOptional && isRailId(railId) && !RAILS[railId].idRequired
+      ? (RAILS[railId].idFields ?? [])
+      : [],
+  );
   const holder = checkHolderName(input.holderName);
   if (holder) errors.holderName = holder;
   if (!isRailId(railId)) {
@@ -443,7 +530,7 @@ export function checkAccount(railId: string, input: AccountInput): Record<string
       }
       continue;
     }
-    if (!value && field.optional) continue;
+    if (!value && (field.optional || id.has(field.key))) continue;
     const e = checkField(field.kind, value, input.details, field.options, field.minDigits);
     if (e) errors[field.key] = e;
   }
@@ -469,11 +556,16 @@ export function documentOf(railId: string, details: Record<string, string>): str
 /** A beneficiary (a payout's, or the seller's own account on a sale): the account, and the
     holder's document the server also asks for (4 to 20 letters, digits, dots, hyphens or
     slashes), taken from the details when the rail keeps one. */
-export function checkBeneficiary(railId: string, input: AccountInput): Record<string, FieldError> {
-  const errors = checkAccount(railId, input);
+export function checkBeneficiary(
+  railId: string,
+  input: AccountInput,
+  opts: { idOptional?: boolean } = {},
+): Record<string, FieldError> {
+  const errors = checkAccount(railId, input, opts);
   const doc = (input.document ?? '').trim() || documentOf(railId, input.details);
-  if (!doc) errors.document = 'required';
-  else if (!/^[A-Za-z0-9./-]{4,20}$/.test(doc)) errors.document = 'format';
+  if (!doc) {
+    if (!(opts.idOptional && idOptional(railId))) errors.document = 'required';
+  } else if (!/^[A-Za-z0-9./-]{4,20}$/.test(doc)) errors.document = 'format';
   return errors;
 }
 
@@ -495,6 +587,7 @@ export function normalizeDetails(
     let v = String(details[field.key] ?? '').trim();
     if (!v) continue;
     if (field.kind === 'alias') v = v.toLowerCase();
+    if (field.kind === 'documentNumberBo') v = boDocument(v);
     if (['cbu', 'clabe', 'cci', 'accountNumber'].includes(field.kind)) v = v.replace(/[\s.-]/g, '');
     out[field.key] = v;
   }
@@ -504,13 +597,15 @@ export function normalizeDetails(
 /* --- The payer's identity: who must send the transfer on a purchase (a BUY order or a charge).
    Merchants check the money comes from that person, so the document is required. --- */
 
-/** The payer's document for a payment in `currency`: Argentina a DNI or CUIT/CUIL, Brazil a CPF or
-    CNPJ, Mexico an RFC or CURP, Colombia a citizen card or NIT, Peru a DNI or RUC, Chile a RUT;
-    any other currency 4 to 20 letters and digits. */
+/** The payer's document for a payment in `currency`: Bolivia a CI or NIT, Argentina a DNI or
+    CUIT/CUIL, Brazil a CPF or CNPJ, Mexico an RFC or CURP, Colombia a citizen card or NIT, Peru a
+    DNI or RUC, Chile a RUT; any other currency 4 to 20 letters and digits. */
 export function checkPayerDocument(currency: string, value: string): FieldError | null {
   const v = (value ?? '').trim();
   if (!v) return 'required';
   switch (currency) {
+    case 'BOB':
+      return checkCiNit(v);
     case 'ARS':
       return digitsOf(v).length <= 8 ? checkDni(v) : checkCuit(v);
     case 'BRL':

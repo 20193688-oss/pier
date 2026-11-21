@@ -5,7 +5,12 @@ import { useMemo, useState } from 'react';
 import { fmt, useI18n } from '@/i18n';
 import { accounts as accountsApi, methods as methodsApi } from '@/lib/api/endpoints';
 import { errorMessage } from '@/lib/api/messages';
-import { accountRails, checkAccount, normalizeDetails } from '@/lib/p2p/rails';
+import {
+  accountRails,
+  checkAccount,
+  defaultCurrency,
+  normalizeDetails,
+} from '@/lib/p2p/rails';
 import { dateOnly } from '@/lib/format';
 import { Field, Notice, SelectField, Spinner, Switch } from '@/components/ui/controls';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
@@ -23,6 +28,7 @@ import {
 import { useDash } from '@/features/dashboard/context';
 import { Figures, LoadState, PageHead, ReadOnly, useLoad } from '@/features/dashboard/ui';
 import type { P2pAccount, P2pMarket, P2pPaymentMethod } from '@/lib/p2p/types';
+import { useGuard } from '@/lib/use-action';
 
 export function MethodsView() {
   const { t, lang } = useI18n();
@@ -47,27 +53,30 @@ export function MethodsView() {
     [methods],
   );
 
-  const toggle = async (method: P2pPaymentMethod, active: boolean) => {
-    setError('');
-    try {
-      await methodsApi.update(scope, method.id, { active });
-      toast(active ? m.activated : m.deactivated);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e, m.saveFailed));
-    }
-  };
-  const remove = async (method: P2pPaymentMethod) => {
-    setError('');
-    try {
-      await methodsApi.remove(scope, method.id);
-      toast(m.deleted);
-      setDeleting(null);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e, m.deleteFailed));
-    }
-  };
+  const guard = useGuard();
+  const toggle = (method: P2pPaymentMethod, active: boolean) =>
+    guard(async () => {
+      setError('');
+      try {
+        await methodsApi.update(scope, method.id, { active });
+        toast(active ? m.activated : m.deactivated);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e, m.saveFailed));
+      }
+    });
+  const remove = (method: P2pPaymentMethod) =>
+    guard(async () => {
+      setError('');
+      try {
+        await methodsApi.remove(scope, method.id);
+        toast(m.deleted);
+        setDeleting(null);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e, m.deleteFailed));
+      }
+    });
   const accountName = (id: string) => {
     const a = accounts.find((x) => x.id === id);
     return a?.label ?? a?.merchant?.displayName ?? id;
@@ -217,7 +226,7 @@ function MethodDialog({
   const [accountId, setAccountId] = useState(
     (accounts.find((a) => a.merchant) ?? accounts[0])?.id ?? '',
   );
-  const [currency, setCurrency] = useState(market.currencies[0]?.code ?? 'ARS');
+  const [currency, setCurrency] = useState(() => defaultCurrency(market.currencies));
   // A payment method is an account the merchant is paid into: never a QR rail.
   const rails = accountRails(market.currencies.find((c) => c.code === currency)?.rails ?? []);
   const [rail, setRail] = useState(rails[0] ?? '');
@@ -228,27 +237,29 @@ function MethodDialog({
   const [error, setError] = useState('');
   const errors = checkAccount(rail, { holderName: account.holderName, details: account.details });
 
-  const save = async () => {
-    setShowAll(true);
-    if (Object.keys(errors).length || !rail || !accountId) return;
-    setBusy(true);
-    setError('');
-    try {
-      await methodsApi.create(scope, {
-        accountId,
-        currency,
-        rail,
-        holderName: account.holderName.trim(),
-        details: normalizeDetails(rail, account.details),
-        ...(label.trim() ? { label: label.trim() } : {}),
-      });
-      onSaved();
-    } catch (e) {
-      setError(errorMessage(t.common, e, m.saveFailed));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const save = () =>
+    guard(async () => {
+      setShowAll(true);
+      if (Object.keys(errors).length || !rail || !accountId) return;
+      setBusy(true);
+      setError('');
+      try {
+        await methodsApi.create(scope, {
+          accountId,
+          currency,
+          rail,
+          holderName: account.holderName.trim(),
+          details: normalizeDetails(rail, account.details),
+          ...(label.trim() ? { label: label.trim() } : {}),
+        });
+        onSaved();
+      } catch (e) {
+        setError(errorMessage(t.common, e, m.saveFailed));
+      } finally {
+        setBusy(false);
+      }
+    });
 
   return (
     <Dialog

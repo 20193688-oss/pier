@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import type { IncomingMessage } from 'node:http';
 import { ValidationPipe, type INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { NestExpressApplication } from '@nestjs/platform-express';
@@ -8,6 +9,16 @@ import helmet from 'helmet';
 import { AppModule, type AppOverrides } from '@/app.module';
 import { ApiError } from '@/common/api-error';
 import type { AppConfig } from '@/config/env';
+import { ORDER_CHAT_BODY_LIMIT, isOrderMessagePost } from '@/p2p/domain/order-chat';
+
+/** Every JSON body but an order message's: 256 kB. */
+export const JSON_BODY_LIMIT = '256kb';
+
+/** A JSON body, as body-parser's default `application/json` type reads it. */
+function isJson(req: IncomingMessage): boolean {
+  const type = req.headers['content-type'] ?? '';
+  return type.split(';')[0].trim().toLowerCase() === 'application/json';
+}
 
 /** Every field problem of a validation, as `path: message` lines. */
 export function flattenValidation(errors: ValidationError[], prefix = ''): string[] {
@@ -34,7 +45,16 @@ export async function createApp(
   );
   app.set('trust proxy', config.trustProxy);
   app.disable('x-powered-by');
-  app.useBodyParser('json', { limit: '256kb' });
+  // Two JSON parsers, each for its own requests: order messages up to ORDER_CHAT_BODY_LIMIT,
+  // everything else up to JSON_BODY_LIMIT (a larger body is a 413).
+  app.useBodyParser('json', {
+    limit: ORDER_CHAT_BODY_LIMIT,
+    type: (req: IncomingMessage) => isJson(req) && isOrderMessagePost(req),
+  });
+  app.useBodyParser('json', {
+    limit: JSON_BODY_LIMIT,
+    type: (req: IncomingMessage) => isJson(req) && !isOrderMessagePost(req),
+  });
   app.use(helmet());
   app.use(cookieParser());
   app.enableCors({

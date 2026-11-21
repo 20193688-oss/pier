@@ -10,10 +10,12 @@ import { TxBuilder, humanAmount, type BuiltTransaction } from '@/chain/tx-builde
 import { ApiError, ErrorCode } from '@/common/api-error';
 import { DataCipher } from '@/common/data-cipher';
 import { page, type Page } from '@/common/pagination';
+import { showsOutcome } from '@/p2p/domain/action-outcome';
 import { isUuid, openParamsOf, type P2pOrderTerms } from '@/p2p/domain/order-ref';
 import { isSelfOpened, type P2pOrderKind } from '@/p2p/domain/order-status';
 import { qrHash, readQrPayment, type QrSummary, type SealedQr } from '@/p2p/domain/qr-pay';
 import {
+  P2P_RAILS,
   isDocumentNumber,
   isP2pRailId,
   isPersonName,
@@ -35,6 +37,7 @@ import type {
 } from '@/p2p/entities/order.entity';
 import { MatcherService } from '@/p2p/matcher.service';
 import { OrderOpener } from '@/p2p/order-opener.service';
+import { onchainOutcome } from '@/p2p/order-outcome';
 import { PaymentMethodsService } from '@/p2p/payment-methods.service';
 import { QuotesService, fiatUnitsOf, noMatch, windowsFor } from '@/p2p/quotes.service';
 import { tierOf } from '@/p2p/tier';
@@ -146,11 +149,13 @@ export class OrdersService {
         payer = { name: p.name, document: p.document };
       }
       if (sealed?.beneficiary) {
-        beneficiary = this.cipher.open<BeneficiaryView>(
+        const opened = this.cipher.open<BeneficiaryView>(
           'order.beneficiary',
           row.id,
           sealed.beneficiary,
         );
+        // A beneficiary may come without an ID (`document`) on the rails that do not need it.
+        beneficiary = { ...opened, document: opened.document ?? null };
       }
     }
     return toMerchantOrderView(row, { payer, beneficiary, qr });
@@ -182,11 +187,18 @@ export class OrdersService {
     if (!isPersonName(beneficiary.holderName)) {
       errors.push('beneficiary.holderName must be a person’s or a company’s name');
     }
-    if (!isDocumentNumber(beneficiary.document)) {
+    // The holder's ID is optional where the rail's transfer does not need it (their bank already
+    // identified them); given, it is checked as always.
+    const document = beneficiary.document?.trim() || null;
+    const idRequired = isP2pRailId(rail) && P2P_RAILS[rail].beneficiaryIdRequired;
+    if (document === null && idRequired) {
+      errors.push(`beneficiary.document is required: ${rail} transfers need the holder’s ID`);
+    }
+    if (document !== null && !isDocumentNumber(document)) {
       errors.push('beneficiary.document must be 4 to 20 letters, digits, dots or hyphens');
     }
     const details = isP2pRailId(rail)
-      ? validateRailDetails(rail, currency, beneficiary.details)
+      ? validateRailDetails(rail, currency, beneficiary.details, { beneficiary: true })
       : { ok: false as const, errors: [`rail ${rail} is not a rail`] };
     if (!details.ok) errors.push(...details.errors.map((e) => `beneficiary.${e}`));
     if (errors.length || !details.ok) {
@@ -194,7 +206,7 @@ export class OrdersService {
     }
     return {
       holderName: beneficiary.holderName.trim(),
-      document: beneficiary.document.trim(),
+      document,
       rail,
       details: details.details,
     };
@@ -475,10 +487,13 @@ export class OrdersService {
     return row;
   }
 
+  /** The caller's order as its client, found as `GET /v1/p2p/orders/{id}` finds it. */
+  async clientOwned(org: OrgPrincipal, id: string): Promise<P2pOrderRow> {
+    return this.owned(org.organizationId, tierOf(org, this.deployments), id);
+  }
+
   async get(org: OrgPrincipal, id: string): Promise<OrderView> {
-    const tier = tierOf(org, this.deployments);
-    const row = await this.owned(org.organizationId, tier, id);
-    return this.clientView(row, true);
+    return this.clientView(await this.clientOwned(org, id), true);
   }
 
   /**
@@ -499,15 +514,22 @@ export class OrdersService {
     return this.clientView(await this.sendBuyerAct(row, action, dto?.reference), true);
   }
 
-  /** Validates and sends one matcher act for an order; shared with the keyless checkout. */
+  /**
+   * Validates and sends one matcher act for an order; shared with the keyless
+   * checkout. Idempotent: an order that already shows the act (stored, or on
+   * the contract when it refuses the call because the first one went through
+   * before the indexer caught up) is answered as it is, and nothing is sent.
+   */
   async sendBuyerAct(
     row: P2pOrderRow,
     action: 'paid' | 'cancel' | 'dispute',
     reference?: string,
   ): Promise<P2pOrderRow> {
     const kind = row.kind as P2pOrderKind;
+    const outcome = action === 'paid' ? 'markPaid' : action;
+    const done = showsOutcome(outcome, row.status);
     const payoutWithdraw =
-      kind === 'PAYOUT' && action === 'cancel' && row.status === 'awaiting_acceptance';
+      kind === 'PAYOUT' && action === 'cancel' && (row.status === 'awaiting_acceptance' || done);
     if (!MATCHER_BUYER_KINDS.includes(kind) && !payoutWithdraw) {
       throw ApiError.badRequest(
         ErrorCode.InvalidState,
@@ -516,6 +538,7 @@ export class OrdersService {
           : 'A sale or a QR payment is signed by the seller’s wallet: build the transaction with POST /v1/p2p/transactions.',
       );
     }
+    if (done) return row;
     const needed: Record<typeof action, string[]> = {
       paid: ['awaiting_payment'],
       cancel: ['awaiting_payment', 'awaiting_acceptance'],
@@ -532,12 +555,17 @@ export class OrdersService {
     const matcher = this.deployments.matcherKey().publicKey();
     try {
       await this.matcher.send(deployment, {
-        kind: action === 'paid' ? 'markPaid' : action,
+        kind: outcome,
         orderId: row.id,
         operation: p2pCall.orderAction(deployment.contract, call, matcher, BigInt(row.onchainId)),
       });
     } catch (err) {
       if (err instanceof ChainCallReverted) {
+        // The first call went through and the indexer has not caught up: the
+        // order as it is (the indexer moves it shortly), not a refusal.
+        if (await onchainOutcome(this.reader, deployment, row, outcome)) {
+          return this.reread(row);
+        }
         throw ApiError.badRequest(
           ErrorCode.InvalidState,
           `The contract refused it (${err.contractError ?? 'refused'}): the order moved on-chain, read it again.`,
@@ -551,10 +579,17 @@ export class OrdersService {
         data: { paidReference: reference.trim() },
       });
     }
-    return (await this.prisma.p2pOrder.findUnique({
-      where: { id: row.id },
-      select: P2P_ORDER_SELECT,
-    })) as P2pOrderRow;
+    return this.reread(row);
+  }
+
+  /** An order row read again (after an act); the one given when it is gone. */
+  private async reread(row: P2pOrderRow): Promise<P2pOrderRow> {
+    return (
+      (await this.prisma.p2pOrder.findUnique({
+        where: { id: row.id },
+        select: P2P_ORDER_SELECT,
+      })) ?? row
+    );
   }
 
   // --- the merchant's reads ------------------------------------------------
@@ -582,7 +617,8 @@ export class OrdersService {
     return page(await Promise.all(rows.map((r) => this.merchantView(r))), total, query);
   }
 
-  async merchantGet(org: OrgPrincipal, id: string): Promise<MerchantOrderView> {
+  /** An order one of the caller's merchant accounts takes, or the 404 of a missing one. */
+  async merchantOwned(org: OrgPrincipal, id: string): Promise<P2pOrderRow> {
     const tier = tierOf(org, this.deployments);
     const organizationId = org.organizationId;
     const row = isUuid(id)
@@ -592,6 +628,10 @@ export class OrdersService {
         })
       : null;
     if (!row) throw ApiError.notFound(`P2P order ${id} not found`);
-    return this.merchantView(row);
+    return row;
+  }
+
+  async merchantGet(org: OrgPrincipal, id: string): Promise<MerchantOrderView> {
+    return this.merchantView(await this.merchantOwned(org, id));
   }
 }

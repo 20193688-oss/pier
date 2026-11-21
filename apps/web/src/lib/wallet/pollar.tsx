@@ -20,7 +20,9 @@ import { WalletError, type StellarWallet } from '@/lib/wallet/types';
 
 type Network = 'testnet' | 'mainnet';
 
-/** Resolves once Pollar's login reaches a state `done` accepts; an error state rejects. */
+/** Resolves once Pollar's login reaches a state `done` accepts; an error state rejects, and so
+    does a login cancelled (`cancelLogin` sets it back to idle): `WalletError('rejected',
+    'cancelled')`, which the sign-in takes back quietly. */
 function waitFor(
   client: PollarClient,
   done: (s: AuthState) => boolean,
@@ -29,6 +31,7 @@ function waitFor(
   return new Promise((resolve, reject) => {
     let off: () => void = () => {};
     let settled = false;
+    let started = false;
     const timer = setTimeout(() => {
       settled = true;
       off();
@@ -36,6 +39,14 @@ function waitFor(
     }, timeoutMs);
     const check = (s: AuthState) => {
       if (settled) return;
+      if (s.step !== 'idle') started = true;
+      else if (started) {
+        settled = true;
+        clearTimeout(timer);
+        off();
+        reject(new WalletError('rejected', 'cancelled'));
+        return;
+      }
       if (s.step === 'error') {
         settled = true;
         clearTimeout(timer);

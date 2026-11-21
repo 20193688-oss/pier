@@ -18,8 +18,14 @@ import { AdminService } from '@/p2p/admin.service';
 import { AppOrdersService } from '@/p2p/app-orders.service';
 import { AdminDisputesQueryDto, AdminMerchantDto, AdminResolutionDto } from '@/p2p/dto/admin.dto';
 import { AppOrderDto, AppQuoteDto, AppTransactionDto } from '@/p2p/dto/app.dto';
+import { CreateOrderMessageDto } from '@/p2p/dto/order-message.dto';
 import { QueryOrdersDto, ReportPaidDto } from '@/p2p/dto/order.dto';
 import { MarketOverviewView } from '@/p2p/entities/market.entity';
+import {
+  OrderMessageAttachmentView,
+  OrderMessageListView,
+  OrderMessageView,
+} from '@/p2p/entities/order-message.entity';
 import { QuoteView } from '@/p2p/entities/offer.entity';
 import {
   CreatedOrderView,
@@ -28,7 +34,9 @@ import {
   OrderView,
 } from '@/p2p/entities/order.entity';
 import { TransactionView } from '@/p2p/entities/transaction.entity';
+import { ORDER_CHAT_SEND_PER_MINUTE } from '@/p2p/domain/order-chat';
 import { MarketService } from '@/p2p/market.service';
+import { OrderMessagesService } from '@/p2p/order-messages.service';
 
 const MINUTE = 60_000;
 
@@ -68,7 +76,10 @@ export class MarketController {
 @Controller('v1/app')
 @SessionAuth()
 export class AppController {
-  constructor(private readonly app: AppOrdersService) {}
+  constructor(
+    private readonly app: AppOrdersService,
+    private readonly chat: OrderMessagesService,
+  ) {}
 
   @Post('quotes')
   @RateLimit({ name: 'app:quote', limit: 30, windowMs: MINUTE })
@@ -115,12 +126,62 @@ export class AppController {
     return this.app.get(session, id);
   }
 
+  @Get('orders/:id/messages')
+  @ApiOperation({
+    summary: 'Your order’s chat with its merchant',
+    description:
+      'Oldest first, the latest 200. A message with an attachment is a transfer receipt; fetch its file from `…/messages/{messageId}/attachment`.',
+  })
+  @ApiOkResponse({ type: OrderMessageListView })
+  @ApiErrors(404)
+  async messages(@CurrentSession() session: SessionPrincipal, @Param('id') id: string) {
+    return this.chat.list(await this.app.own(session, id));
+  }
+
+  @Post('orders/:id/messages')
+  @RateLimit({ name: 'app:message', limit: ORDER_CHAT_SEND_PER_MINUTE, windowMs: MINUTE })
+  @ApiOperation({
+    summary: 'Write to your order’s merchant',
+    description:
+      'A text (trimmed, 1 to 1000 characters), an attachment (an image or a PDF of at most 2 MiB, base64, whose leading bytes match its type), or both. The other side’s organization gets a `P2P_ORDER_MESSAGE` event. Attach your transfer receipt here after paying a purchase.',
+  })
+  @ApiCreatedResponse({ type: OrderMessageView })
+  @ApiErrors(400, 404, 429)
+  async sendMessage(
+    @CurrentSession() session: SessionPrincipal,
+    @Param('id') id: string,
+    @Body() dto: CreateOrderMessageDto,
+  ) {
+    const order = await this.app.own(session, id);
+    return this.chat.send(
+      order,
+      { from: 'creator', organizationId: order.organizationId, address: session.address },
+      dto,
+    );
+  }
+
+  @Get('orders/:id/messages/:messageId/attachment')
+  @ApiOperation({
+    summary: 'A file sent on your order’s chat',
+    description: 'Its bytes in base64.',
+  })
+  @ApiOkResponse({ type: OrderMessageAttachmentView })
+  @ApiErrors(404)
+  async attachment(
+    @CurrentSession() session: SessionPrincipal,
+    @Param('id') id: string,
+    @Param('messageId') messageId: string,
+  ) {
+    return this.chat.attachment(await this.app.own(session, id), messageId);
+  }
+
   @Post('orders/:id/paid')
   @HttpCode(200)
   @RateLimit({ name: 'app:action', limit: 30, windowMs: MINUTE })
   @ApiOperation({
     summary: 'I sent the transfer',
-    description: 'For a purchase: the matcher marks it paid for you.',
+    description:
+      'For a purchase: the matcher marks it paid for you. Idempotent: once the order shows it, it answers the order as it is.',
   })
   @ApiOkResponse({ type: OrderView })
   @ApiErrors(400, 404, 429)
@@ -135,7 +196,10 @@ export class AppController {
   @Post('orders/:id/cancel')
   @HttpCode(200)
   @RateLimit({ name: 'app:action', limit: 30, windowMs: MINUTE })
-  @ApiOperation({ summary: 'Cancel a purchase before paying' })
+  @ApiOperation({
+    summary: 'Cancel a purchase before paying',
+    description: 'Idempotent: once the order shows it, it answers the order as it is.',
+  })
   @ApiOkResponse({ type: OrderView })
   @ApiErrors(400, 404, 429)
   cancel(@CurrentSession() session: SessionPrincipal, @Param('id') id: string) {
@@ -145,7 +209,10 @@ export class AppController {
   @Post('orders/:id/dispute')
   @HttpCode(200)
   @RateLimit({ name: 'app:action', limit: 30, windowMs: MINUTE })
-  @ApiOperation({ summary: 'Dispute a paid purchase the merchant did not release' })
+  @ApiOperation({
+    summary: 'Dispute a paid purchase the merchant did not release',
+    description: 'Idempotent: once the order shows it, it answers the order as it is.',
+  })
   @ApiOkResponse({ type: OrderView })
   @ApiErrors(400, 404, 429)
   dispute(@CurrentSession() session: SessionPrincipal, @Param('id') id: string) {
@@ -157,10 +224,10 @@ export class AppController {
   @ApiOperation({
     summary: 'Build a transaction for your wallet on your order',
     description:
-      'Mostly a sale’s `release` once the merchant paid you; also `dispute` and `cancel`.',
+      'Mostly a sale’s `release` once the merchant paid you; also `dispute` and `cancel`. An action the order already shows answers 409 `already_done` (nothing to sign).',
   })
   @ApiOkResponse({ type: TransactionView })
-  @ApiErrors(400, 404)
+  @ApiErrors(400, 404, 409)
   transaction(
     @CurrentSession() session: SessionPrincipal,
     @Param('id') id: string,

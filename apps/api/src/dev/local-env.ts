@@ -1,11 +1,28 @@
-import type { DevAccounts, DevChain, DevMarket } from '@/dev/stellar-dev';
+import { listsTusd, type DevAccounts, type DevChain, type DevMarket } from '@/dev/stellar-dev';
+
+/**
+ * The tokens a dev market lists beyond the network's table (`P2P_<NET>_TOKENS`):
+ * always the native lumen (XLM, through its SAC; no trustline). Testnet lists
+ * Circle's USDC from the table, so it gets XLM only: the market shows USDC and
+ * XLM. The local quickstart network has no Circle, so it keeps the stack's dev
+ * dollar TUSD (its only dollar) before XLM.
+ */
+export function devExtraTokens(chain: Pick<DevChain, 'network'>, market: Pick<DevMarket, 'tusd'>) {
+  return [
+    ...(listsTusd(chain.network)
+      ? [{ code: market.tusd.code, issuer: market.tusd.issuer, symbol: market.tusd.code }]
+      : []),
+    { native: true as const, symbol: 'XLM' },
+  ];
+}
 
 /**
  * The API's environment for a dev market on the local network or testnet (the
- * `test` tier): the market and TUSD, the matcher, sponsor and SEP-10 keys (three
- * distinct dev keys), the dev tools on (they refuse mainnet), and insecure
- * webhooks allowed (local receivers). `SEP10_HOME_DOMAIN` is the web origin's
- * host, as the web signs challenges for it.
+ * `test` tier): the market and its tokens ({@link devExtraTokens}), the
+ * matcher, sponsor and SEP-10 keys (three distinct dev keys), the dev tools on
+ * (they refuse mainnet), and insecure webhooks allowed (local receivers).
+ * `SEP10_HOME_DOMAIN` is the web origin's host, as the web signs challenges
+ * for it.
  */
 export function localApiEnv(input: {
   port: number;
@@ -37,9 +54,7 @@ export function localApiEnv(input: {
     ...(chain.horizonUrl ? { [`STELLAR_${net}_HORIZON_URL`]: chain.horizonUrl } : {}),
     [`P2P_${net}_CONTRACT`]: market.contract,
     [`P2P_${net}_START_LEDGER`]: String(market.startLedger),
-    [`P2P_${net}_TOKENS`]: JSON.stringify([
-      { code: market.tusd.code, issuer: market.tusd.issuer, symbol: market.tusd.code },
-    ]),
+    [`P2P_${net}_TOKENS`]: JSON.stringify(devExtraTokens(chain, market)),
     P2P_MATCHER_SECRET: accounts.matcher.secret,
     P2P_SPONSOR_SECRET: accounts.sponsor.secret,
     CHECKOUT_URL: `${input.webOrigin}/pay`,

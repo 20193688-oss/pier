@@ -58,6 +58,9 @@ const ROW: P2pOrderRow = {
   chargeId: '9b7e2c41-3f5a-4d8e-a1b2-c3d4e5f60718',
   payoutBatchId: 'batch_1',
   externalReference: 'client-secret-ref-881',
+  chatCount: 2,
+  chatLastAt: new Date('2026-11-19T12:05:00Z'),
+  chatLastFrom: 'merchant',
   createdAt: new Date('2026-11-19T12:01:00Z'),
   updatedAt: new Date('2026-11-19T12:01:00Z'),
 };
@@ -147,6 +150,17 @@ describe('P2P views', () => {
     ]) {
       expect(body).not.toHaveProperty(key);
     }
+  });
+
+  it('summarises the chat on both sides’ views, never in a webhook body', () => {
+    const chat = { count: 2, lastAt: new Date('2026-11-19T12:05:00Z'), lastFrom: 'merchant' };
+    expect(toOrderView(ROW, null).chat).toEqual(chat);
+    expect(toMerchantOrderView(ROW, { payer: null, beneficiary: null }).chat).toEqual(chat);
+    expect(
+      toOrderView({ ...ROW, chatCount: 0, chatLastAt: null, chatLastFrom: null }, null).chat,
+    ).toEqual({ count: 0, lastAt: null, lastFrom: null });
+    expect(toOrderWebhookData(ROW, 'client')).not.toHaveProperty('chat');
+    expect(toOrderWebhookData(ROW, 'merchant')).not.toHaveProperty('chat');
   });
 
   it('never shows the merchant the client’s own fields on its order routes', () => {

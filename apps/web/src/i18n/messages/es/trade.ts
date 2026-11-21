@@ -28,6 +28,8 @@ const trade = {
   merchant: 'Comerciante',
   validFor: 'Precio válido por {time}',
   refreshing: 'Actualizando el precio…',
+  priceUpdated: 'El precio se actualizó: 1 {token} = {price} {currency} (antes {before}).',
+  priceUpdatedConfirm: 'El precio se actualizó. Revisa el nuevo monto y confirma de nuevo.',
   quoteUntrusted:
     'Este precio trae condiciones que no podemos comprobar, así que no lo usamos. Prueba con otro monto.',
   quoteFailed:
@@ -40,6 +42,7 @@ const trade = {
     badAmount: 'Usa como máximo {n} decimales',
     method: 'Elige un medio de pago',
     quoting: 'Buscando un precio…',
+    sessionEnded: 'Tu sesión se cerró',
     noQuote: 'Sin precio para este monto',
     continue: 'Continuar',
   },
@@ -59,8 +62,15 @@ const trade = {
     body: 'El comerciante verifica que la transferencia venga de esta persona. Usa una cuenta a tu nombre.',
     name: 'Nombre completo',
     document: 'Número de documento',
-    documentHint: 'DNI o CUIT, CPF, RFC o CURP, cédula, RUT: el de tu país.',
+    documentHint: 'CI o NIT, DNI o CUIT, CPF, RFC o CURP, cédula, RUT: el de tu país.',
     receiveTo: 'Los USDC llegan a',
+  },
+  other: {
+    title: 'A qué cuenta llega',
+    body: 'La cuenta de quien recibe y su nombre. El comerciante transfiere ahí y te manda el comprobante.',
+    theyReceive: 'Recibe',
+    youSend: 'Envías',
+    receiveIn: 'Recibe por',
   },
   seller: {
     title: 'Dónde recibes el dinero',
@@ -73,6 +83,7 @@ const trade = {
     pay: 'Pagas',
     sell: 'Vendes',
     receive: 'Recibes',
+    receives: 'Recibe {name}',
     merchant: 'Comerciante',
     network: 'Red',
     method: 'Medio de pago',
@@ -95,9 +106,13 @@ const trade = {
       'El comerciante revisa tu transferencia y libera los USDC a tu wallet. Esta página se actualiza sola.',
     waitingMerchant: 'Esperando que un comerciante acepte la orden.',
     merchantPaying: 'El comerciante te está enviando {amount} {currency} a tu cuenta.',
+    merchantPayingOther: 'El comerciante le está enviando {amount} {currency} a {name}.',
     confirmTitle: 'Revisa tu cuenta',
+    confirmTitleOther: 'Confirma que le llegó',
     confirmBody:
       'El comerciante la marcó como pagada. Libera los USDC solo cuando tengas {amount} {currency} en tu cuenta.',
+    confirmBodyOther:
+      'El comerciante la marcó como pagada y dejó el comprobante en el chat. Libera los USDC cuando {name} confirme que recibió {amount} {currency}.',
     release: 'Liberar {token}',
     sign: 'Bloquea tus USDC en la orden',
     signBody:

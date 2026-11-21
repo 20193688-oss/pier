@@ -9,8 +9,13 @@ import { Asset } from '@stellar/stellar-sdk';
  * (`MarketReader`); this table only says what the network IS.
  *
  * Token issuers are never guessed: USDC is Circle's published issuer on each
- * network. Every other token (the dev stack's `TUSD`) comes from the
- * environment (`P2P_<NET>_TOKENS`), and never on mainnet.
+ * network. Every other token comes from the environment (`P2P_<NET>_TOKENS`),
+ * and never on mainnet: the native lumen `XLM` through its Stellar Asset
+ * Contract (the dev stack lists it on testnet, next to Circle's USDC) and, on
+ * the local quickstart network only, which has no Circle, the dev stack's own
+ * dollar `TUSD`. Listing XLM on mainnet is one line in {@link tableTokens}
+ * (`nativeTokenOf('mainnet')`) once the operator decides it: every flow
+ * already handles a native token.
  */
 
 export const TIERS = ['live', 'test'] as const;
@@ -30,13 +35,17 @@ export function isNetworkId(value: unknown): value is NetworkId {
 /** Every Stellar asset has 7 decimals: amounts are integers of 10^-7 (stroops for XLM). */
 export const STELLAR_DECIMALS = 7;
 
-/** A classic asset the market trades, used on-chain through its Stellar Asset Contract. */
+/**
+ * An asset the market trades, used on-chain through its Stellar Asset
+ * Contract: a classic asset (code and issuer), or the native lumen (`XLM`,
+ * no issuer), which needs no trustline.
+ */
 export interface Token {
   symbol: string;
-  /** The asset code (`USDC`). */
+  /** The asset code (`USDC`; `XLM` for the native lumen). */
   code: string;
-  /** The issuing account (G...). */
-  issuer: string;
+  /** The issuing account (G...); null only for the native lumen. */
+  issuer: string | null;
   /** The asset's Stellar Asset Contract (C...) on this network. */
   contract: string;
   decimals: number;
@@ -106,6 +115,9 @@ export function networksOf(tier: Tier): NetworkId[] {
   return NETWORK_IDS.filter((id) => NETWORKS[id].tier === tier);
 }
 
+/** The native lumen's asset code. */
+export const NATIVE_CODE = 'XLM';
+
 /** A classic asset on a network, with its Stellar Asset Contract id. */
 export function tokenOf(network: NetworkId, code: string, issuer: string, symbol = code): Token {
   return {
@@ -117,7 +129,39 @@ export function tokenOf(network: NetworkId, code: string, issuer: string, symbol
   };
 }
 
-/** The tokens the table lists for a network (USDC where Circle issues it). */
+/** The native lumen on a network, with its Stellar Asset Contract id (no issuer). */
+export function nativeTokenOf(network: NetworkId, symbol = NATIVE_CODE): Token {
+  return {
+    symbol,
+    code: NATIVE_CODE,
+    issuer: null,
+    contract: Asset.native().contractId(NETWORKS[network].passphrase),
+    decimals: STELLAR_DECIMALS,
+  };
+}
+
+/** Whether a token is the native lumen (it has no issuer and no trustline). */
+export function isNativeToken(token: Pick<Token, 'issuer'>): boolean {
+  return token.issuer === null;
+}
+
+/** The classic `Asset` of a token: `Asset.native()` for the lumen. */
+export function assetOf(token: Pick<Token, 'code' | 'issuer'>): Asset {
+  return token.issuer === null ? Asset.native() : new Asset(token.code, token.issuer);
+}
+
+/** Whether a classic asset (an operation's) is this token. */
+export function isAssetOf(token: Pick<Token, 'code' | 'issuer'>, asset: Asset): boolean {
+  return token.issuer === null
+    ? asset.isNative()
+    : !asset.isNative() && asset.getCode() === token.code && asset.getIssuer() === token.issuer;
+}
+
+/**
+ * The tokens the table lists for a network: USDC where Circle issues it. XLM
+ * is not listed by the table on any network yet; on testnet and local it comes
+ * from `P2P_<NET>_TOKENS` (`{"native":true}`).
+ */
 export function tableTokens(network: NetworkId): Token[] {
   const issuer = NETWORKS[network].usdcIssuer;
   return issuer ? [tokenOf(network, 'USDC', issuer)] : [];

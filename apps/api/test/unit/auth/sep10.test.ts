@@ -119,6 +119,7 @@ describe('SEP-10', () => {
       address: user.publicKey(),
       sequence: 1n,
       balance: 0n,
+      spendable: 0n,
       thresholds: { master: 1, low: 1, medium: 2, high: 2 },
       signers: [{ key: cosigner.publicKey(), weight: 1 }],
       subentries: 1,

@@ -4,7 +4,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router';
 import { useDocumentMeta, useI18n } from '@/i18n';
-import { useSession } from '@/lib/session';
+import { sessionGate, useSession } from '@/lib/session';
 import { orgs as orgsApi } from '@/lib/api/endpoints';
 import { errorMessage } from '@/lib/api/messages';
 import { Logo } from '@/components/ui/Logo';
@@ -25,6 +25,7 @@ import { PayoutsView } from '@/features/dashboard/views/PayoutsView';
 import { KeysView } from '@/features/dashboard/views/KeysView';
 import { WebhooksView } from '@/features/dashboard/views/WebhooksView';
 import { TeamView } from '@/features/dashboard/views/TeamView';
+import { useGuard } from '@/lib/use-action';
 
 type Section = {
   path: string;
@@ -62,15 +63,18 @@ const GROUPS: { key: 'market' | 'money' | 'developers' | 'org'; items: Section[]
 export default function DashboardApp() {
   const { t } = useI18n();
   useDocumentMeta(t.dash.metaTitle);
-  const { session, refresh } = useSession();
-  if (session === undefined)
+  const auth = useSession();
+  const { session, refresh } = auth;
+  const gate = sessionGate(auth);
+  if (gate === 'loading')
     return (
       <div className="flex min-h-dvh items-center justify-center gap-3 text-ink-3" role="status">
         <Spinner />
         {t.dash.state.loading}
       </div>
     );
-  if (!session) return <SignInGate />;
+  // Without a session, or one that could not be renewed silently: the sign-in.
+  if (gate === 'signin' || !session) return <SignInGate />;
   if (!session.organizations.length) return <CreateOrg onCreated={() => void refresh()} />;
   return (
     <DashProvider orgs={session.organizations}>
@@ -83,7 +87,7 @@ function Bare({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-4 py-4">
+      <header className="mx-auto flex w-full max-w-5xl items-center justify-between px-6 py-4 sm:px-8">
         <Link to="/" aria-label={t.common.nav.home}>
           <Logo />
         </Link>
@@ -94,7 +98,7 @@ function Bare({ children }: { children: ReactNode }) {
       </header>
       <main
         id="main"
-        className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-4 pb-24"
+        className="mx-auto flex w-full max-w-xl flex-1 flex-col justify-center px-6 pb-24"
       >
         {children}
       </main>
@@ -126,25 +130,29 @@ function CreateOrg({ onCreated }: { onCreated: () => void }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const valid = name.trim().length >= 2 && name.trim().length <= 60;
+  const guard = useGuard();
   return (
     <Bare>
       <form
         className="sheet flex flex-col gap-4 p-6 sm:p-8"
-        onSubmit={async (e) => {
+        onSubmit={(e) => {
           e.preventDefault();
           setTouched(true);
           if (!valid) return;
-          setBusy(true);
-          setError('');
-          try {
-            await orgsApi.create(name.trim());
-            toast(t.dash.orgs.created);
-            onCreated();
-          } catch (err) {
-            setError(errorMessage(t.common, err));
-          } finally {
-            setBusy(false);
-          }
+          // One organization per tap: a second submit while it is being made is dropped.
+          void guard(async () => {
+            setBusy(true);
+            setError('');
+            try {
+              await orgsApi.create(name.trim());
+              toast(t.dash.orgs.created);
+              onCreated();
+            } catch (err) {
+              setError(errorMessage(t.common, err));
+            } finally {
+              setBusy(false);
+            }
+          });
         }}
       >
         <h1 className="text-[1.75rem]">{t.dash.orgs.createTitle}</h1>
@@ -188,9 +196,9 @@ function Shell() {
           <SideNav />
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-[color-mix(in_oklab,var(--paper)_90%,transparent)] px-4 py-3 backdrop-blur-md lg:hidden">
+          <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-[color-mix(in_oklab,var(--paper)_90%,transparent)] px-6 py-3 backdrop-blur-md lg:hidden">
             <Link to="/dashboard" aria-label={t.common.nav.home}>
-              <Logo size={26} />
+              <Logo size={20} />
             </Link>
             <button
               type="button"
@@ -213,7 +221,7 @@ function Shell() {
               {d.tier.testBanner}
             </p>
           )}
-          <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-8">
+          <main id="main" className="mx-auto w-full max-w-5xl flex-1 px-6 py-8 sm:px-8">
             <Routes>
               <Route index element={<Navigate to="overview" replace />} />
               <Route path="overview" element={<OverviewView />} />

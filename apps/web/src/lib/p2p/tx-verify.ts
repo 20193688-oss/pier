@@ -73,10 +73,12 @@ export type TxExpectation =
   | { action: 'deposit' | 'withdraw'; token: string; amountUnits: string }
   | { action: 'set_operator'; operator: string; perms: number }
   | { action: 'set_matcher'; matcher: string; maxPerOrderUnits: string; autoSettle: boolean }
-  /* A transfer of `token` to `to` (G or M: a classic payment; C: the token contract's
-     `transfer`), with the note as a text memo (null: no memo). */
+  /* A transfer of `token` to `to` (G or M: a classic payment; C, or the native coin to anyone:
+     the token contract's `transfer`), with the note as a text memo (null: no memo; a contract
+     call carries none, so a native transfer's note stays off chain). */
   | { action: 'payment'; to: string; token: string; amountUnits: string; memo: string | null }
-  /* The sponsored activation (docs/STELLAR.md 5.6) for the trustline of `token`. */
+  /* The sponsored activation (docs/STELLAR.md 5.6) for the trustline of `token` (for the native
+     coin, only the missing account). */
   | { action: 'activate'; token: string };
 
 export type VerifyProblem =
@@ -291,9 +293,12 @@ function verifyPayment(
   if (!token || !isDestination(expect.to) || units(expect.amountUnits) === null) return 'args';
   if (expect.to === ctx.wallet) return 'args';
   const op = tx.operations[0];
-  if (expect.to.startsWith('C')) {
-    // A contract receives through the token contract; a contract call carries no memo.
-    if (expect.memo !== null || tx.memo.type !== 'none') return 'memo';
+  // A contract receives through the token contract, and so does anyone receiving the native coin
+  // (the API moves XLM through its Stellar Asset Contract). A contract call carries no memo: a
+  // contract may not be promised one; a native transfer's note stays off chain.
+  const native = token.issuer === null;
+  if (expect.to.startsWith('C') || native) {
+    if ((expect.to.startsWith('C') && expect.memo !== null) || tx.memo.type !== 'none') return 'memo';
     if (op.type !== 'invokeHostFunction') return 'function';
     const invoke = invocationOf(op as InvokeOp);
     if (!invoke) return 'function';
@@ -317,19 +322,21 @@ function verifyPayment(
 
 /** The sponsored activation: the sponsor begins sponsoring the wallet's reserves, creates its
     account (only when it is missing, with nothing in it), the wallet opens the token's trustline
-    with no limit and ends the sponsorship. Nothing else, in that order. */
+    with no limit and ends the sponsorship. Nothing else, in that order. The native coin needs no
+    trustline: its activation is only the missing account (begin, create, end). */
 function verifyActivation(tx: Transaction, ctx: VerifyContext, symbol: string): VerifyProblem | null {
   const token = tokenOf(ctx.network, symbol);
-  if (!token || !token.issuer) return 'args';
+  if (!token) return 'args';
+  const native = token.issuer === null;
   if (tx.memo.type !== 'none') return 'memo';
   const ops = tx.operations;
-  if (ops.length !== 3 && ops.length !== 4) return 'operations';
+  if (native ? ops.length !== 3 : ops.length !== 3 && ops.length !== 4) return 'operations';
   const src = (op: { source?: string }) => op.source ?? tx.source;
   const w = ctx.wallet;
   const [begin, ...rest] = ops;
   const end = rest[rest.length - 1];
-  const trust = rest[rest.length - 2];
-  const create = rest.length === 3 ? rest[0] : null;
+  const trust = native ? null : rest[rest.length - 2];
+  const create = native || rest.length === 3 ? rest[0] : null;
   if (begin.type !== 'beginSponsoringFutureReserves' || begin.sponsoredId !== w) return 'operations';
   const sponsor = src(begin);
   if (sponsor === w || !isAccount(sponsor)) return 'source';
@@ -341,16 +348,20 @@ function verifyActivation(tx: Transaction, ctx: VerifyContext, symbol: string): 
     // A missing account has no sequence: the sponsor's transaction creates it.
     if (tx.source !== sponsor) return 'source';
   }
-  if (trust.type !== 'changeTrust' || src(trust) !== w) return 'operations';
-  const line = trust.line as { isNative?: () => boolean; getCode?: () => string; getIssuer?: () => string };
-  if (
-    typeof line.getCode !== 'function' ||
-    line.isNative?.() ||
-    line.getCode() !== token.code ||
-    line.getIssuer?.() !== token.issuer
-  )
-    return 'args';
-  if (trust.limit !== MAX_TRUST_LIMIT) return 'args';
+  if (native) {
+    if (!create) return 'operations';
+  } else {
+    if (!trust || trust.type !== 'changeTrust' || src(trust) !== w) return 'operations';
+    const line = trust.line as { isNative?: () => boolean; getCode?: () => string; getIssuer?: () => string };
+    if (
+      typeof line.getCode !== 'function' ||
+      line.isNative?.() ||
+      line.getCode() !== token.code ||
+      line.getIssuer?.() !== token.issuer
+    )
+      return 'args';
+    if (trust.limit !== MAX_TRUST_LIMIT) return 'args';
+  }
   if (end.type !== 'endSponsoringFutureReserves' || src(end) !== w) return 'operations';
   return null;
 }

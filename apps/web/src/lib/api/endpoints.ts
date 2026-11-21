@@ -40,7 +40,7 @@ export interface Scope {
   tier?: Tier | null;
 }
 
-const scoped = (scope?: Scope): Record<string, string> => ({
+export const scoped = (scope?: Scope): Record<string, string> => ({
   ...(scope?.org ? { [ORG_HEADER]: scope.org } : {}),
   ...(scope?.tier ? { [TIER_HEADER]: scope.tier } : {}),
 });
@@ -251,6 +251,7 @@ export const tx = (raw: unknown, action?: string): P2pTransaction => {
 /** The API's names for the transaction builder's actions (the contract's function names
     differ in case: `mark_paid` is `markPaid`). */
 const API_ACTION: Record<string, string> = {
+  open_with_deposit: 'open',
   accept: 'accept',
   mark_paid: 'markPaid',
   release: 'release',
@@ -263,7 +264,13 @@ const API_ACTION: Record<string, string> = {
 };
 /** An API action name for a contract function (unknown names pass as they are). */
 export const apiAction = (fn: string) => API_ACTION[fn] ?? fn;
-export type OrderTxAction = 'accept' | 'mark_paid' | 'release' | 'cancel' | 'dispute';
+export type OrderTxAction =
+  | 'open_with_deposit'
+  | 'accept'
+  | 'mark_paid'
+  | 'release'
+  | 'cancel'
+  | 'dispute';
 
 export interface QrQuoteInput {
   kind: 'QR_PAY';
@@ -293,7 +300,7 @@ export interface BuyOrderInput {
 export interface SellOrderInput {
   side: 'SELL';
   quoteId: string;
-  beneficiary: { holderName: string; document: string; details: Record<string, string> };
+  beneficiary: { holderName: string; document?: string; details: Record<string, string> };
 }
 
 /** The buy/sell app: the signed-in wallet's own quotes and orders (`/v1/app/*`). */
@@ -364,7 +371,9 @@ export const trade = {
       transfer received and release it. The API refuses it anywhere else. */
   simulateTransfer: (orderId: string) =>
     request({ method: 'POST', path: ROUTES.devSimulateTransfer(orderId), body: {} }),
-  /** An unsigned transaction for the seller's own wallet, on its own sale. */
+  /** An unsigned transaction for the seller's own wallet, on its own sale. `open_with_deposit`
+      is a pending sale's (or QR payment's) opening, simulated now: ask for it right before
+      signing, since one simulated earlier can go stale (another order takes its order id). */
   transaction: async (orderId: string, action: OrderTxAction) =>
     tx(
       await request({

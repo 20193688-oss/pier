@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import {
   Account,
-  Asset,
   Contract,
   FeeBumpTransaction,
   Keypair,
@@ -12,7 +11,8 @@ import {
 } from '@stellar/stellar-sdk';
 import { ApiError } from '@/common/api-error';
 import { DeploymentsService, type StellarNetwork } from '@/chain/deployments.service';
-import type { Token } from '@/chain/networks';
+import { assetOf, isNativeToken, type Token } from '@/chain/networks';
+import { STELLAR_BASE_RESERVE_STROOPS } from '@/p2p/domain/constants';
 
 /** A call the contract (or the host) refuses in simulation: `contractError` names the contract error when known. */
 export class ChainCallReverted extends Error {
@@ -31,6 +31,11 @@ export interface AccountState {
   sequence: bigint;
   /** Lumens, stroops. */
   balance: bigint;
+  /**
+   * Lumens the account can send, stroops: its balance less the reserves it
+   * pays for itself (sponsorship counted) and its selling liabilities.
+   */
+  spendable: bigint;
   /** Master key weight and the low / medium / high thresholds. */
   thresholds: { master: number; low: number; medium: number; high: number };
   /** Every signer other than the master key: `G...` keys (and other signer kinds by their StrKey). */
@@ -38,7 +43,11 @@ export interface AccountState {
   subentries: number;
 }
 
-/** A trustline as the ledger holds it. */
+/**
+ * A trustline as the ledger holds it. For the native lumen (which needs no
+ * trustline) it is the account itself: its SPENDABLE lumens, no limit, always
+ * authorised.
+ */
 export interface TrustlineState {
   balance: bigint;
   limit: bigint;
@@ -47,6 +56,29 @@ export interface TrustlineState {
 }
 
 const AUTHORIZED_FLAG = 1;
+/** The largest int64: a trustline with no limit, and the lumen's "limit". */
+const MAX_INT64 = (1n << 63n) - 1n;
+
+/**
+ * The lumens an account can spend, stroops: its balance less its minimum
+ * balance and its selling liabilities (offers on the DEX). The minimum balance
+ * is `(2 + subentries + sponsoring - sponsored)` base reserves: reserves a
+ * sponsor pays (CAP-33) are not the account's, and the ones it pays for
+ * others are. Never negative.
+ */
+export function spendableLumens(
+  a: xdr.AccountEntry,
+  baseReserve: bigint = STELLAR_BASE_RESERVE_STROOPS,
+): bigint {
+  const v1 = a.ext.type === 'v1' ? a.ext.v1 : null;
+  const selling = v1 ? BigInt(v1.liabilities.selling) : 0n;
+  const v2 = v1 && v1.ext.type === 'v2' ? v1.ext.v2 : null;
+  const entries =
+    2n + BigInt(a.numSubEntries) + BigInt(v2?.numSponsoring ?? 0) - BigInt(v2?.numSponsored ?? 0);
+  const minimum = (entries > 0n ? entries : 0n) * baseReserve;
+  const spendable = BigInt(a.balance) - minimum - selling;
+  return spendable > 0n ? spendable : 0n;
+}
 
 /** The contract error code in a host error text (`Error(Contract, #12)`), or null. */
 export function contractErrorCode(text: string): number | null {
@@ -181,25 +213,36 @@ export class ChainClient {
     return state ? new Account(address, state.sequence.toString()) : null;
   }
 
-  /** The trustlines of `address` to each token (null where there is none). */
+  /**
+   * The trustlines of `address` to each token (null where there is none). The
+   * native lumen needs no trustline: its entry is the account's spendable
+   * lumens, always authorised (null when the account does not exist).
+   */
   async trustlines(
     n: StellarNetwork,
     address: string,
     tokens: readonly Token[],
   ): Promise<(TrustlineState | null)[]> {
     if (tokens.length === 0) return [];
+    const accountId = Keypair.fromPublicKey(address).xdrAccountId();
     const keys = tokens.map((t) =>
-      xdr.LedgerKey.trustline(
-        new xdr.LedgerKeyTrustLine({
-          accountId: Keypair.fromPublicKey(address).xdrAccountId(),
-          asset: new Asset(t.code, t.issuer).toTrustLineXdrObject(),
-        }),
-      ),
+      isNativeToken(t)
+        ? xdr.LedgerKey.account(new xdr.LedgerKeyAccount({ accountId }))
+        : xdr.LedgerKey.trustline(
+            new xdr.LedgerKeyTrustLine({
+              accountId,
+              asset: assetOf(t).toTrustLineXdrObject(),
+            }),
+          ),
     );
-    const res = await this.ledgerEntries(n, keys);
+    const unique = [...new Map(keys.map((k) => [k.toXdr('base64'), k])).values()];
+    const res = await this.ledgerEntries(n, unique);
     return keys.map((k) => {
       const wanted = k.toXdr('base64');
       const found = res.entries.find((e) => e.key.toXdr('base64') === wanted)?.val;
+      if (found?.type === 'account') {
+        return { balance: spendableLumens(found.account), limit: MAX_INT64, authorized: true };
+      }
       if (!found || found.type !== 'trustline') return null;
       const tl = found.trustLine;
       return {
@@ -234,6 +277,7 @@ export function accountStateOf(address: string, a: xdr.AccountEntry): AccountSta
     address,
     sequence: BigInt(a.seqNum),
     balance: BigInt(a.balance),
+    spendable: spendableLumens(a),
     thresholds: { master: t[0], low: t[1], medium: t[2], high: t[3] },
     signers: a.signers.flatMap((s) => {
       try {

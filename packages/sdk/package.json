@@ -27,7 +27,8 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "eslint src test --max-warnings=0 && prettier --check src test",
-    "bot": "node dist/bot/auto-release.js"
+    "bot": "node dist/bot/auto-release.js",
+    "bot:simulated": "node dist/bot/simulated-merchant.js"
   },
   "dependencies": {
     "openapi-fetch": "0.17.0"

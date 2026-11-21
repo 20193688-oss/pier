@@ -1,4 +1,15 @@
-import { Asset, Keypair, Operation, type rpc } from '@stellar/stellar-sdk';
+import {
+  Account,
+  Asset,
+  BASE_FEE,
+  Keypair,
+  Operation,
+  TransactionBuilder,
+  contract,
+  rpc,
+  type xdr,
+} from '@stellar/stellar-sdk';
+import { decodeResult, p2pCall } from '@/chain/market-codec';
 import {
   deployAssetContract,
   deployMarket,
@@ -10,11 +21,14 @@ import { NETWORKS, type NetworkId } from '@/chain/networks';
 
 /**
  * The dev stack's Stellar side, on the local quickstart network or testnet
- * (never mainnet): its accounts, each with a role, funded by friendbot; the
- * dev dollar `TUSD` from its own issuer (so it can mint without a faucet);
- * and the market deployed with the committed wasm. These keys are generated
- * per stack and kept in `.dev-stack/`; they are test keys, printed on
- * purpose, and never used on mainnet.
+ * (never mainnet): its accounts, each with a role, funded by friendbot; and
+ * the market deployed with the committed wasm, trading a dollar and the
+ * native lumen (XLM, through its Stellar Asset Contract). The dollar is the
+ * network's USDC where Circle issues it (testnet: the stack buys it with test
+ * lumens on the DEX); only the local network, which has no Circle, trades the
+ * stack's own `TUSD` from its own issuer (so it can mint without a faucet).
+ * These keys are generated per stack and kept in `.dev-stack/`; they are test
+ * keys, printed on purpose, and never used on mainnet.
  */
 
 export const DEV_ROLES = [
@@ -43,6 +57,15 @@ export type DevAccounts = Record<DevRole, DevAccount>;
 export const UNFUNDED_ROLES: readonly DevRole[] = ['sep10', 'user'];
 
 export const DEV_TOKEN_CODE = 'TUSD';
+
+/**
+ * Whether the dev market lists the stack's own dollar (TUSD) on a network:
+ * only where Circle issues no USDC (the local quickstart network). Testnet
+ * lists Circle's USDC and XLM only.
+ */
+export function listsTusd(network: DevNetwork): boolean {
+  return NETWORKS[network].usdcIssuer === null;
+}
 
 export type DevNetwork = Exclude<NetworkId, 'mainnet'>;
 
@@ -135,11 +158,89 @@ export async function mintTusd(
   ]);
 }
 
+/** A market view call, simulated (nothing is submitted). */
+async function readView<T>(
+  server: rpc.Server,
+  passphrase: string,
+  fn: string,
+  op: xdr.Operation,
+): Promise<T> {
+  const tx = new TransactionBuilder(new Account(contract.NULL_ACCOUNT, '0'), {
+    fee: BASE_FEE,
+    networkPassphrase: passphrase,
+  })
+    .addOperation(op)
+    .setTimeout(60)
+    .build();
+  const sim = await server.simulateTransaction(tx);
+  if (rpc.Api.isSimulationError(sim) || !sim.result) {
+    throw new Error(`${fn} could not be read: ${JSON.stringify(sim)}`);
+  }
+  return decodeResult<T>(fn, sim.result.retval);
+}
+
+/** Whether the market allows `token` (its SAC), as a simulated view call. */
+export async function tokenAllowed(
+  server: rpc.Server,
+  passphrase: string,
+  market: string,
+  token: string,
+): Promise<boolean> {
+  return readView<boolean>(
+    server,
+    passphrase,
+    'token_allowed',
+    p2pCall.tokenAllowed(market, token),
+  );
+}
+
+/** An account's free balance of `token` (its SAC) in the market, base units. */
+export async function marketBalanceOf(
+  server: rpc.Server,
+  passphrase: string,
+  market: string,
+  account: string,
+  token: string,
+): Promise<bigint> {
+  const value = await readView<bigint | number>(
+    server,
+    passphrase,
+    'balance_of',
+    p2pCall.balanceOf(market, account, token),
+  );
+  return BigInt(value);
+}
+
 /**
- * Funds every role but the SEP-10 key and the user, issues TUSD (its asset
- * contract deployed), gives the merchant and the business TUSD, deploys the
- * market (owner, arbiter and treasury are dev accounts) and allows TUSD (and
- * the network's USDC, where Circle issues it).
+ * Lists the native lumen on a dev market: deploys its Stellar Asset Contract
+ * where the network lacks it (the local network; testnet has it) and has the
+ * owner allow it (`set_token`), unless it is allowed already. Answers whether
+ * it changed anything. Dev networks only.
+ */
+export async function allowNativeToken(
+  chain: DevChain,
+  owner: DevAccount,
+  market: string,
+): Promise<boolean> {
+  refuseMainnet(chain.network);
+  const server = await rpcFor(chain.rpcUrl, chain.passphrase);
+  const native = await deployAssetContract(
+    server,
+    chain.passphrase,
+    keypair(owner),
+    Asset.native(),
+  );
+  if (await tokenAllowed(server, chain.passphrase, market, native)) return false;
+  await setTokens(server, chain.passphrase, keypair(owner), market, [native]);
+  return true;
+}
+
+/**
+ * Funds every role but the SEP-10 key and the user, deploys TUSD's asset
+ * contract, deploys the market (owner, arbiter and treasury are dev accounts)
+ * and allows the native lumen and the network's dollar: Circle's USDC where it
+ * exists (testnet), else TUSD, minted to the merchant and the business (the
+ * local network).
  */
 export async function setUpDevMarket(
   chain: DevChain,
@@ -157,12 +258,15 @@ export async function setUpDevMarket(
   const owner = keypair(accounts.owner);
   const tusd = new Asset(DEV_TOKEN_CODE, accounts.issuer.publicKey);
   const tusdContract = await deployAssetContract(server, chain.passphrase, owner, tusd);
-  const mint = options.mintPerHolder ?? 1_000_000n * 10_000_000n;
-  for (const holder of [accounts.merchant, accounts.business]) {
-    await trustTusd(server, chain, holder, accounts.issuer.publicKey);
-    await mintTusd(server, chain, accounts.issuer, holder.publicKey, mint);
+  const usdcIssuer = NETWORKS[chain.network].usdcIssuer;
+  if (listsTusd(chain.network)) {
+    const mint = options.mintPerHolder ?? 1_000_000n * 10_000_000n;
+    for (const holder of [accounts.merchant, accounts.business]) {
+      await trustTusd(server, chain, holder, accounts.issuer.publicKey);
+      await mintTusd(server, chain, accounts.issuer, holder.publicKey, mint);
+    }
+    log(`TUSD issued (${tusdContract}) and minted`);
   }
-  log(`TUSD issued (${tusdContract}) and minted`);
   const feeBps = options.feeBps ?? 50;
   const deployed = await deployMarket(server, chain.passphrase, owner, {
     owner: accounts.owner.publicKey,
@@ -170,10 +274,10 @@ export async function setUpDevMarket(
     arbiter: accounts.arbiter.publicKey,
     feeBps,
   });
-  const usdcIssuer = NETWORKS[chain.network].usdcIssuer;
+  const nativeContract = await deployAssetContract(server, chain.passphrase, owner, Asset.native());
   const allowed = [
-    tusdContract,
-    ...(usdcIssuer ? [new Asset('USDC', usdcIssuer).contractId(chain.passphrase)] : []),
+    nativeContract,
+    usdcIssuer ? new Asset('USDC', usdcIssuer).contractId(chain.passphrase) : tusdContract,
   ];
   await setTokens(server, chain.passphrase, owner, deployed.contract, allowed);
   log(`market ${deployed.contract} deployed`);

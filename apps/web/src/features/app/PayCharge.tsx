@@ -17,7 +17,7 @@ import { countdown, msLeft } from '@/lib/p2p/orders';
 import { useSession } from '@/lib/session';
 import { useAppData } from '@/features/app/data';
 import { Screen } from '@/features/app/shell';
-import { Facts, useUsd } from '@/features/app/parts';
+import { Facts, useUsd, WalletSummary } from '@/features/app/parts';
 import { balancePrice, chargeExpectation } from '@/lib/app/charge';
 import type { ChargePayment, PayerCharge } from '@/lib/app/types';
 
@@ -52,13 +52,13 @@ export default function PayCharge() {
 
   if (charge === undefined || !network || !token || !market || !session)
     return (
-      <Screen back title={c.title}>
+      <Screen back title={c.title} aside={<WalletSummary />}>
         <Skeleton className="h-64" />
       </Screen>
     );
   if (charge === null)
     return (
-      <Screen back title={c.title}>
+      <Screen back title={c.title} aside={<WalletSummary />}>
         <Notice tone="warn">{c.notFound}</Notice>
       </Screen>
     );
@@ -83,7 +83,7 @@ export default function PayCharge() {
 
   const short = !!price && BigInt(price.amount) > BigInt(balance || '0');
   return (
-    <Screen back title={c.title}>
+    <Screen back title={c.title} aside={<WalletSummary />}>
       <div className="flex flex-col gap-4 pb-4">
         <div className="rounded-[20px] bg-well px-4 py-5 text-center">
           <p className="text-ink-3">{c.from}</p>

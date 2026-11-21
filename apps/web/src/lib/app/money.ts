@@ -47,3 +47,22 @@ export function localValue(units: string, price: number, currency: string): stri
   const n = (Number(BigInt(units)) / 10 ** USDC_DECIMALS) * price;
   return n.toFixed(fiatDecimals(currency));
 }
+
+/** The tokens (to two decimals) that `fiat` local money asks for at `price` (local money per
+    token), rounded up to the cent so what arrives is worth at least that; null without an amount
+    or a price. */
+export function tokensForLocal(fiat: string, price: number | null | undefined): string | null {
+  const n = Number(fiat);
+  if (!(n > 0) || !price || !(price > 0)) return null;
+  // The tolerance keeps float noise (74 / 3.7 = 20.000000000000004) from adding a cent.
+  const cents = Math.ceil((n / price) * 100 - 1e-6);
+  return cents > 0 ? (cents / 100).toFixed(2) : null;
+}
+
+/* Tokens that are dollars: shown as "US$ …". Anything else (XLM) shows its own unit. */
+const DOLLAR_TOKENS = new Set(['USDC', 'USDT', 'TUSD', 'PYUSD', 'USDP']);
+
+/** Whether a token reads as dollars ("US$ 12,50") rather than in its own unit ("12,5 XLM"). */
+export function isDollarToken(symbol: string | null | undefined): boolean {
+  return !!symbol && DOLLAR_TOKENS.has(symbol.toUpperCase());
+}

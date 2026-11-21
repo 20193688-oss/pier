@@ -15,6 +15,7 @@ import { Icon } from '@/components/ui/Icon';
 import { useToast } from '@/components/ui/Toast';
 import { useDash } from '@/features/dashboard/context';
 import { LoadState, PageHead, useLoad } from '@/features/dashboard/ui';
+import { useGuard } from '@/lib/use-action';
 
 export function KeysView() {
   const { t, lang } = useI18n();
@@ -28,20 +29,22 @@ export function KeysView() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const revoke = async (key: ApiKey) => {
-    setBusy(true);
-    setError('');
-    try {
-      await apiKeys.revoke(org.id, key.id);
-      toast(k.revokedToast);
-      setRevoking(null);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const revoke = (key: ApiKey) =>
+    guard(async () => {
+      setBusy(true);
+      setError('');
+      try {
+        await apiKeys.revoke(org.id, key.id);
+        toast(k.revokedToast);
+        setRevoking(null);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+      } finally {
+        setBusy(false);
+      }
+    });
 
   return (
     <>
@@ -181,19 +184,21 @@ function CreateKey({
   const [error, setError] = useState('');
   const nameError = touched && !name.trim() ? k.nameError : null;
   const scopesError = touched && !scopes.length ? k.scopesError : null;
-  const submit = async () => {
-    setTouched(true);
-    if (!name.trim() || !scopes.length) return;
-    setBusy(true);
-    setError('');
-    try {
-      onCreated(await apiKeys.create(org.id, { name: name.trim(), tier, scopes }));
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const submit = () =>
+    guard(async () => {
+      setTouched(true);
+      if (!name.trim() || !scopes.length) return;
+      setBusy(true);
+      setError('');
+      try {
+        onCreated(await apiKeys.create(org.id, { name: name.trim(), tier, scopes }));
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+      } finally {
+        setBusy(false);
+      }
+    });
   return (
     <Dialog
       title={k.createTitle}

@@ -109,6 +109,7 @@ export function transferMatch(
     beneficiary: null,
     bond: '0',
     buyerAddress: BUYER,
+    chat: { count: 0, lastAt: null, lastFrom: null },
     contract: MARKET,
     createdAt: '2026-11-19T12:01:00.000Z',
     currency: 'ARS',

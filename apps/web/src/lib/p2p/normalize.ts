@@ -10,6 +10,7 @@
    map, and the market nests each currency's rails.
    Each function also takes the screens' own shape (a cached value, an older answer) and leaves it as
    it is, so it can run on anything. Pure; tests/unit/normalize.test.ts. */
+import { readSummary } from '@/lib/p2p/chat';
 import { fromBaseUnits, toBaseUnits } from '@/lib/p2p/amounts';
 import { isAccount } from '@/lib/stellar/network';
 import type {
@@ -413,6 +414,7 @@ export function normalizeOrder(raw: unknown, decimals: Decimals = null): P2pOrde
     externalReference: str(o.externalReference),
     createdAt: iso(o.createdAt) ?? '',
     updatedAt: iso(o.updatedAt) ?? undefined,
+    ...(o.chat !== undefined ? { chat: readSummary(o.chat) } : {}),
   };
 }
 

@@ -96,7 +96,7 @@ export function LoadState<T>({
   if (load.error && load.data === undefined)
     return (
       <div className="flex flex-col items-start gap-3">
-        <Notice tone="error">{load.error}</Notice>
+        <Notice tone="error" stay>{load.error}</Notice>
         <button type="button" className="btn btn-line btn-sm" onClick={load.reload}>
           {t.common.actions.retry}
         </button>
@@ -152,6 +152,8 @@ export function SignDialog({
   steps,
   onDone,
   onClose,
+  children,
+  blocked,
 }: {
   title: string;
   intro?: ReactNode;
@@ -160,19 +162,29 @@ export function SignDialog({
   steps: TxStep[];
   onDone: () => void;
   onClose: () => void;
+  /* What goes with the signature, above it (a mark-paid's receipt). */
+  children?: ReactNode;
+  /* What is still missing before it can be signed; the signing waits while set. */
+  blocked?: string;
 }) {
   const { scope, market } = useDash();
   return (
     <Dialog title={title} onClose={onClose}>
       {intro && <div className="mb-4 text-ink-2">{intro}</div>}
-      <SignFlow
-        network={network}
-        signer={signer}
-        steps={steps}
-        via={orgSubmitter(scope)}
-        sponsored={market?.sponsor.enabled ?? false}
-        onDone={onDone}
-      />
+      {children && <div className="mb-4">{children}</div>}
+      {blocked ? (
+        <Notice tone="info">{blocked}</Notice>
+      ) : (
+        <SignFlow
+          allowConnect
+          network={network}
+          signer={signer}
+          steps={steps}
+          via={orgSubmitter(scope)}
+          sponsored={market?.sponsor.enabled ?? false}
+          onDone={onDone}
+        />
+      )}
     </Dialog>
   );
 }

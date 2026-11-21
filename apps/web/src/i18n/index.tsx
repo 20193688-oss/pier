@@ -53,7 +53,13 @@ interface I18nValue {
   setLang: (lang: Lang) => void;
 }
 
-const I18nContext = createContext<I18nValue>({ lang: DEFAULT_LANG, t: es, setLang: () => {} });
+// Outside the provider (or a context left behind by a hot reload) the words still carry the
+// product's name: never the raw catalog with `{brand}` in it.
+const I18nContext = createContext<I18nValue>({
+  lang: DEFAULT_LANG,
+  t: CATALOGS[DEFAULT_LANG],
+  setLang: () => {},
+});
 
 export function I18nProvider({ children, lang: forced }: { children: ReactNode; lang?: Lang }) {
   const [lang, setLangState] = useState<Lang>(() => forced ?? initialLang());

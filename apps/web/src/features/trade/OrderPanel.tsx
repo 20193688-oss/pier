@@ -5,7 +5,10 @@
    A sale: the one transaction the wallet signs to lock the USDC in the order (`open_with_deposit`),
    a merchant accepts and pays into the seller's account, the seller releases once the money is
    there (or the settle window does). Every on-chain step is the person's own wallet's, checked
-   first (SignFlow), and the API pays its network fee. */
+   first (SignFlow), and the API pays its network fee.
+
+   Every action goes out once: a second tap while it runs is dropped, and once it went through its
+   buttons stay off until the order shows the move (the network and the indexer take a moment). */
 import { useEffect, useState } from 'react';
 import { fmt, useI18n } from '@/i18n';
 import { trade as tradeApi } from '@/lib/api/endpoints';
@@ -22,7 +25,7 @@ import {
 import { bpsOf, toBaseUnits, fromBaseUnits } from '@/lib/p2p/amounts';
 import { decimalsFrom, decimalsOf } from '@/lib/p2p/normalize';
 import { explorerLink } from '@/lib/stellar/network';
-import { saveSteps, savedQuoteTerms, savedSteps } from '@/lib/p2p/steps';
+import { saveSteps, savedQuoteTerms, savedRecipient, savedSteps } from '@/lib/p2p/steps';
 import { QR_PAY_WINDOWS } from '@/lib/p2p/qr-pay';
 import { appSubmitter } from '@/lib/api/app';
 import { saleTerms } from '@/lib/p2p/tx-verify';
@@ -34,6 +37,7 @@ import { CopyRow, figureSize, StatusPill, useNow } from '@/components/ui/misc';
 import { accountRows, railName, TokenMark } from '@/components/p2p/parts';
 import { SignFlow, type TxStep } from '@/components/wallet/SignFlow';
 import { useSession } from '@/lib/session';
+import { useAction, useGuard } from '@/lib/use-action';
 import type { P2pMarket, P2pOrder } from '@/lib/p2p/types';
 
 export function OrderPanel({
@@ -54,8 +58,12 @@ export function OrderPanel({
   const { session, expire } = useSession();
   const [order, setOrder] = useState<P2pOrder | null | undefined>(undefined);
   const [reference, setReference] = useState('');
-  const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
+  // The status the order had when an action of the person's went through: while it still reads
+  // that, the action is under way and nothing can be sent again.
+  const [sentAt, setSentAt] = useState<string | null>(null);
+  const guard = useGuard();
+  const [simulating, setSimulating] = useState(false);
   const [error, setError] = useState('');
   const [confirm, setConfirm] = useState<null | 'cancel' | 'dispute'>(null);
   const [signed, setSigned] = useState(false);
@@ -96,11 +104,40 @@ export function OrderPanel({
   useEffect(() => {
     if (!status) return;
     setNote('');
+    setSentAt(null);
     onMoved?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   const now = useNow(!!order && !isTerminal(order.status));
+
+  // A purchase's acts go through the API (the matcher acts for the buyer); asked again once done,
+  // the API answers with the order as it is.
+  const acting = useAction(async (action: 'paid' | 'cancel' | 'dispute') => {
+    if (!order) return false;
+    setError('');
+    const before = order.status;
+    try {
+      setOrder(
+        await tradeApi.act(
+          order.id,
+          action,
+          action === 'paid' && reference.trim() ? { reference: reference.trim().slice(0, 60) } : {},
+          decimalsOf(market, order.network, order.token),
+        ),
+      );
+      setSentAt(before);
+      setConfirm(null);
+      return true;
+    } catch (e) {
+      if (isUnauthorized(e)) {
+        expire();
+        return false;
+      }
+      setError(errorMessage(t.common, e, action === 'paid' ? o.reportFailed : o.actionFailed));
+      return false;
+    }
+  });
 
   if (order === undefined)
     return (
@@ -120,6 +157,8 @@ export function OrderPanel({
     );
 
   const network = market.networks.find((n) => n.id === order.network) ?? null;
+  // A sale to someone else's account names them instead of "your account".
+  const recipient = order.kind === 'SELL' ? savedRecipient(order.id) : null;
   const decimals = decimalsOf(market, order.network, order.token);
   const buy = order.kind === 'BUY' || order.kind === 'CHARGE';
   const actions = userActions(order, now);
@@ -136,26 +175,9 @@ export function OrderPanel({
   const txLink = explorerLink(network, 'tx', shownTx);
   const me = session?.address ?? '';
 
-  const act = async (action: 'paid' | 'cancel' | 'dispute') => {
-    setBusy(true);
-    setError('');
-    try {
-      setOrder(
-        await tradeApi.act(
-          order.id,
-          action,
-          action === 'paid' && reference.trim() ? { reference: reference.trim().slice(0, 60) } : {},
-          decimals,
-        ),
-      );
-      setConfirm(null);
-    } catch (e) {
-      if (isUnauthorized(e)) return expire();
-      setError(errorMessage(t.common, e, action === 'paid' ? o.reportFailed : o.actionFailed));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const waiting = sentAt !== null && sentAt === order.status;
+  const busy = acting.busy || simulating;
+  const act = acting.run;
 
   /* A sale's on-chain step built by the API for this wallet. */
   const builtStep = (action: 'release' | 'cancel' | 'dispute', label: string): TxStep => ({
@@ -183,17 +205,20 @@ export function OrderPanel({
           },
   });
   const unverifiable = !buy && order.status === 'pending' && sale.problem !== null;
+  // The sale's opening is simulated when the seller signs (a transaction simulated when the
+  // order was made goes stale once another order takes the order id it names), and built and
+  // sent again once if the network still refuses it.
   const saleSteps: TxStep[] = (() => {
-    const open = (order.transactions ?? [])[0];
-    if (!open || !network || !sale.terms) return [];
+    if (!network || !sale.terms) return [];
     return [
       {
         label: fmt(o.stepOpen, {
           amount: amountOnly(lang, order.tokenAmount),
           token: order.token,
         }),
-        build: async () => open,
+        build: () => tradeApi.transaction(order.id, 'open_with_deposit'),
         expect: { action: 'open_with_deposit', ...sale.terms },
+        retryOnFail: 1,
       },
     ];
   })();
@@ -304,11 +329,11 @@ export function OrderPanel({
             <button
               type="button"
               className="btn btn-ink btn-lg mt-4 w-full"
-              disabled={busy || !actions.includes('paid')}
+              disabled={busy || waiting || !actions.includes('paid')}
               onClick={() => void act('paid')}
             >
-              {busy && <Spinner />}
-              {busy ? o.reporting : o.transferred}
+              {acting.busy && <Spinner />}
+              {acting.busy ? o.reporting : o.transferred}
             </button>
           </div>
         </>
@@ -323,7 +348,9 @@ export function OrderPanel({
             </dd>
           </div>
           <div>
-            <dt className="text-ink-3">{a.summary.receive}</dt>
+            <dt className="text-ink-3">
+              {recipient ? fmt(a.summary.receives, { name: recipient }) : a.summary.receive}
+            </dt>
             <dd className="num font-semibold">
               {buy ? units(lang, net, order.token) : money(lang, order.fiatAmount, order.currency)}
             </dd>
@@ -354,7 +381,7 @@ export function OrderPanel({
       <div className="flex flex-col gap-4 px-5 pt-5 pb-6 sm:px-6">
         {unverifiable && (
           <>
-            <Notice tone="error">
+            <Notice tone="error" stay>
               {sale.problem === 'fee' ? o.unverifiableFee : o.unverifiable}
             </Notice>
             <button type="button" className="btn btn-ink self-start" onClick={onNew}>
@@ -401,19 +428,21 @@ export function OrderPanel({
               type="button"
               className="btn btn-line btn-sm self-start border-dashed"
               disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                setError('');
-                try {
-                  await tradeApi.simulateTransfer(order.id);
-                  setNote(o.simulated);
-                  setPoke((x) => x + 1);
-                } catch (e) {
-                  setError(errorMessage(t.common, e, o.actionFailed));
-                } finally {
-                  setBusy(false);
-                }
-              }}
+              onClick={() =>
+                void guard(async () => {
+                  setSimulating(true);
+                  setError('');
+                  try {
+                    await tradeApi.simulateTransfer(order.id);
+                    setNote(o.simulated);
+                    setPoke((x) => x + 1);
+                  } catch (e) {
+                    setError(errorMessage(t.common, e, o.actionFailed));
+                  } finally {
+                    setSimulating(false);
+                  }
+                })
+              }
             >
               <Icon name="bolt" size={16} />
               {o.simulate}
@@ -426,19 +455,21 @@ export function OrderPanel({
         )}
         {!buy && order.status === 'awaiting_payment' && (
           <p className="text-ink-2" role="status">
-            {fmt(o.merchantPaying, {
+            {fmt(recipient ? o.merchantPayingOther : o.merchantPaying, {
               amount: amountOnly(lang, order.fiatAmount, order.currency),
               currency: order.currency,
+              name: recipient ?? '',
             })}
           </p>
         )}
-        {!buy && order.status === 'paid' && network && (
+        {!buy && order.status === 'paid' && network && !waiting && (
           <div className="flex flex-col gap-3">
-            <h3 className="text-[1.15rem]">{o.confirmTitle}</h3>
+            <h3 className="text-[1.15rem]">{recipient ? o.confirmTitleOther : o.confirmTitle}</h3>
             <p className="text-ink-2">
-              {fmt(o.confirmBody, {
+              {fmt(recipient ? o.confirmBodyOther : o.confirmBody, {
                 amount: amountOnly(lang, order.fiatAmount, order.currency),
                 currency: order.currency,
+                name: recipient ?? '',
               })}
             </p>
             <SignFlow
@@ -457,11 +488,17 @@ export function OrderPanel({
                 ),
               ]}
               onDone={() => {
-                setNote(o.sent);
+                setSentAt(order.status);
                 setPoke((x) => x + 1);
               }}
             />
           </div>
+        )}
+        {waiting && !ended && (
+          <p className="flex items-center gap-3 text-ink-2" role="status">
+            <Spinner />
+            {o.sent}
+          </p>
         )}
 
         {ended && endTitle[order.status] && (
@@ -488,9 +525,9 @@ export function OrderPanel({
         {note && !ended && <Notice tone="ok">{note}</Notice>}
         {error && <Notice tone="error">{error}</Notice>}
 
-        {(actions.includes('cancel') || actions.includes('dispute') || ended) && (
+        {((!waiting && (actions.includes('cancel') || actions.includes('dispute'))) || ended) && (
           <div className="flex flex-wrap gap-2">
-            {actions.includes('cancel') && (
+            {!waiting && actions.includes('cancel') && (
               <button
                 type="button"
                 className="btn btn-line btn-sm"
@@ -500,7 +537,7 @@ export function OrderPanel({
                 {o.cancel}
               </button>
             )}
-            {actions.includes('dispute') && (
+            {!waiting && actions.includes('dispute') && (
               <button
                 type="button"
                 className="btn btn-line btn-sm"
@@ -548,8 +585,8 @@ export function OrderPanel({
             startLabel={confirm === 'cancel' ? o.cancel : o.dispute}
             steps={[builtStep(confirm, confirm === 'cancel' ? o.cancel : o.dispute)]}
             onDone={() => {
+              setSentAt(order.status);
               setConfirm(null);
-              setNote(o.sent);
               setPoke((x) => x + 1);
             }}
           />

@@ -548,7 +548,7 @@
             "type": "array"
           },
           "xlm": {
-            "description": "Lumens, stroops (fees are sponsored: usually 0).",
+            "description": "The whole lumen balance, stroops, reserves included (fees are sponsored: usually 0). What can be sent is the `XLM` entry of `tokens`, when the market lists it.",
             "example": "0",
             "type": "string"
           }
@@ -736,7 +736,7 @@
                 "$ref": "#/components/schemas/P2pTransaction"
               }
             ],
-            "description": "A classic `payment` to a G or M recipient, a SAC `transfer` to a C recipient; the note is its text memo."
+            "description": "A classic `payment` to a G or M recipient, a SAC `transfer` to a C recipient; the note is its text memo. The native lumen (`XLM`) always moves through its SAC `transfer` (the note then stays off-chain)."
           },
           "transfer": {
             "$ref": "#/components/schemas/AppTransfer"
@@ -876,6 +876,7 @@
           "currency": {
             "description": "A trade only.",
             "enum": [
+              "BOB",
               "ARS",
               "BRL",
               "MXN",
@@ -911,13 +912,14 @@
             "type": "string"
           },
           "qr": {
-            "description": "A QR payment: the scanned merchant QR exactly as read (Argentina’s interoperable QR or PIX). Its CRC must check.",
+            "description": "A QR payment: the scanned merchant QR exactly as read (Argentina’s interoperable QR, PIX, or Peru’s interoperable QR of Yape, Plin and the banks). Its CRC must check. A static QR carries no amount: give `fiatAmount`.",
             "example": "00020101021243650016com.mercadolibre...6304ABCD",
             "type": "string"
           },
           "rail": {
             "description": "A trade only.",
             "enum": [
+              "bo_bank_transfer",
               "ar_bank_transfer",
               "br_pix",
               "mx_spei",
@@ -925,7 +927,8 @@
               "pe_bank_transfer",
               "cl_bank_transfer",
               "ar_qr",
-              "br_pix_qr"
+              "br_pix_qr",
+              "pe_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -960,12 +963,12 @@
         "description": "One token the market lists, as the account holds it.",
         "properties": {
           "amount": {
-            "description": "Base units (7 decimals); 0 without a trustline.",
+            "description": "Base units (7 decimals); 0 without a trustline. For the native lumen (`XLM`): the SPENDABLE lumens, the balance less the reserves the account pays itself (sponsored ones excluded) and its selling liabilities.",
             "example": "125000000",
             "type": "string"
           },
           "authorized": {
-            "description": "Whether the issuer authorised that trustline.",
+            "description": "Whether the issuer authorised that trustline. Always true for the native lumen.",
             "example": true,
             "type": "boolean"
           },
@@ -979,7 +982,7 @@
             "type": "string"
           },
           "trustline": {
-            "description": "Whether the account has a trustline to it.",
+            "description": "Whether the account has a trustline to it. Always true for the native lumen, which needs none.",
             "example": true,
             "type": "boolean"
           }
@@ -997,8 +1000,9 @@
         "description": "An action your own wallet signs on your order.",
         "properties": {
           "action": {
-            "description": "Usually `release` (a sale or QR payment you were paid for), `dispute` or `cancel`; refused when your wallet may not do it now.",
+            "description": "Usually `release` (a sale or QR payment you were paid for), `dispute` or `cancel`; `open` is a pending sale or QR payment’s `open_with_deposit`, simulated now (ask for it right before signing: one simulated earlier can go stale when another order takes the order id it names). Refused when your wallet may not do it now.",
             "enum": [
+              "open",
               "accept",
               "markPaid",
               "release",
@@ -1174,7 +1178,7 @@
         "type": "object"
       },
       "BeneficiaryDto": {
-        "description": "Where the merchant pays the local money on a sale or a payout: a holder, their document and the rail’s account details.",
+        "description": "Where the merchant pays the local money on a sale or a payout (to yourself or to someone else): a holder, the rail’s account details and, where the rail’s transfer needs it, the holder’s ID. The ID (`document` and the rail’s ID fields, such as `cuit` or `documentType`/`documentNumber`) is optional on every rail whose `beneficiaryIdRequired` is false (`GET /v1/market`): the holder’s bank already identified them. Chile (`rut`) and Colombia need it. Given, it is checked as always.",
         "properties": {
           "details": {
             "additionalProperties": {
@@ -1188,7 +1192,10 @@
             "type": "object"
           },
           "document": {
+            "description": "The holder’s ID number. Required only on rails whose `beneficiaryIdRequired` is true (Chile, Colombia).",
             "example": "27234567891",
+            "maxLength": 20,
+            "minLength": 4,
             "type": "string"
           },
           "holderName": {
@@ -1200,7 +1207,6 @@
         },
         "required": [
           "holderName",
-          "document",
           "details"
         ],
         "type": "object"
@@ -1219,7 +1225,9 @@
             "type": "object"
           },
           "document": {
+            "description": "The holder’s ID number; null where the rail’s transfer does not need it and none was given.",
             "example": "27234567891",
+            "nullable": true,
             "type": "string"
           },
           "holderName": {
@@ -1828,6 +1836,7 @@
         "properties": {
           "currency": {
             "enum": [
+              "BOB",
               "ARS",
               "BRL",
               "MXN",
@@ -1904,6 +1913,7 @@
           },
           "rail": {
             "enum": [
+              "bo_bank_transfer",
               "ar_bank_transfer",
               "br_pix",
               "mx_spei",
@@ -1911,7 +1921,8 @@
               "pe_bank_transfer",
               "cl_bank_transfer",
               "ar_qr",
-              "br_pix_qr"
+              "br_pix_qr",
+              "pe_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -1938,6 +1949,7 @@
           },
           "currency": {
             "enum": [
+              "BOB",
               "ARS",
               "BRL",
               "MXN",
@@ -1987,6 +1999,7 @@
             ],
             "items": {
               "enum": [
+                "bo_bank_transfer",
                 "ar_bank_transfer",
                 "br_pix",
                 "mx_spei",
@@ -1994,7 +2007,8 @@
                 "pe_bank_transfer",
                 "cl_bank_transfer",
                 "ar_qr",
-                "br_pix_qr"
+                "br_pix_qr",
+                "pe_qr"
               ],
               "type": "string"
             },
@@ -2082,6 +2096,57 @@
         ],
         "type": "object"
       },
+      "CreateOrderMessage": {
+        "description": "A message on an order’s chat: a text, an attachment (a transfer receipt), or both. At least one.",
+        "properties": {
+          "attachment": {
+            "$ref": "#/components/schemas/CreateOrderMessageAttachment"
+          },
+          "text": {
+            "description": "Trimmed; 1 to 1000 characters.",
+            "example": "Listo, ya te transferí.",
+            "maxLength": 1000,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CreateOrderMessageAttachment": {
+        "description": "An image or a PDF (a transfer receipt), at most 2097152 bytes, in base64. Its leading bytes must be those of its type.",
+        "properties": {
+          "contentType": {
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "application/pdf"
+            ],
+            "example": "application/pdf",
+            "type": "string"
+          },
+          "data": {
+            "description": "The file in standard base64 (padded, no line breaks).",
+            "example": "JVBERi0xLjQK...",
+            "format": "byte",
+            "maxLength": 2796204,
+            "type": "string"
+          },
+          "name": {
+            "description": "Shown to the other side; never used as a path.",
+            "example": "comprobante.pdf",
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "contentType",
+          "data"
+        ],
+        "type": "object"
+      },
       "CreateOrganization": {
         "properties": {
           "name": {
@@ -2106,6 +2171,7 @@
           },
           "currency": {
             "enum": [
+              "BOB",
               "ARS",
               "BRL",
               "MXN",
@@ -2139,6 +2205,7 @@
           },
           "rail": {
             "enum": [
+              "bo_bank_transfer",
               "ar_bank_transfer",
               "br_pix",
               "mx_spei",
@@ -2146,7 +2213,8 @@
               "pe_bank_transfer",
               "cl_bank_transfer",
               "ar_qr",
-              "br_pix_qr"
+              "br_pix_qr",
+              "pe_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -2202,6 +2270,7 @@
         "properties": {
           "currency": {
             "enum": [
+              "BOB",
               "ARS",
               "BRL",
               "MXN",
@@ -2241,6 +2310,7 @@
           },
           "rail": {
             "enum": [
+              "bo_bank_transfer",
               "ar_bank_transfer",
               "br_pix",
               "mx_spei",
@@ -2248,7 +2318,8 @@
               "pe_bank_transfer",
               "cl_bank_transfer",
               "ar_qr",
-              "br_pix_qr"
+              "br_pix_qr",
+              "pe_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -2342,6 +2413,7 @@
                 "P2P_ORDER_DISPUTED",
                 "P2P_ORDER_RESOLVED",
                 "P2P_ORDER_FAILED",
+                "P2P_ORDER_MESSAGE",
                 "P2P_CHARGE_SUCCEEDED",
                 "P2P_PAYOUT_BATCH_COMPLETED"
               ],
@@ -2448,6 +2520,14 @@
             "example": null,
             "nullable": true,
             "type": "string"
+          },
+          "chat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderChatSummary"
+              }
+            ],
+            "description": "The order’s chat with its merchant (`…/orders/{id}/messages`)."
           },
           "contract": {
             "example": "CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7",
@@ -2691,6 +2771,7 @@
           "externalReference",
           "paymentDetails",
           "qr",
+          "chat",
           "createdAt",
           "updatedAt",
           "transactions"
@@ -2722,6 +2803,7 @@
                 "P2P_ORDER_DISPUTED",
                 "P2P_ORDER_RESOLVED",
                 "P2P_ORDER_FAILED",
+                "P2P_ORDER_MESSAGE",
                 "P2P_CHARGE_SUCCEEDED",
                 "P2P_PAYOUT_BATCH_COMPLETED"
               ],
@@ -2824,6 +2906,7 @@
               "invalid_state",
               "idempotency_conflict",
               "operation_in_flight",
+              "already_done",
               "challenge_invalid",
               "signature_invalid",
               "account_taken",
@@ -3094,6 +3177,14 @@
             "example": "GCEZWKCA5VLDNRLN3RPRJMRZOX3Z6G5CHCGSNFHEYVXM3XOJMDS674JZ",
             "type": "string"
           },
+          "chat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderChatSummary"
+              }
+            ],
+            "description": "The order’s chat with the side that created it (`/v1/p2p/merchant/orders/{id}/messages`)."
+          },
           "contract": {
             "example": "CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7",
             "type": "string"
@@ -3305,6 +3396,7 @@
           "payer",
           "beneficiary",
           "qr",
+          "chat",
           "createdAt",
           "updatedAt"
         ],
@@ -3345,8 +3437,9 @@
           },
           "standard": {
             "enum": [
+              "ar-interoperable",
               "pix",
-              "ar-interoperable"
+              "pe-interoperable"
             ],
             "example": "ar-interoperable",
             "type": "string"
@@ -3620,6 +3713,35 @@
         ],
         "type": "object"
       },
+      "OrderChatSummary": {
+        "description": "An order’s chat at a glance (an unread badge reads it): how many messages, when the last one came and from which side.",
+        "properties": {
+          "count": {
+            "example": 3,
+            "type": "number"
+          },
+          "lastAt": {
+            "example": "2026-11-20T12:05:00.000Z",
+            "nullable": true,
+            "type": "string"
+          },
+          "lastFrom": {
+            "enum": [
+              "creator",
+              "merchant"
+            ],
+            "example": "merchant",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "count",
+          "lastAt",
+          "lastFrom"
+        ],
+        "type": "object"
+      },
       "OrderListView": {
         "description": "A page of orders.",
         "properties": {
@@ -3661,6 +3783,148 @@
         },
         "required": [
           "displayName"
+        ],
+        "type": "object"
+      },
+      "OrderMessageAttachment": {
+        "description": "A message’s file, its bytes in base64.",
+        "properties": {
+          "contentType": {
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "application/pdf"
+            ],
+            "example": "application/pdf",
+            "type": "string"
+          },
+          "data": {
+            "description": "The file, base64 (at most 2097152 bytes decoded).",
+            "example": "JVBERi0xLjQK...",
+            "format": "byte",
+            "type": "string"
+          },
+          "name": {
+            "description": "For display only.",
+            "example": "comprobante.pdf",
+            "type": "string"
+          },
+          "size": {
+            "description": "Bytes.",
+            "example": 48213,
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "contentType",
+          "size",
+          "data"
+        ],
+        "type": "object"
+      },
+      "OrderMessageAttachmentMeta": {
+        "description": "A message’s file, without its bytes.",
+        "properties": {
+          "contentType": {
+            "enum": [
+              "image/png",
+              "image/jpeg",
+              "image/webp",
+              "application/pdf"
+            ],
+            "example": "application/pdf",
+            "type": "string"
+          },
+          "name": {
+            "description": "For display only.",
+            "example": "comprobante.pdf",
+            "type": "string"
+          },
+          "size": {
+            "description": "Bytes.",
+            "example": 48213,
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "contentType",
+          "size"
+        ],
+        "type": "object"
+      },
+      "OrderMessageList": {
+        "description": "An order’s latest messages (200 at most), oldest first.",
+        "properties": {
+          "data": {
+            "items": {
+              "$ref": "#/components/schemas/OrderMessageView"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "OrderMessageView": {
+        "description": "One message of an order’s chat, between the side that created the order (`creator`) and its merchant (`merchant`). A message with an attachment is a transfer receipt (`kind: receipt`); fetch its bytes from `…/messages/{messageId}/attachment`.",
+        "properties": {
+          "attachment": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderMessageAttachmentMeta"
+              }
+            ],
+            "nullable": true,
+            "type": "object"
+          },
+          "createdAt": {
+            "example": "2026-11-20T12:05:00.000Z",
+            "format": "date-time",
+            "type": "string"
+          },
+          "from": {
+            "enum": [
+              "creator",
+              "merchant"
+            ],
+            "example": "merchant",
+            "type": "string"
+          },
+          "id": {
+            "example": "6c1d0f3a-2b4e-4f6a-9c8d-7e6f5a4b3c2d",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "text",
+              "receipt"
+            ],
+            "example": "receipt",
+            "type": "string"
+          },
+          "orderId": {
+            "example": "3f1c2b7e-8d4a-4c1e-9b2f-6a5d4c3b2a10",
+            "type": "string"
+          },
+          "text": {
+            "example": "Listo, ya te transferí.",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "orderId",
+          "from",
+          "kind",
+          "text",
+          "attachment",
+          "createdAt"
         ],
         "type": "object"
       },
@@ -3772,6 +4036,14 @@
             "example": null,
             "nullable": true,
             "type": "string"
+          },
+          "chat": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/OrderChatSummary"
+              }
+            ],
+            "description": "The order’s chat with its merchant (`…/orders/{id}/messages`)."
           },
           "contract": {
             "example": "CAKGHC55HFGIGFDRKKLH7MYLVXE5ELAO57VE2VUCDXBWDVFNDIXXZTJ7",
@@ -4008,6 +4280,7 @@
           "externalReference",
           "paymentDetails",
           "qr",
+          "chat",
           "createdAt",
           "updatedAt"
         ],
@@ -4454,6 +4727,7 @@
           },
           "currency": {
             "enum": [
+              "BOB",
               "ARS",
               "BRL",
               "MXN",
@@ -4476,6 +4750,7 @@
           },
           "rail": {
             "enum": [
+              "bo_bank_transfer",
               "ar_bank_transfer",
               "br_pix",
               "mx_spei",
@@ -4483,7 +4758,8 @@
               "pe_bank_transfer",
               "cl_bank_transfer",
               "ar_qr",
-              "br_pix_qr"
+              "br_pix_qr",
+              "pe_qr"
             ],
             "example": "ar_bank_transfer",
             "type": "string"
@@ -4523,8 +4799,9 @@
           },
           "standard": {
             "enum": [
+              "ar-interoperable",
               "pix",
-              "ar-interoperable"
+              "pe-interoperable"
             ],
             "example": "ar-interoperable",
             "type": "string"
@@ -4727,6 +5004,11 @@
       "RailFieldView": {
         "description": "One field of a payment rail’s account details.",
         "properties": {
+          "beneficiaryRequired": {
+            "description": "Whether an order’s beneficiary (a sale’s, a payout’s) must give it: as `required`, but the holder’s ID only where the rail’s transfer needs it.",
+            "example": false,
+            "type": "boolean"
+          },
           "description": {
             "description": "What it holds, in English.",
             "example": "CBU or CVU, 22 digits (or give alias instead)",
@@ -4749,7 +5031,7 @@
             "type": "array"
           },
           "required": {
-            "description": "Whether it must be given.",
+            "description": "Whether a merchant’s payment method (`/v1/p2p/payment-methods`) must give it.",
             "example": false,
             "type": "boolean"
           }
@@ -4757,13 +5039,19 @@
         "required": [
           "name",
           "description",
-          "required"
+          "required",
+          "beneficiaryRequired"
         ],
         "type": "object"
       },
       "RailView": {
         "description": "A local payment rail and the details it needs.",
         "properties": {
+          "beneficiaryIdRequired": {
+            "description": "Whether an order’s beneficiary must give the holder’s ID (the beneficiary’s `document` and the ID fields): true only where the transfer system needs it (Chile, Colombia).",
+            "example": false,
+            "type": "boolean"
+          },
           "fields": {
             "items": {
               "$ref": "#/components/schemas/RailFieldView"
@@ -4794,7 +5082,8 @@
           "id",
           "name",
           "kind",
-          "fields"
+          "fields",
+          "beneficiaryIdRequired"
         ],
         "type": "object"
       },
@@ -5018,10 +5307,10 @@
         "type": "object"
       },
       "TokenView": {
-        "description": "A stablecoin the P2P market trades on one network: a classic Stellar asset, used on-chain through its Stellar Asset Contract.",
+        "description": "A token the P2P market trades on one network, used on-chain through its Stellar Asset Contract: a classic Stellar asset (a stablecoin such as USDC), or the native lumen (`XLM`, `issuer: null`, no trustline needed).",
         "properties": {
           "code": {
-            "description": "The asset code.",
+            "description": "The asset code (`XLM` for the native lumen).",
             "example": "USDC",
             "type": "string"
           },
@@ -5036,8 +5325,9 @@
             "type": "number"
           },
           "issuer": {
-            "description": "The issuing account (G...).",
+            "description": "The issuing account (G...); null only for the native lumen (`XLM`).",
             "example": "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5",
+            "nullable": true,
             "type": "string"
           },
           "symbol": {
@@ -5119,6 +5409,7 @@
           },
           "currency": {
             "enum": [
+              "BOB",
               "ARS",
               "BRL",
               "MXN",
@@ -5234,6 +5525,7 @@
             ],
             "items": {
               "enum": [
+                "bo_bank_transfer",
                 "ar_bank_transfer",
                 "br_pix",
                 "mx_spei",
@@ -5241,7 +5533,8 @@
                 "pe_bank_transfer",
                 "cl_bank_transfer",
                 "ar_qr",
-                "br_pix_qr"
+                "br_pix_qr",
+                "pe_qr"
               ],
               "type": "string"
             },
@@ -5332,6 +5625,7 @@
                 "P2P_ORDER_DISPUTED",
                 "P2P_ORDER_RESOLVED",
                 "P2P_ORDER_FAILED",
+                "P2P_ORDER_MESSAGE",
                 "P2P_CHARGE_SUCCEEDED",
                 "P2P_PAYOUT_BATCH_COMPLETED"
               ],
@@ -5403,6 +5697,7 @@
               "P2P_ORDER_DISPUTED",
               "P2P_ORDER_RESOLVED",
               "P2P_ORDER_FAILED",
+              "P2P_ORDER_MESSAGE",
               "P2P_CHARGE_SUCCEEDED",
               "P2P_PAYOUT_BATCH_COMPLETED"
             ],
@@ -5473,6 +5768,7 @@
                 "P2P_ORDER_DISPUTED",
                 "P2P_ORDER_RESOLVED",
                 "P2P_ORDER_FAILED",
+                "P2P_ORDER_MESSAGE",
                 "P2P_CHARGE_SUCCEEDED",
                 "P2P_PAYOUT_BATCH_COMPLETED"
               ],
@@ -5980,7 +6276,7 @@
     },
     "/v1/app/activate": {
       "post": {
-        "description": "Creates the account when it is missing and opens the token’s trustline, the sponsor paying the reserves (CAP-33: begin_sponsoring_future_reserves, create_account with 0 XLM, change_trust, end_sponsoring_future_reserves). `transaction: null` when there is nothing to do. Submit it with `POST /v1/app/submit`, which adds the sponsor’s signature; limited per account and per IP, within the sponsor’s budget.",
+        "description": "Creates the account when it is missing and opens the token’s trustline, the sponsor paying the reserves (CAP-33: begin_sponsoring_future_reserves, create_account with 0 XLM, change_trust, end_sponsoring_future_reserves). The native lumen (`XLM`) needs no trustline: activating for it only creates a missing account. `transaction: null` when there is nothing to do. Submit it with `POST /v1/app/submit`, which adds the sponsor’s signature; limited per account and per IP, within the sponsor’s budget.",
         "operationId": "appWalletActivate",
         "parameters": [],
         "requestBody": {
@@ -6447,7 +6743,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           },
           "429": {
             "content": {
@@ -6765,7 +7061,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           },
           "429": {
             "content": {
@@ -6874,6 +7170,7 @@
     },
     "/v1/app/orders/{id}/cancel": {
       "post": {
+        "description": "Idempotent: once the order shows it, it answers the order as it is.",
         "operationId": "appCancel",
         "parameters": [
           {
@@ -6963,6 +7260,7 @@
     },
     "/v1/app/orders/{id}/dispute": {
       "post": {
+        "description": "Idempotent: once the order shows it, it answers the order as it is.",
         "operationId": "appDispute",
         "parameters": [
           {
@@ -7050,9 +7348,255 @@
         ]
       }
     },
+    "/v1/app/orders/{id}/messages": {
+      "get": {
+        "description": "Oldest first, the latest 200. A message with an attachment is a transfer receipt; fetch its file from `…/messages/{messageId}/attachment`.",
+        "operationId": "appMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Your order’s chat with its merchant",
+        "tags": [
+          "App"
+        ]
+      },
+      "post": {
+        "description": "A text (trimmed, 1 to 1000 characters), an attachment (an image or a PDF of at most 2 MiB, base64, whose leading bytes match its type), or both. The other side’s organization gets a `P2P_ORDER_MESSAGE` event. Attach your transfer receipt here after paying a purchase.",
+        "operationId": "appSendMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageView"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Write to your order’s merchant",
+        "tags": [
+          "App"
+        ]
+      }
+    },
+    "/v1/app/orders/{id}/messages/{messageId}/attachment": {
+      "get": {
+        "description": "Its bytes in base64.",
+        "operationId": "appAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageAttachment"
+                }
+              }
+            },
+            "description": ""
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "A file sent on your order’s chat",
+        "tags": [
+          "App"
+        ]
+      }
+    },
     "/v1/app/orders/{id}/paid": {
       "post": {
-        "description": "For a purchase: the matcher marks it paid for you.",
+        "description": "For a purchase: the matcher marks it paid for you. Idempotent: once the order shows it, it answers the order as it is.",
         "operationId": "appPaid",
         "parameters": [
           {
@@ -7152,7 +7696,7 @@
     },
     "/v1/app/orders/{id}/transactions": {
       "post": {
-        "description": "Mostly a sale’s `release` once the merchant paid you; also `dispute` and `cancel`.",
+        "description": "Mostly a sale’s `release` once the merchant paid you; also `dispute` and `cancel`. An action the order already shows answers 409 `already_done` (nothing to sign).",
         "operationId": "appTransaction",
         "parameters": [
           {
@@ -7224,6 +7768,16 @@
               }
             },
             "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [
@@ -7352,7 +7906,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           },
           "429": {
             "content": {
@@ -7443,7 +7997,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           },
           "429": {
             "content": {
@@ -8328,7 +8882,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [
@@ -8881,7 +9435,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [
@@ -8962,7 +9516,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [
@@ -9068,7 +9622,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [
@@ -9200,7 +9754,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           },
           "429": {
             "content": {
@@ -9631,7 +10185,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [
@@ -9830,7 +10384,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [
@@ -10380,7 +10934,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [
@@ -10744,6 +11298,338 @@
           }
         ],
         "summary": "One order your merchant account takes part in",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/v1/p2p/merchant/orders/{id}/messages": {
+      "get": {
+        "description": "Oldest first, the latest 200. A message with an attachment is a transfer receipt; fetch its file from `…/messages/{messageId}/attachment`.",
+        "operationId": "ordersMerchantMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the organization to act for (API keys carry theirs).",
+            "in": "header",
+            "name": "Midpoint-Organization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the tier to act on (default `test`).",
+            "in": "header",
+            "name": "Midpoint-Tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "live",
+                "test"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "summary": "The chat with the side that created an order you take",
+        "tags": [
+          "Orders"
+        ]
+      },
+      "post": {
+        "description": "A text (trimmed, 1 to 1000 characters), an attachment (an image or a PDF of at most 2 MiB, base64, whose leading bytes match its type), or both. The other side’s organization gets a `P2P_ORDER_MESSAGE` event. Send the transfer receipt here once you paid a sale, a QR payment or a payout.",
+        "operationId": "ordersMerchantSendMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the organization to act for (API keys carry theirs).",
+            "in": "header",
+            "name": "Midpoint-Organization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the tier to act on (default `test`).",
+            "in": "header",
+            "name": "Midpoint-Tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "live",
+                "test"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageView"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "summary": "Write to the side that created an order you take",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/v1/p2p/merchant/orders/{id}/messages/{messageId}/attachment": {
+      "get": {
+        "description": "Its bytes in base64.",
+        "operationId": "ordersMerchantAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the organization to act for (API keys carry theirs).",
+            "in": "header",
+            "name": "Midpoint-Organization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the tier to act on (default `test`).",
+            "in": "header",
+            "name": "Midpoint-Tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "live",
+                "test"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageAttachment"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "summary": "A file sent on the chat of an order you take",
         "tags": [
           "Orders"
         ]
@@ -11521,7 +12407,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           },
           "429": {
             "content": {
@@ -11662,7 +12548,7 @@
     },
     "/v1/p2p/orders/{id}/cancel": {
       "post": {
-        "description": "The matcher cancels for the buyer; a payout is cancelled here only before its merchant accepts it.",
+        "description": "The matcher cancels for the buyer; a payout is cancelled here only before its merchant accepts it. Idempotent: once the order shows it, it answers the order as it is.",
         "operationId": "ordersCancel",
         "parameters": [
           {
@@ -11774,7 +12660,7 @@
     },
     "/v1/p2p/orders/{id}/dispute": {
       "post": {
-        "description": "The merchant did not release a payment the person made: the arbiter decides.",
+        "description": "The merchant did not release a payment the person made: the arbiter decides. Idempotent: once the order shows it, it answers the order as it is.",
         "operationId": "ordersDispute",
         "parameters": [
           {
@@ -11884,9 +12770,341 @@
         ]
       }
     },
+    "/v1/p2p/orders/{id}/messages": {
+      "get": {
+        "description": "Oldest first, the latest 200. A message with an attachment is a transfer receipt; fetch its file from `…/messages/{messageId}/attachment`.",
+        "operationId": "ordersMessages",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the organization to act for (API keys carry theirs).",
+            "in": "header",
+            "name": "Midpoint-Organization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the tier to act on (default `test`).",
+            "in": "header",
+            "name": "Midpoint-Tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "live",
+                "test"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageList"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "summary": "Your order’s chat with its merchant",
+        "tags": [
+          "Orders"
+        ]
+      },
+      "post": {
+        "description": "A text (trimmed, 1 to 1000 characters), an attachment (an image or a PDF of at most 2 MiB, base64, whose leading bytes match its type), or both. The other side’s organization gets a `P2P_ORDER_MESSAGE` event.",
+        "operationId": "ordersSendMessage",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the organization to act for (API keys carry theirs).",
+            "in": "header",
+            "name": "Midpoint-Organization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the tier to act on (default `test`).",
+            "in": "header",
+            "name": "Midpoint-Tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "live",
+                "test"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrderMessage"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageView"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`rate_limited`: retry after the `Retry-After` header."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "summary": "Write to your order’s merchant",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
+    "/v1/p2p/orders/{id}/messages/{messageId}/attachment": {
+      "get": {
+        "description": "Its bytes in base64.",
+        "operationId": "ordersAttachment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "messageId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the organization to act for (API keys carry theirs).",
+            "in": "header",
+            "name": "Midpoint-Organization",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Wallet sessions only: the tier to act on (default `test`).",
+            "in": "header",
+            "name": "Midpoint-Tier",
+            "required": false,
+            "schema": {
+              "enum": [
+                "live",
+                "test"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OrderMessageAttachment"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`validation_failed`, or a domain refusal (`invalid_state`, `no_match` on a quote, `network_unsupported`, `asset_unsupported`, `quote_expired`, `challenge_invalid`, `signature_invalid`)."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`unauthorized`: no credentials, or an unknown, revoked or expired key or session."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`forbidden`: the credentials may not do this (scope, role, tier, cross-site write)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`not_found`: nothing of yours with that id on this tier."
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          },
+          {
+            "session": []
+          }
+        ],
+        "summary": "A file sent on your order’s chat",
+        "tags": [
+          "Orders"
+        ]
+      }
+    },
     "/v1/p2p/orders/{id}/paid": {
       "post": {
-        "description": "The person sent the transfer: the matcher marks the order paid for them (they need no gas).",
+        "description": "The person sent the transfer: the matcher marks the order paid for them (they need no gas). Idempotent: once the order shows it, it answers the order as it is.",
         "operationId": "ordersPaid",
         "parameters": [
           {
@@ -12853,7 +14071,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           },
           "429": {
             "content": {
@@ -13107,7 +14325,7 @@
     },
     "/v1/p2p/transactions": {
       "post": {
-        "description": "Unsigned calldata for one of your accounts (or a sale’s seller): approve, deposit, withdraw, setOperator, setMatcher, accept, markPaid, release, cancel, dispute. Each is checked against the order or account it names; the contract still decides.",
+        "description": "Unsigned calldata for one of your accounts (or a sale’s seller): approve, deposit, withdraw, setOperator, setMatcher, accept, markPaid, release, cancel, dispute. Each is checked against the order or account it names; the contract still decides. An order action the order already shows answers 409 `already_done` (nothing to sign).",
         "operationId": "ordersBuild",
         "parameters": [
           {
@@ -13193,6 +14411,16 @@
               }
             },
             "description": "`not_found`: nothing of yours with that id on this tier."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            },
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           },
           "503": {
             "content": {
@@ -13377,7 +14605,7 @@
                 }
               }
             },
-            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `account_taken`, `charge_closed`, `last_owner`."
+            "description": "`conflict`, `no_match`, `idempotency_conflict`, `operation_in_flight`, `already_done` (the order already shows that action; `details` names its status), `account_taken`, `charge_closed`, `last_owner`."
           }
         },
         "security": [

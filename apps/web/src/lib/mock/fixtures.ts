@@ -69,6 +69,21 @@ const field = (key: string, required = true) => ({ key, required });
 
 export const CURRENCIES = [
   {
+    code: 'BOB',
+    rails: [
+      {
+        id: 'bo_bank_transfer',
+        fields: [
+          field('bank'),
+          field('accountType'),
+          field('accountNumber'),
+          field('documentType'),
+          field('documentNumber'),
+        ],
+      },
+    ],
+  },
+  {
     code: 'ARS',
     rails: [
       {
@@ -108,6 +123,7 @@ export const CURRENCIES = [
         id: 'pe_bank_transfer',
         fields: [field('cci'), field('documentType'), field('documentNumber')],
       },
+      { id: 'pe_qr', fields: [] },
     ],
   },
   {
@@ -123,6 +139,7 @@ export const CURRENCIES = [
 
 /** Price of 1 USDC in each currency, for the user's purchase (the merchant sells) and sale. */
 export const PRICES: Record<string, { buy: number; sell: number }> = {
+  BOB: { buy: 12.05, sell: 11.85 },
   ARS: { buy: 1488.5, sell: 1452 },
   BRL: { buy: 5.47, sell: 5.36 },
   MXN: { buy: 18.92, sell: 18.55 },
@@ -196,6 +213,17 @@ export const MERCHANT_ACCOUNTS: Record<
   string,
   { holderName: string; document: string | null; details: Record<string, string> }
 > = {
+  bo_bank_transfer: {
+    holderName: 'Norte Cambios SRL',
+    document: '1020304025',
+    details: {
+      bank: 'Banco Unión',
+      accountType: 'checking',
+      accountNumber: '1000023456789',
+      documentType: 'NIT',
+      documentNumber: '1020304025',
+    },
+  },
   ar_bank_transfer: {
     holderName: 'Norte Cambios SRL',
     document: '30-71234567-9',

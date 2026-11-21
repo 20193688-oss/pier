@@ -106,6 +106,47 @@ describe('EMV merchant QR', () => {
     expect(r.qr.payload).toBe(AR_QR);
   });
 
+  it("reads Peru's interoperable QR, whose wallet account is one opaque token (Yape)", () => {
+    // The shape a Yape QR has: field 39 is a base64 token, not a TLV template.
+    const token = 'Zm9vYmFyYmF6cXV4MTIzNDU2Nzg5MGFiY2RlZmdoaWo=';
+    const body =
+      tlv('00', '01') +
+      tlv('01', '11') +
+      tlv('39', token) +
+      tlv('52', '5611') +
+      tlv('53', '604') +
+      tlv('58', 'PE') +
+      tlv('59', 'BODEGA LUCHO') +
+      tlv('60', 'Lima');
+    const r = parseEmv(withCrc(body));
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.qr).toMatchObject({
+      standard: 'pe-interoperable',
+      dynamic: false,
+      currency: 'PEN',
+      countryCode: 'PE',
+      amount: null,
+      merchantName: 'BODEGA LUCHO',
+      merchantCity: 'Lima',
+      accounts: [],
+    });
+    // With an amount (a dynamic QR) the amount is read as usual.
+    const priced = parseEmv(
+      withCrc(body.replace(tlv('01', '11'), tlv('01', '12')) + tlv('54', '12.50')),
+    );
+    expect(priced.ok && priced.qr.amount).toBe('12.50');
+    // Outside Peru the same opaque account still fails closed, and so does a token that is not one.
+    expect(parseEmv(withCrc(body.replace(tlv('58', 'PE'), tlv('58', 'AR'))))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+    expect(parseEmv(withCrc(body.replace(tlv('39', token), tlv('39', 'not a token!'))))).toEqual({
+      ok: false,
+      error: 'malformed',
+    });
+  });
+
   it('refuses repeated fields, a second PIX account and an amount in an unknown currency', () => {
     const base = tlv('00', '01') + tlv('01', '12');
     const tail = tlv('58', 'AR') + tlv('59', 'Cafe') + tlv('60', 'Salta');

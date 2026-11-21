@@ -11,7 +11,7 @@ import {
 } from '@/lib/api/endpoints';
 import { errorMessage } from '@/lib/api/messages';
 import { parseDecimal } from '@/lib/p2p/amounts';
-import { accountRails, fiatDecimals, isQrRailId } from '@/lib/p2p/rails';
+import { accountRails, defaultCurrency, fiatDecimals, isQrRailId } from '@/lib/p2p/rails';
 import { ago, money, rate } from '@/lib/format';
 import { Check, Field, Notice, SelectField, Spinner, Switch } from '@/components/ui/controls';
 import { ConfirmDialog, Dialog } from '@/components/ui/Dialog';
@@ -22,6 +22,7 @@ import { CurrencyMark, railName } from '@/components/p2p/parts';
 import { useDash } from '@/features/dashboard/context';
 import { Figures, LoadState, PageHead, ReadOnly, useLoad } from '@/features/dashboard/ui';
 import type { P2pAccount, P2pMarket, P2pOffer, P2pPaymentMethod } from '@/lib/p2p/types';
+import { useGuard } from '@/lib/use-action';
 
 const TTLS = ['300', '900', '3600', '21600', '86400'] as const;
 
@@ -56,27 +57,30 @@ export function OffersView() {
     };
   }, [offers]);
 
-  const toggle = async (offer: P2pOffer, active: boolean) => {
-    setError('');
-    try {
-      await offersApi.update(scope, offer.id, { active });
-      toast(active ? o.activated : o.paused);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e, o.saveFailed));
-    }
-  };
-  const remove = async (offer: P2pOffer) => {
-    setError('');
-    try {
-      await offersApi.remove(scope, offer.id);
-      toast(o.deleted);
-      setDeleting(null);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e, o.deleteFailed));
-    }
-  };
+  const guard = useGuard();
+  const toggle = (offer: P2pOffer, active: boolean) =>
+    guard(async () => {
+      setError('');
+      try {
+        await offersApi.update(scope, offer.id, { active });
+        toast(active ? o.activated : o.paused);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e, o.saveFailed));
+      }
+    });
+  const remove = (offer: P2pOffer) =>
+    guard(async () => {
+      setError('');
+      try {
+        await offersApi.remove(scope, offer.id);
+        toast(o.deleted);
+        setDeleting(null);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e, o.deleteFailed));
+      }
+    });
 
   const nameOf = (id: string) => market?.networks.find((n) => n.id === id)?.name ?? id;
   const accountName = (id: string) => {
@@ -268,8 +272,11 @@ function OfferDialog({
           side: 'SELL_TOKEN',
           network: market.networks[0]?.id ?? '',
           token: market.networks[0]?.tokens[0]?.symbol ?? 'USDC',
-          currency: market.currencies[0]?.code ?? 'ARS',
-          rails: accountRails(market.currencies[0]?.rails ?? []).slice(0, 1),
+          currency: defaultCurrency(market.currencies),
+          rails: accountRails(
+            market.currencies.find((c) => c.code === defaultCurrency(market.currencies))?.rails ??
+              [],
+          ).slice(0, 1),
           price: '',
           priceTtlSeconds: 3600,
           minFiat: '',
@@ -311,32 +318,34 @@ function OfferDialog({
       : [];
   const valid = !Object.values(errors).some(Boolean) && !!network && !!currency && !missing.length;
 
-  const save = async () => {
-    setTouched(true);
-    if (!valid) return;
-    setBusy(true);
-    setError('');
-    try {
-      if (offer) {
-        await offersApi.update(scope, offer.id, {
-          price: price!,
-          minFiat: min!,
-          maxFiat: max!,
-          priceTtlSeconds: form.priceTtlSeconds,
-          rails: form.rails,
-          active: form.active,
-        });
-        onSaved(false);
-      } else {
-        await offersApi.create(scope, { ...form, price: price!, minFiat: min!, maxFiat: max! });
-        onSaved(true);
+  const guard = useGuard();
+  const save = () =>
+    guard(async () => {
+      setTouched(true);
+      if (!valid) return;
+      setBusy(true);
+      setError('');
+      try {
+        if (offer) {
+          await offersApi.update(scope, offer.id, {
+            price: price!,
+            minFiat: min!,
+            maxFiat: max!,
+            priceTtlSeconds: form.priceTtlSeconds,
+            rails: form.rails,
+            active: form.active,
+          });
+          onSaved(false);
+        } else {
+          await offersApi.create(scope, { ...form, price: price!, minFiat: min!, maxFiat: max! });
+          onSaved(true);
+        }
+      } catch (e) {
+        setError(errorMessage(t.common, e, o.saveFailed));
+      } finally {
+        setBusy(false);
       }
-    } catch (e) {
-      setError(errorMessage(t.common, e, o.saveFailed));
-    } finally {
-      setBusy(false);
-    }
-  };
+    });
 
   const show = (e: string | null) => (touched ? e : null);
   return (

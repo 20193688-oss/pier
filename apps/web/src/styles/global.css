@@ -148,6 +148,18 @@
     -webkit-text-size-adjust: 100%;
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    /* No grey box on tap: every control shows its own press (scale, colour). */
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* Taps act at once (no double-tap zoom wait). */
+  a,
+  button,
+  label,
+  summary,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
   body {
     margin: 0;
@@ -331,11 +343,16 @@
     text-decoration: none;
     box-shadow: 0 10px 24px -16px rgb(0 0 0 / 0.5);
     transition:
-      transform 120ms,
-      background-color 120ms;
+      transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      box-shadow 220ms ease,
+      background-color 200ms ease;
   }
-  .tile:hover {
-    background: #fff;
+  @media (hover: hover) and (pointer: fine) {
+    .tile:hover {
+      background: #fff;
+      transform: translateY(-3px);
+      box-shadow: 0 18px 32px -18px rgb(0 0 0 / 0.65);
+    }
   }
   .tile:active {
     transform: scale(0.97);
@@ -367,19 +384,23 @@
 
   /* The highlighter: a marker stroke behind the exact amount. It sweeps in once when the order
      screen opens (the one orchestrated motion), and sits still with reduced motion. */
+  /* The highlighter runs past the first and last glyph (its slanted ends included, and a last letter
+     that tight tracking pushes past its box): wider padding, given back by the margin, so the
+     amount sits where it did and is covered whole. */
   .marker {
     background-image: linear-gradient(
       100deg,
-      transparent 0.2em,
-      var(--marker) 0.2em,
-      var(--marker) calc(100% - 0.15em),
-      transparent calc(100% - 0.15em)
+      transparent 0.08em,
+      var(--marker) 0.08em,
+      var(--marker) calc(100% - 0.08em),
+      transparent calc(100% - 0.08em)
     );
     background-repeat: no-repeat;
     background-size: 100% 62%;
     background-position: 0 78%;
     color: var(--marker-ink);
-    padding: 0 0.12em;
+    padding: 0 0.3em;
+    margin: 0 -0.18em;
     box-decoration-break: clone;
     -webkit-box-decoration-break: clone;
   }
@@ -487,14 +508,12 @@
     line-height: 1.2;
     text-decoration: none;
     transition:
-      background-color 120ms,
-      border-color 120ms,
-      color 120ms,
-      transform 80ms;
+      background-color 200ms ease,
+      border-color 200ms ease,
+      color 200ms ease,
+      box-shadow 220ms ease,
+      transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
     white-space: nowrap;
-  }
-  .btn:active:not(:disabled) {
-    transform: scale(0.985);
   }
   .btn:disabled {
     opacity: 0.5;
@@ -513,6 +532,7 @@
   }
   .btn-line:hover:not(:disabled) {
     border-color: var(--ink);
+    background: var(--well);
   }
   .btn-quiet {
     background: transparent;
@@ -551,6 +571,44 @@
     min-height: 36px;
     padding: 0.4rem 0.85rem;
     font-size: 0.875rem;
+  }
+  /* Hover, where there is a pointer to hover with: solid buttons rise a little on a soft shadow,
+     cards that open something (.lift) rise and deepen their shadow, and the arrow inside moves
+     on (.chev). A press always sinks a little. */
+  .lift {
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      box-shadow 220ms ease,
+      background-color 200ms ease,
+      border-color 200ms ease;
+  }
+  .chev {
+    transition: transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .btn-ink:hover:not(:disabled),
+    .btn-white:hover:not(:disabled),
+    .btn-bad:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 12px 24px -14px rgb(10 11 14 / 0.6);
+    }
+    .btn-glass:hover:not(:disabled) {
+      transform: translateY(-1px);
+    }
+    .lift:hover {
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-float);
+      border-color: var(--line-2);
+    }
+    .lift:hover .chev,
+    .btn:hover .chev {
+      transform: translateX(3px);
+    }
+  }
+  .btn:active:not(:disabled),
+  .lift:active {
+    transform: scale(0.98);
+    box-shadow: none;
   }
   /* A round icon button. */
   .btn-icon {
@@ -751,6 +809,71 @@
   }
   .app-with-tabs {
     padding-bottom: calc(104px + env(safe-area-inset-bottom, 0px));
+  }
+  /* From a tablet up the tabs are a side navigation: no dock to clear. */
+  @media (min-width: 768px) {
+    .app-with-tabs {
+      padding-bottom: 24px;
+    }
+  }
+  /* A screen comes in: forward from the right, back from the left, a tab switch fades. Only the
+     start is set (fill backwards), so nothing stays transformed once it has arrived. */
+  .screen {
+    animation: screen-fade 220ms cubic-bezier(0.2, 0.7, 0.2, 1) backwards;
+  }
+  .screen[data-motion='forward'] {
+    animation-name: screen-forward;
+  }
+  .screen[data-motion='back'] {
+    animation-name: screen-back;
+  }
+  @keyframes screen-fade {
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+  }
+  @keyframes screen-forward {
+    from {
+      opacity: 0;
+      transform: translateX(32px);
+    }
+  }
+  @keyframes screen-back {
+    from {
+      opacity: 0;
+      transform: translateX(-32px);
+    }
+  }
+  /* A toast drops in from the top on a phone and rises from the bottom from tablets up. */
+  .toast {
+    animation: toast-in 240ms cubic-bezier(0.2, 0.9, 0.25, 1) backwards;
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(-10px) scale(0.98);
+    }
+  }
+  @media (min-width: 768px) {
+    .toast {
+      animation-name: toast-up;
+    }
+  }
+  @keyframes toast-up {
+    from {
+      opacity: 0;
+      transform: translateY(10px) scale(0.98);
+    }
+  }
+  /* The tab just chosen settles in with a small spring. */
+  .tab-on {
+    animation: tab-on 280ms cubic-bezier(0.3, 1.5, 0.5, 1) backwards;
+  }
+  @keyframes tab-on {
+    from {
+      transform: scale(0.82);
+    }
   }
   .app-without-tabs {
     padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));

@@ -5,6 +5,7 @@
    The API's own shapes differ in places (base units, token addresses, flat deadlines, nested
    rails): src/lib/p2p/normalize.ts turns its answers into these, so the screens read one
    vocabulary. */
+import type { ChatSummary } from '@/lib/p2p/chat';
 
 export type P2pTier = 'mainnet' | 'testnet';
 
@@ -285,6 +286,8 @@ export interface P2pOrder {
   externalReference?: string | null;
   createdAt: string;
   updatedAt?: string;
+  /* Its chat: how many messages, the newest one's time and side (the unread dot). */
+  chat?: ChatSummary;
 }
 
 export interface P2pTransferMatch {

@@ -60,3 +60,25 @@ export function savedQuoteTerms(orderId: string): AcceptedQuote | null {
     return null;
   }
 }
+
+/** Who a sale to someone else's account pays (their name as the person typed it), kept on this
+    device so the order speaks of them instead of "your account". Null: one's own account, or
+    another device. */
+const RECIPIENT = (orderId: string) => `midpoint.recipient:${orderId}`;
+
+export function saveRecipient(orderId: string, name: string | null) {
+  try {
+    if (name) localStorage.setItem(RECIPIENT(orderId), name.slice(0, 80));
+    else localStorage.removeItem(RECIPIENT(orderId));
+  } catch {
+    /* the order then reads as one's own */
+  }
+}
+
+export function savedRecipient(orderId: string): string | null {
+  try {
+    return localStorage.getItem(RECIPIENT(orderId)) || null;
+  } catch {
+    return null;
+  }
+}

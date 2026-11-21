@@ -24,6 +24,7 @@ import { BAD, decodeArgs, readInvocation, type Decoded } from '@/lib/stellar/dec
 import { MARKET_INTERFACE, SAC_TRANSFER } from '@/lib/stellar/market-interface';
 import { toHex } from '@/lib/p2p/order-ref';
 import { toBaseUnits } from '@/lib/p2p/amounts';
+import { showsOutcome } from '@/lib/p2p/orders';
 import type { P2pTransaction } from '@/lib/p2p/types';
 import { MATCHER, NETWORK, RULES, SPONSOR, USDC } from '@/lib/mock/fixtures';
 import {
@@ -160,6 +161,9 @@ export function buildTransaction(
       if (!ORDER_FNS.includes(fn)) return { error: [422, 'unknown_action', 'Unknown action.'] };
       const order = db().orders.find((o) => o.id === args.orderId);
       if (!order || !order.onchainId) return { error: [404, 'not_found', 'Order not found.'] };
+      // An action the order already shows (a retry) is answered as done, as the API does.
+      if (showsOutcome(fn, order.status))
+        return { error: [409, 'already_done', `This order is already ${order.status}.`] };
       return { tx: orderCall(order, fn, from)! };
     }
   }

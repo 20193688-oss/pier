@@ -1,4 +1,6 @@
 import { ApiProperty, ApiSchema } from '@nestjs/swagger';
+import { P2P_QR_STANDARDS } from '@/p2p/domain/rails';
+import { OrderChatSummaryView } from '@/p2p/entities/order-message.entity';
 import { TransactionView } from '@/p2p/entities/transaction.entity';
 
 const STATUSES = [
@@ -99,7 +101,7 @@ export class OrderMerchantView {
     'What a QR payment’s scanned QR reads, for the person who scanned it (never the payload itself).',
 })
 export class QrSummaryView {
-  @ApiProperty({ enum: ['pix', 'ar-interoperable'], example: 'ar-interoperable' })
+  @ApiProperty({ enum: P2P_QR_STANDARDS, example: 'ar-interoperable' })
   standard!: string;
 
   @ApiProperty({ type: String, nullable: true, example: 'Panaderia La Salteña' })
@@ -131,7 +133,7 @@ export class MerchantQrView {
   })
   payload!: string;
 
-  @ApiProperty({ enum: ['pix', 'ar-interoperable'], example: 'ar-interoperable' })
+  @ApiProperty({ enum: P2P_QR_STANDARDS, example: 'ar-interoperable' })
   standard!: string;
 
   @ApiProperty({ type: String, nullable: true, example: 'Panaderia La Salteña' })
@@ -315,6 +317,12 @@ export class OrderView {
   })
   qr!: QrSummaryView | null;
 
+  @ApiProperty({
+    type: OrderChatSummaryView,
+    description: 'The order’s chat with its merchant (`…/orders/{id}/messages`).',
+  })
+  chat!: OrderChatSummaryView;
+
   @ApiProperty({ example: '2026-11-19T12:01:00.000Z' })
   createdAt!: Date;
 
@@ -369,8 +377,14 @@ export class BeneficiaryView {
   @ApiProperty({ example: 'Ana López' })
   holderName!: string;
 
-  @ApiProperty({ example: '27234567891' })
-  document!: string;
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    example: '27234567891',
+    description:
+      'The holder’s ID number; null where the rail’s transfer does not need it and none was given.',
+  })
+  document!: string | null;
 
   @ApiProperty({ example: 'ar_bank_transfer' })
   rail!: string;
@@ -511,6 +525,13 @@ export class MerchantOrderView {
     description: 'A live QR payment’s QR: what the merchant pays. Null otherwise.',
   })
   qr!: MerchantQrView | null;
+
+  @ApiProperty({
+    type: OrderChatSummaryView,
+    description:
+      'The order’s chat with the side that created it (`/v1/p2p/merchant/orders/{id}/messages`).',
+  })
+  chat!: OrderChatSummaryView;
 
   @ApiProperty({ example: '2026-11-19T12:01:00.000Z' })
   createdAt!: Date;

@@ -22,7 +22,32 @@ export interface P2pRailField {
 
 export type RailDetails = Record<string, string>;
 
+/** The scanned QR standards the market pays, each on its own QR rail (`@midpoint/payment-qr`'s names). */
+export const P2P_QR_STANDARDS = ['ar-interoperable', 'pix', 'pe-interoperable'] as const;
+export type P2pQrStandard = (typeof P2P_QR_STANDARDS)[number];
+
 export type RailCheck = { ok: true; details: RailDetails } | { ok: false; errors: string[] };
+
+/** How a rail's own check reads the details. */
+export interface RailCheckOptions {
+  /**
+   * The holder's ID (`P2pRail.holderId`) may be left out: an order's
+   * beneficiary on a rail whose transfer system does not need it. Given, it
+   * is checked as always, and a document type comes with its number.
+   */
+  idOptional?: boolean;
+}
+
+/** Whose details these are. */
+export interface ValidateRailOptions {
+  /**
+   * An order's beneficiary (where a merchant pays a sale or a payout), not a
+   * merchant's own payment method: the holder's ID is optional on every rail
+   * whose `beneficiaryIdRequired` is false (their bank already identified
+   * them, and the transfer does not carry it).
+   */
+  beneficiary?: boolean;
+}
 
 export interface P2pRail {
   currency: P2pCurrency;
@@ -30,11 +55,20 @@ export interface P2pRail {
    * A QR rail pays a scanned merchant QR (the destination is the payload):
    * it takes no account details and serves only QR payments (`QR_PAY`).
    */
-  qr?: 'ar-interoperable' | 'pix';
+  qr?: P2pQrStandard;
   /** A neutral display name, in English. */
   name: string;
   fields: readonly P2pRailField[];
-  check(details: RailDetails): RailCheck;
+  /** The detail fields that identify the account's holder (their ID); none on some rails. */
+  holderId: readonly string[];
+  /**
+   * Whether an order's beneficiary must give the holder's ID (`holderId`, and
+   * the beneficiary's own `document`): only where the transfer system needs it
+   * to pay (Chile's RUT, Colombia's document). A merchant's payment method
+   * always gives every `required` field.
+   */
+  beneficiaryIdRequired: boolean;
+  check(details: RailDetails, options?: RailCheckOptions): RailCheck;
   /** A short, masked line for lists and notifications. */
   summary(details: RailDetails): string;
 }
@@ -191,6 +225,29 @@ function result(values: RailDetails, errors: string[]): RailCheck {
   return errors.length ? { ok: false, errors } : { ok: true, details: values };
 }
 
+/** The fields a check requires: without the holder's ID when it is optional. */
+function requiredOf(
+  names: readonly string[],
+  holderId: readonly string[],
+  options: RailCheckOptions | undefined,
+): readonly string[] {
+  return options?.idOptional ? names.filter((n) => !holderId.includes(n)) : names;
+}
+
+/** An optional document comes whole: its type with its number, and the other way round. */
+function pairDocument(details: RailDetails, errors: string[]): void {
+  const given = (name: string) => {
+    const value: unknown = details?.[name];
+    return value !== undefined && value !== null && value !== '';
+  };
+  if (given('documentType') && !given('documentNumber')) {
+    errors.push('details.documentNumber is required with documentType');
+  }
+  if (given('documentNumber') && !given('documentType')) {
+    errors.push('details.documentType is required with documentNumber');
+  }
+}
+
 function requireFields(values: RailDetails, names: readonly string[], errors: string[]): void {
   for (const name of names) {
     if (!values[name]) errors.push(`details.${name} is required`);
@@ -236,10 +293,30 @@ const CL_FIELDS = [
   field('rut', "The holder's RUT, with its check digit"),
 ] as const;
 
+const BO_ACCOUNT_TYPES = ['savings', 'checking'] as const;
+/** Bolivia: CI (identity card, with its complement), NIT (tax id), CE (foreigner's card), passport. */
+const BO_DOCUMENT_TYPES = ['CI', 'NIT', 'CE', 'PP'] as const;
+const BO_FIELDS = [
+  field('bank', 'Bank name'),
+  field('accountType', 'Account type', true, BO_ACCOUNT_TYPES),
+  field('accountNumber', 'Account number, 6 to 20 digits'),
+  field('documentType', "The holder's document type", true, BO_DOCUMENT_TYPES),
+  field(
+    'documentNumber',
+    "The holder's document number, 5 to 15 letters or digits (a CI with its complement)",
+  ),
+] as const;
+
+/** The holder's ID on the rails that take a document type and number. */
+const DOCUMENT_ID = ['documentType', 'documentNumber'] as const;
+
 const DOCUMENT_NUMBER_RE = /^[A-Za-z0-9]{5,15}$/;
+/** Spaces, dots and hyphens dropped: how people write account and document numbers. */
+const compact = (value: string) => value.replace(/[\s.-]/g, '');
 const BANK_NAME_RE = /^[\p{L}\p{N} .,&'-]{2,60}$/u;
 
 export const P2P_RAIL_IDS = [
+  'bo_bank_transfer',
   'ar_bank_transfer',
   'br_pix',
   'mx_spei',
@@ -248,6 +325,7 @@ export const P2P_RAIL_IDS = [
   'cl_bank_transfer',
   'ar_qr',
   'br_pix_qr',
+  'pe_qr',
 ] as const;
 export type P2pRailId = (typeof P2P_RAIL_IDS)[number];
 
@@ -256,11 +334,48 @@ export function isP2pRailId(value: unknown): value is P2pRailId {
 }
 
 export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
+  bo_bank_transfer: {
+    currency: 'BOB',
+    name: 'Bank transfer',
+    fields: BO_FIELDS,
+    holderId: DOCUMENT_ID,
+    beneficiaryIdRequired: false,
+    check(details, options) {
+      const { values, errors } = pick(details, BO_FIELDS);
+      if (values.accountNumber) values.accountNumber = compact(values.accountNumber);
+      if (values.documentNumber) values.documentNumber = compact(values.documentNumber);
+      requireFields(
+        values,
+        requiredOf(
+          ['bank', 'accountType', 'accountNumber', 'documentType', 'documentNumber'],
+          DOCUMENT_ID,
+          options,
+        ),
+        errors,
+      );
+      if (options?.idOptional) pairDocument(details, errors);
+      if (values.bank && !BANK_NAME_RE.test(values.bank)) {
+        errors.push('details.bank must be a bank name');
+      }
+      if (values.accountNumber && !/^\d{6,20}$/.test(values.accountNumber)) {
+        errors.push('details.accountNumber must be 6 to 20 digits');
+      }
+      if (values.documentNumber && !DOCUMENT_NUMBER_RE.test(values.documentNumber)) {
+        errors.push('details.documentNumber must be 5 to 15 letters or digits');
+      } else if (values.documentNumber) {
+        values.documentNumber = values.documentNumber.toUpperCase();
+      }
+      return result(values, errors);
+    },
+    summary: (d) => `${d.bank} ${mask(d.accountNumber ?? '')}`,
+  },
   ar_bank_transfer: {
     currency: 'ARS',
     name: 'Bank transfer (CBU, CVU or alias)',
     fields: AR_FIELDS,
-    check(details) {
+    holderId: ['cuit'],
+    beneficiaryIdRequired: false,
+    check(details, options) {
       const { values, errors } = pick(details, AR_FIELDS);
       if (values.cbu) values.cbu = onlyDigits(values.cbu);
       if (values.alias) values.alias = values.alias.toLowerCase();
@@ -274,7 +389,7 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
       if (values.alias && !isValidCbuAlias(values.alias)) {
         errors.push('details.alias must be 6 to 20 of a-z, 0-9, dot and hyphen');
       }
-      requireFields(values, ['cuit'], errors);
+      requireFields(values, requiredOf(['cuit'], ['cuit'], options), errors);
       if (values.cuit && !isValidCuit(values.cuit)) {
         errors.push('details.cuit is not a valid CUIT or CUIL');
       }
@@ -286,6 +401,9 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
     currency: 'BRL',
     name: 'PIX',
     fields: BR_FIELDS,
+    // A PIX key may be a CPF, but it is the account, not the holder's ID.
+    holderId: [],
+    beneficiaryIdRequired: false,
     check(details) {
       const { values, errors } = pick(details, BR_FIELDS);
       requireFields(values, ['keyType', 'key'], errors);
@@ -313,6 +431,8 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
     currency: 'MXN',
     name: 'SPEI (CLABE)',
     fields: MX_FIELDS,
+    holderId: [],
+    beneficiaryIdRequired: false,
     check(details) {
       const { values, errors } = pick(details, MX_FIELDS);
       if (values.clabe) values.clabe = onlyDigits(values.clabe);
@@ -328,6 +448,9 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
     currency: 'COP',
     name: 'Bank transfer',
     fields: CO_FIELDS,
+    // Colombian banks need the recipient's document to transfer.
+    holderId: DOCUMENT_ID,
+    beneficiaryIdRequired: true,
     check(details) {
       const { values, errors } = pick(details, CO_FIELDS);
       if (values.accountNumber) values.accountNumber = onlyDigits(values.accountNumber);
@@ -353,10 +476,17 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
     currency: 'PEN',
     name: 'Bank transfer (CCI)',
     fields: PE_FIELDS,
-    check(details) {
+    holderId: DOCUMENT_ID,
+    beneficiaryIdRequired: false,
+    check(details, options) {
       const { values, errors } = pick(details, PE_FIELDS);
       if (values.cci) values.cci = onlyDigits(values.cci);
-      requireFields(values, ['cci', 'documentType', 'documentNumber'], errors);
+      requireFields(
+        values,
+        requiredOf(['cci', 'documentType', 'documentNumber'], DOCUMENT_ID, options),
+        errors,
+      );
+      if (options?.idOptional) pairDocument(details, errors);
       if (values.cci && !/^\d{20}$/.test(values.cci)) {
         errors.push('details.cci must be 20 digits');
       }
@@ -371,6 +501,9 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
     currency: 'CLP',
     name: 'Bank transfer',
     fields: CL_FIELDS,
+    // Chilean banks need the recipient's RUT to transfer.
+    holderId: ['rut'],
+    beneficiaryIdRequired: true,
     check(details) {
       const { values, errors } = pick(details, CL_FIELDS);
       if (values.accountNumber) values.accountNumber = onlyDigits(values.accountNumber);
@@ -394,6 +527,8 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
     qr: 'ar-interoperable',
     name: 'Interoperable QR (Transferencias 3.0)',
     fields: [],
+    holderId: [],
+    beneficiaryIdRequired: false,
     check: () => ({
       ok: false,
       errors: ['ar_qr takes no account: the destination is the scanned QR'],
@@ -405,15 +540,30 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
     qr: 'pix',
     name: 'PIX QR (BR Code)',
     fields: [],
+    holderId: [],
+    beneficiaryIdRequired: false,
     check: () => ({
       ok: false,
       errors: ['br_pix_qr takes no account: the destination is the scanned QR'],
     }),
     summary: () => 'PIX QR',
   },
+  pe_qr: {
+    currency: 'PEN',
+    qr: 'pe-interoperable',
+    name: 'Interoperable QR (Peru: Yape, Plin, banks)',
+    fields: [],
+    holderId: [],
+    beneficiaryIdRequired: false,
+    check: () => ({
+      ok: false,
+      errors: ['pe_qr takes no account: the destination is the scanned QR'],
+    }),
+    summary: () => 'QR',
+  },
 };
 
-/** True for a rail that pays a scanned QR (`ar_qr`, `br_pix_qr`). */
+/** True for a rail that pays a scanned QR (`ar_qr`, `br_pix_qr`, `pe_qr`). */
 export function isQrRail(rail: string): boolean {
   return isP2pRailId(rail) && P2P_RAILS[rail].qr !== undefined;
 }
@@ -423,11 +573,16 @@ export function qrRailFor(standard: string): P2pRailId | null {
   return P2P_RAIL_IDS.find((id) => P2P_RAILS[id].qr === standard) ?? null;
 }
 
-/** Checks a rail's details for its currency; one message per problem. */
+/**
+ * Checks a rail's details for its currency; one message per problem. An
+ * order's beneficiary (`options.beneficiary`) may leave out the holder's ID
+ * where the rail does not need it.
+ */
 export function validateRailDetails(
   rail: P2pRailId,
   currency: string,
   details: unknown,
+  options: ValidateRailOptions = {},
 ): RailCheck {
   const entry = P2P_RAILS[rail];
   if (entry.currency !== currency) {
@@ -439,7 +594,18 @@ export function validateRailDetails(
   if (details === null || typeof details !== 'object' || Array.isArray(details)) {
     return { ok: false, errors: ['details must be an object'] };
   }
-  return entry.check(details as RailDetails);
+  return entry.check(details as RailDetails, {
+    idOptional: options.beneficiary === true && !entry.beneficiaryIdRequired,
+  });
+}
+
+/**
+ * Whether an order's beneficiary must give a field of the rail: its
+ * `required` fields, but the holder's ID only where the rail needs it.
+ */
+export function beneficiaryRequires(rail: P2pRailId, field: P2pRailField): boolean {
+  const entry = P2P_RAILS[rail];
+  return field.required && (entry.beneficiaryIdRequired || !entry.holderId.includes(field.name));
 }
 
 /** The rails that pay in `currency`. */

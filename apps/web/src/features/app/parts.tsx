@@ -1,26 +1,44 @@
 /* Pieces several app screens share: an activity row and the list that groups rows by day, the
-   activation card, a dollar amount with its local-money equivalent, and a key/value list. */
+   activation card, a dollar amount with its local-money equivalent, a key/value list, and the
+   local-currency picker. */
 import { useState, type ReactNode } from 'react';
 import { Link } from 'react-router';
 import { fmt, useI18n } from '@/i18n';
 import { Icon, type IconName } from '@/components/ui/Icon';
-import { Notice } from '@/components/ui/controls';
+import { Notice, Skeleton } from '@/components/ui/controls';
 import { useToast } from '@/components/ui/Toast';
 import { StatusPill, Pill } from '@/components/ui/misc';
+import { CurrencyMark, PickerSheet } from '@/components/p2p/parts';
 import { SignFlow } from '@/components/wallet/SignFlow';
 import { app, appSubmitter } from '@/lib/api/app';
-import { groupByDay, money, shortAddress, timeOnly } from '@/lib/format';
-import { localValue, usd } from '@/lib/app/money';
-import { toBaseUnits } from '@/lib/p2p/amounts';
+import {
+  currencyName,
+  groupByDay,
+  money,
+  shortAddress,
+  timeOnly,
+  units as tokenUnits,
+} from '@/lib/format';
+import { isQrRail } from '@/lib/p2p/qr-pay';
+import { hasUnseen } from '@/lib/p2p/chat';
+import { seenAt } from '@/lib/p2p/chat-seen';
+import { savedRecipient } from '@/lib/p2p/steps';
+import { isDollarToken, localValue, usd } from '@/lib/app/money';
+import { fromBaseUnits, toBaseUnits } from '@/lib/p2p/amounts';
 import { useAppData } from '@/features/app/data';
 import { useSession } from '@/lib/session';
 import { install, usePwa } from '@/lib/pwa';
 import type { ActivityItem, AppTransfer } from '@/lib/app/types';
 
-/** "US$ 12,50" in the reader's language. */
+/** An amount of the app's token (or of `symbol`) as a person reads it: dollars as "US$ 12,50",
+    anything else in its own unit ("12,5 XLM"). */
 export function useUsd() {
   const { t, lang } = useI18n();
-  return (units: string | bigint) => usd(lang, units, t.app.usd);
+  const { token } = useAppData();
+  return (units: string | bigint, symbol: string | null = token?.symbol ?? null) =>
+    !symbol || isDollarToken(symbol)
+      ? usd(lang, units, t.app.usd)
+      : tokenUnits(lang, fromBaseUnits(units, 7), symbol);
 }
 
 /** The local-money equivalent of `units` ("≈ 18.150,00 ARS"), or null without a price. */
@@ -32,6 +50,44 @@ export function useLocal() {
     return v ? fmt(t.app.approx, { amount: money(lang, v, currency) }) : null;
   };
 }
+
+/** The app's local currency and its picker sheet (every currency the market pays out in, each
+    with its flag): `open` shows the sheet, `sheet` is rendered by the screen. */
+export function useCurrencyPicker() {
+  const { t, lang } = useI18n();
+  const { market, currency, setCurrency } = useAppData();
+  const [open, setOpen] = useState(false);
+  const currencies = (market?.currencies ?? []).filter((c) => c.rails.some((r) => !isQrRail(r)));
+  const sheet = open ? (
+    <PickerSheet
+      title={t.trade.pickCurrency}
+      searchLabel={t.trade.searchCurrency}
+      selected={currency}
+      onClose={() => setOpen(false)}
+      onPick={(code) => {
+        setOpen(false);
+        setCurrency(code);
+      }}
+      items={currencies.map((c) => ({
+        key: c.code,
+        mark: <CurrencyMark code={c.code} size={34} />,
+        title: c.code,
+        sub: currencyName(c.code, lang),
+        search: `${c.code} ${currencyName(c.code, lang)}`,
+      }))}
+    />
+  ) : null;
+  return {
+    currency,
+    choices: currencies.length,
+    open: () => setOpen(true),
+    sheet,
+    label: fmt(t.trade.changeCurrency, { currency: currencyName(currency, lang) }),
+  };
+}
+
+/** Orders that ended without moving anything: their row is struck through. */
+const VOID_STATUSES = new Set(['failed', 'cancelled', 'expired', 'rejected']);
 
 const who = (handle: string | null, address: string, outside: string) =>
   handle ? `@${handle}` : address ? shortAddress(address) : outside;
@@ -55,6 +111,10 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
   let incoming: boolean;
   let to: string;
   let pill: ReactNode = null;
+  let unread = false;
+  // Nothing moved (a cancelled, expired or refused order, a failed transfer): the row is struck
+  // through in red and says why in plain words instead of a pill.
+  let voided: string | null = null;
   if (item.type === 'transfer') {
     const tr: AppTransfer = item.transfer;
     incoming = tr.direction === 'in';
@@ -63,47 +123,64 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
       ? fmt(a.received, { who: who(tr.fromHandle, tr.from, a.outside) })
       : fmt(a.sent, { who: who(tr.toHandle, tr.to, a.outside) });
     sub = [tr.note, timeOnly(lang, tr.createdAt)].filter(Boolean).join(' · ');
-    amount = fmtUsd(tr.amount);
+    amount = fmtUsd(tr.amount, tr.token || null);
     to = `/app/activity/transfer/${tr.id}`;
-    if (tr.status !== 'COMPLETED')
-      pill = (
-        <Pill tone={tr.status === 'FAILED' ? 'fail' : 'pend'}>{a.transferStatus[tr.status]}</Pill>
-      );
+    if (tr.status === 'FAILED') voided = a.transferStatus.FAILED;
+    else if (tr.status !== 'COMPLETED')
+      pill = <Pill tone="pend">{a.transferStatus[tr.status]}</Pill>;
   } else {
     const o = item.order;
     incoming = o.kind === 'BUY';
     icon = o.kind === 'BUY' ? 'plus' : o.kind === 'QR_PAY' ? 'store' : 'bank';
-    title = (a.kinds as Record<string, string>)[o.kind] ?? o.kind;
+    // A send to someone else's bank account names them (kept on this device when it was sent).
+    const recipient = o.kind === 'SELL' ? savedRecipient(o.id) : null;
+    title = recipient
+      ? fmt(a.sent, { who: recipient })
+      : ((a.kinds as Record<string, string>)[o.kind] ?? o.kind);
     sub = [money(lang, o.fiatAmount, o.currency), timeOnly(lang, o.createdAt)]
       .filter(Boolean)
       .join(' · ');
     amount = fmtUsd(toBaseUnits(o.tokenAmount, decimals) ?? '0');
     to = `/app/activity/order/${o.id}`;
-    if (o.status !== 'completed')
+    unread = !!o.chat && hasUnseen(o.chat, 'creator', seenAt('app', o.id));
+    if (VOID_STATUSES.has(o.status))
+      voided = (t.p2p.status as Record<string, string>)[o.status] ?? o.status;
+    else if (o.status !== 'completed')
       pill = (
         <StatusPill status={o.status}>
           {(t.p2p.status as Record<string, string>)[o.status] ?? o.status}
         </StatusPill>
       );
   }
+  const struck = voided ? 'line-through decoration-bad decoration-[1.5px] text-ink-3' : '';
   return (
     <Link
       to={to}
-      className="-mx-2 flex min-h-[64px] items-center gap-3 rounded-[14px] px-2 py-2 transition-colors hover:bg-well"
+      data-voided={voided ? '' : undefined}
+      className="-mx-3 flex min-h-[68px] items-center gap-3 rounded-[16px] px-3 py-2 transition-[background-color,transform] duration-200 hover:bg-well active:scale-[0.99]"
     >
-      <span className="icon-tile" aria-hidden="true">
+      <span className={`icon-tile ${voided ? 'opacity-50' : ''}`} aria-hidden="true">
         <Icon name={icon} size={19} strokeWidth={2.1} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <b className="truncate font-medium">{title}</b>
-        <span className="truncate text-[0.8125rem] text-ink-3">{sub}</span>
+        <b className="flex min-w-0 items-center gap-2 font-medium">
+          <span className={`truncate ${struck}`}>{title}</span>
+          {unread && (
+            <span
+              className="size-2 shrink-0 rounded-full bg-bad"
+              role="img"
+              aria-label={t.p2p.chat.unread}
+            />
+          )}
+        </b>
+        <span className={`truncate text-[0.8125rem] text-ink-3 ${struck}`}>{sub}</span>
       </span>
       <span className="flex flex-col items-end gap-1">
-        <b className={`num font-medium ${incoming ? 'text-ok' : ''}`}>
+        <b className={`num font-medium ${voided ? struck : incoming ? 'text-ok' : ''}`}>
           {incoming ? '+' : '−'}
           {amount}
         </b>
-        {pill}
+        {voided ? <span className="text-[0.8125rem] font-medium text-bad">{voided}</span> : pill}
       </span>
     </Link>
   );
@@ -249,6 +326,64 @@ export function InstallBanner() {
           </button>
         </div>
       </div>
+    </section>
+  );
+}
+
+const positive = (v: string | null | undefined) => !!v && /^\d+$/.test(v) && BigInt(v) > 0n;
+
+/** The wallet at a glance, beside a form on a wide screen: the balance in the app's token, its
+    local value, and the other coins the wallet holds (other tokens, and XLM). */
+export function WalletSummary() {
+  const { t, lang } = useI18n();
+  const h = t.app.home;
+  const { balance, balances, token, network } = useAppData();
+  const fmtUsd = useUsd();
+  const local = useLocal();
+  const decimalsOf = (symbol: string) =>
+    network?.tokens.find((x) => x.symbol === symbol)?.decimals ?? 7;
+  const others = (balances?.tokens ?? []).filter(
+    (b) => b.symbol !== token?.symbol && b.trustline && positive(b.amount),
+  );
+  const xlm =
+    positive(balances?.xlm) && !others.some((b) => b.symbol === 'XLM') && token?.symbol !== 'XLM'
+      ? balances!.xlm
+      : null;
+  return (
+    <section
+      className="tone-dark aura-night grain overflow-hidden rounded-[24px] p-6 text-ink"
+      aria-label={h.balance}
+    >
+      <p className="text-[0.875rem] font-medium text-ink-3">{h.balance}</p>
+      {balances === undefined ? (
+        <Skeleton className="mt-3 h-10 w-2/3" />
+      ) : (
+        <p className="figure mt-2 text-[2.25rem]">{fmtUsd(balance)}</p>
+      )}
+      <p className="num mt-2 min-h-[1.5em] text-ink-2">{local(balance) ?? ''}</p>
+      {(others.length > 0 || xlm) && (
+        <ul
+          className="mt-5 flex flex-col gap-2 border-t border-line pt-4 text-[0.9375rem]"
+          role="list"
+        >
+          {others.map((b) => (
+            <li key={b.contract} className="flex items-center justify-between gap-3">
+              <span className="text-ink-2">{b.symbol}</span>
+              <span className="num font-medium">
+                {tokenUnits(lang, fromBaseUnits(b.amount, decimalsOf(b.symbol)), b.symbol)}
+              </span>
+            </li>
+          ))}
+          {xlm && (
+            <li className="flex items-center justify-between gap-3">
+              <span className="text-ink-2">XLM</span>
+              <span className="num font-medium">
+                {tokenUnits(lang, fromBaseUnits(xlm, 7), 'XLM')}
+              </span>
+            </li>
+          )}
+        </ul>
+      )}
     </section>
   );
 }

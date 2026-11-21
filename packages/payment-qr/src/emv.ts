@@ -1,5 +1,6 @@
-/* EMVCo merchant-presented QR codes (EMV QRCPS-MPM): the format of Brazil's PIX "BR Code" and of
-   Argentina's interoperable QR (Transferencias 3.0), among others. A payload is a run of TLV
+/* EMVCo merchant-presented QR codes (EMV QRCPS-MPM): the format of Brazil's PIX "BR Code", of
+   Argentina's interoperable QR (Transferencias 3.0) and of Peru's interoperable QR (Yape, Plin and
+   the banks), among others. A payload is a run of TLV
    fields (two-digit id, two-digit length, value), ending in field 63: a CRC16/CCITT-FALSE of
    everything before its value. Templates (26-51 merchant accounts, 62 additional data, 64
    language, 80-99) nest TLV fields of their own.
@@ -14,7 +15,7 @@ export interface EmvField {
   children?: EmvField[];
 }
 
-export type MerchantQrStandard = 'pix' | 'ar-interoperable' | 'emv';
+export type MerchantQrStandard = 'pix' | 'ar-interoperable' | 'pe-interoperable' | 'emv';
 
 export interface MerchantQr {
   standard: MerchantQrStandard;
@@ -70,6 +71,10 @@ const CURRENCY_RE = /^\d{3}$/;
 const isTemplate = (id: number) => (id >= 26 && id <= 51) || id === 62 || id === 64 || id >= 80;
 /* Templates whose content decides who is paid or what the payment says: they must parse. */
 const mustParse = (id: number) => (id >= 26 && id <= 51) || id === 62;
+/* Peru's wallets put the account in a merchant-account field as one opaque token (Yape: field 39,
+   44 characters of base64) instead of a TLV template. Only the wallet that scans it reads it, and
+   nothing the person agrees to (name, amount, currency) comes from it, so it is kept as is. */
+const OPAQUE_ACCOUNT_RE = /^[A-Za-z0-9+/=_-]{8,99}$/;
 
 /** CRC16/CCITT-FALSE (polynomial 0x1021, initial 0xFFFF) of `text`'s UTF-8 bytes, as the four
     upper-case hex digits field 63 carries. */
@@ -125,14 +130,17 @@ export function parseEmv(input: string): EmvResult {
 
   if (hasDuplicateIds(fields)) return { ok: false, error: 'malformed' };
 
+  const peru = field(fields, '58')?.value?.toUpperCase() === 'PE';
   for (const f of fields) {
     const id = Number(f.id);
     if (!isTemplate(id)) continue;
     const children = parseTlv(f.value);
     // A merchant-account or additional-data template that is not TLV fails closed: a banking
-    // app could read something this parser skipped.
+    // app could read something this parser skipped. Peru's opaque account tokens are the one
+    // exception (OPAQUE_ACCOUNT_RE).
     if (!children) {
-      if (mustParse(id)) return { ok: false, error: 'malformed' };
+      const opaque = peru && id >= 26 && id <= 51 && OPAQUE_ACCOUNT_RE.test(f.value);
+      if (mustParse(id) && !opaque) return { ok: false, error: 'malformed' };
       continue;
     }
     if (hasDuplicateIds(children)) return { ok: false, error: 'malformed' };
@@ -177,7 +185,9 @@ export function parseEmv(input: string): EmvResult {
       ? 'pix'
       : countryCode === 'AR' && currencyNumeric === '032'
         ? 'ar-interoperable'
-        : 'emv';
+        : countryCode === 'PE' && currencyNumeric === '604'
+          ? 'pe-interoperable'
+          : 'emv';
 
   return {
     ok: true,

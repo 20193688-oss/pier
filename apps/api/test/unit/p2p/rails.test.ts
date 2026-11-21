@@ -227,3 +227,140 @@ describe('P2P rails: details', () => {
     expect(P2P_RAILS.mx_spei.summary({ clabe: '002010077777777771' })).toBe('CLABE ••••7771');
   });
 });
+
+describe('P2P rails: the Bolivian bank transfer (bo_bank_transfer)', () => {
+  const valid = {
+    bank: 'Banco Unión',
+    accountType: 'savings',
+    accountNumber: '1000012345678',
+    documentType: 'CI',
+    documentNumber: '4567891',
+  };
+  const check = (details: Record<string, unknown>) =>
+    validateRailDetails('bo_bank_transfer', 'BOB', details);
+  const errorsOf = (details: Record<string, unknown>) => {
+    const r = check(details);
+    return r.ok ? [] : r.errors;
+  };
+
+  it('is the first rail, pays in BOB, and is the only BOB rail', () => {
+    expect(P2P_RAIL_IDS[0]).toBe('bo_bank_transfer');
+    expect(railsFor('BOB')).toEqual(['bo_bank_transfer']);
+    const rail = P2P_RAILS.bo_bank_transfer;
+    expect(rail).toMatchObject({ currency: 'BOB', name: 'Bank transfer' });
+    expect(rail.qr).toBeUndefined();
+    expect(rail.fields.map((f) => [f.name, f.required, f.options ?? null])).toEqual([
+      ['bank', true, null],
+      ['accountType', true, ['savings', 'checking']],
+      ['accountNumber', true, null],
+      ['documentType', true, ['CI', 'NIT', 'CE', 'PP']],
+      ['documentNumber', true, null],
+    ]);
+  });
+
+  it('takes valid details as they are', () => {
+    expect(check(valid)).toEqual({ ok: true, details: valid });
+    expect(
+      check({
+        ...valid,
+        accountType: 'checking',
+        documentType: 'NIT',
+        documentNumber: '1023456789',
+      }).ok,
+    ).toBe(true);
+  });
+
+  it('drops spaces, dots and hyphens and uppercases the document (a CI with its complement)', () => {
+    expect(
+      check({
+        bank: '  Banco Mercantil Santa Cruz ',
+        accountType: 'checking',
+        accountNumber: '401-012.345 6',
+        documentType: 'CI',
+        documentNumber: '1234567-1a',
+      }),
+    ).toEqual({
+      ok: true,
+      details: {
+        bank: 'Banco Mercantil Santa Cruz',
+        accountType: 'checking',
+        accountNumber: '4010123456',
+        documentType: 'CI',
+        documentNumber: '12345671A',
+      },
+    });
+    expect(check({ ...valid, documentNumber: '1234567-1A' })).toMatchObject({
+      ok: true,
+      details: { documentNumber: '12345671A' },
+    });
+    expect(check({ ...valid, documentNumber: '1.023.456.789' })).toMatchObject({
+      ok: true,
+      details: { documentNumber: '1023456789' },
+    });
+  });
+
+  it('requires every field', () => {
+    for (const name of Object.keys(valid)) {
+      expect(errorsOf({ ...valid, [name]: undefined }), name).toEqual([
+        `details.${name} is required`,
+      ]);
+      expect(errorsOf({ ...valid, [name]: '' }), name).toEqual([`details.${name} is required`]);
+    }
+  });
+
+  it('refuses a bank that is not a name', () => {
+    expect(errorsOf({ ...valid, bank: 'B' })).toEqual(['details.bank must be a bank name']);
+    expect(errorsOf({ ...valid, bank: 'Banco <script>' })).toEqual([
+      'details.bank must be a bank name',
+    ]);
+  });
+
+  it('refuses an account type or a document type it does not list', () => {
+    expect(errorsOf({ ...valid, accountType: 'vista' })).toEqual([
+      'details.accountType must be one of savings, checking',
+      'details.accountType is required',
+    ]);
+    for (const documentType of ['DNI', 'ci']) {
+      expect(errorsOf({ ...valid, documentType }), documentType).toEqual([
+        'details.documentType must be one of CI, NIT, CE, PP',
+        'details.documentType is required',
+      ]);
+    }
+  });
+
+  it('takes an account number of 6 to 20 digits only', () => {
+    expect(check({ ...valid, accountNumber: '123456' }).ok).toBe(true);
+    expect(check({ ...valid, accountNumber: '1'.repeat(20) }).ok).toBe(true);
+    for (const accountNumber of ['12345', '1'.repeat(21), '12345A789', '1234/5678']) {
+      expect(errorsOf({ ...valid, accountNumber }), accountNumber).toEqual([
+        'details.accountNumber must be 6 to 20 digits',
+      ]);
+    }
+  });
+
+  it('takes a document number of 5 to 15 letters or digits only', () => {
+    expect(check({ ...valid, documentNumber: '12345' }).ok).toBe(true);
+    expect(check({ ...valid, documentNumber: 'A'.repeat(15) }).ok).toBe(true);
+    for (const documentNumber of ['1234', 'A'.repeat(16), '1234567/1A', '12345_67', 'Ñ12345']) {
+      expect(errorsOf({ ...valid, documentNumber }), documentNumber).toEqual([
+        'details.documentNumber must be 5 to 15 letters or digits',
+      ]);
+    }
+  });
+
+  it('refuses another currency and fields it does not declare', () => {
+    expect(validateRailDetails('bo_bank_transfer', 'ARS', valid)).toEqual({
+      ok: false,
+      errors: ['rail bo_bank_transfer pays in BOB, not ARS'],
+    });
+    expect(errorsOf({ ...valid, cbu: '2850590940090418135201' })).toEqual([
+      'details.cbu is not a field of this rail',
+    ]);
+  });
+
+  it('summarises with the bank and the masked account', () => {
+    expect(P2P_RAILS.bo_bank_transfer.summary({ ...valid, accountNumber: '4010123456' })).toBe(
+      'Banco Unión ••••3456',
+    );
+  });
+});

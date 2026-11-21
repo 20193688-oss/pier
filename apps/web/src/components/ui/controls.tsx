@@ -1,12 +1,15 @@
 /* Form controls with their label, hint and error wired for assistive tech (the error replaces the
    hint and marks the control invalid). */
 import {
+  useEffect,
   useId,
+  useRef,
   type InputHTMLAttributes,
   type ReactNode,
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react';
+import { useToast } from '@/components/ui/Toast';
 
 interface FieldFrame {
   label: ReactNode;
@@ -199,10 +202,14 @@ export function Notice({
   tone = 'info',
   children,
   className = '',
+  stay = false,
 }: {
   tone?: 'info' | 'error' | 'ok' | 'warn';
   children: ReactNode;
   className?: string;
+  /* An error that is a state of the screen (could not load, a QR not taken, a file missing
+     columns) stays on it as a line; any other error is only a toast. */
+  stay?: boolean;
 }) {
   const tones = {
     info: 'bg-info-soft text-info',
@@ -210,8 +217,28 @@ export function Notice({
     ok: 'bg-ok-soft text-ok',
     warn: 'bg-warn-soft text-warn',
   } as const;
+  // An error comes up as a toast each time its words change (src/components/ui/Toast.tsx): the
+  // toast is what the person reads, and announces it, unless the line stays on screen too.
+  const inline = tone !== 'error' || stay;
+  const toast = useToast();
+  const line = useRef<HTMLParagraphElement>(null);
+  const words = useRef<HTMLSpanElement>(null);
+  const said = useRef('');
+  useEffect(() => {
+    if (tone !== 'error') return;
+    const text = (line.current ?? words.current)?.textContent?.trim() ?? '';
+    if (text && text !== said.current) toast(text, 'error', { silent: inline });
+    said.current = text;
+  });
+  if (!inline)
+    return (
+      <span ref={words} hidden>
+        {children}
+      </span>
+    );
   return (
     <p
+      ref={line}
       role={tone === 'error' ? 'alert' : 'status'}
       className={`rounded-[12px] px-3.5 py-2.5 text-[0.9375rem] ${tones[tone]} ${className}`}
     >

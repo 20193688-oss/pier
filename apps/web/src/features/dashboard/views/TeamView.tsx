@@ -16,6 +16,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useDash } from '@/features/dashboard/context';
 import { LoadState, PageHead, useLoad } from '@/features/dashboard/ui';
 import { grantableRoles, isMemberAddress } from '@/features/dashboard/views/admin-model';
+import { useGuard } from '@/lib/use-action';
 
 export function TeamView() {
   const { t, lang } = useI18n();
@@ -31,35 +32,38 @@ export function TeamView() {
   const [error, setError] = useState('');
   const grantable = grantableRoles(org.role);
 
-  const changeRole = async (member: Member, role: Role) => {
-    setError('');
-    try {
-      const next = await orgsApi.updateMember(org.id, member.id, { role });
-      load.setData((list) =>
-        list?.map((x) => (x.id === member.id ? { ...x, role: next.role || role } : x)),
-      );
-      toast(m.roleChanged);
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-      load.reload();
-    }
-  };
+  const guard = useGuard();
+  const changeRole = (member: Member, role: Role) =>
+    guard(async () => {
+      setError('');
+      try {
+        const next = await orgsApi.updateMember(org.id, member.id, { role });
+        load.setData((list) =>
+          list?.map((x) => (x.id === member.id ? { ...x, role: next.role || role } : x)),
+        );
+        toast(m.roleChanged);
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+        load.reload();
+      }
+    });
 
-  const remove = async (member: Member) => {
-    setBusy(true);
-    setError('');
-    try {
-      await orgsApi.removeMember(org.id, member.id);
-      toast(m.removed);
-      setRemoving(null);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-      setRemoving(null);
-    } finally {
-      setBusy(false);
-    }
-  };
+  const remove = (member: Member) =>
+    guard(async () => {
+      setBusy(true);
+      setError('');
+      try {
+        await orgsApi.removeMember(org.id, member.id);
+        toast(m.removed);
+        setRemoving(null);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+        setRemoving(null);
+      } finally {
+        setBusy(false);
+      }
+    });
 
   return (
     <>
@@ -193,20 +197,22 @@ function AddMember({
   const [error, setError] = useState('');
   const addressError = touched && !isMemberAddress(address) ? m.addressError : null;
 
-  const submit = async () => {
-    setTouched(true);
-    if (!isMemberAddress(address) || !grantable.includes(role)) return;
-    setBusy(true);
-    setError('');
-    try {
-      await orgsApi.addMember(org.id, { address: address.trim(), role });
-      onAdded();
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const submit = () =>
+    guard(async () => {
+      setTouched(true);
+      if (!isMemberAddress(address) || !grantable.includes(role)) return;
+      setBusy(true);
+      setError('');
+      try {
+        await orgsApi.addMember(org.id, { address: address.trim(), role });
+        onAdded();
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+      } finally {
+        setBusy(false);
+      }
+    });
 
   return (
     <Dialog

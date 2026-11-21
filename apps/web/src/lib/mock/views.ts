@@ -1,6 +1,6 @@
 /* How the mock API shows an order to each side, and which orders are the app user's own. */
 import { parseEmv } from '@midpoint/payment-qr';
-import { db, pub, tick, type Wire } from '@/lib/mock/db';
+import { chatSummary, db, pub, tick, type Wire } from '@/lib/mock/db';
 
 /** A QR payment's QR as its merchant sees it, only while the order is live. */
 export function qrView(o: Wire) {
@@ -20,7 +20,7 @@ export function qrView(o: Wire) {
 }
 
 export function orderView(o: Wire, role: 'client' | 'merchant') {
-  const v = pub(tick(o));
+  const v = { ...pub(tick(o)), chat: chatSummary(o.id) };
   if (role === 'merchant')
     return {
       ...v,

@@ -8,6 +8,7 @@ import { loadConfig } from '@/config/env';
 import {
   DevApi,
   devChain,
+  devDollar,
   keypair,
   localApiEnv,
   newDevAccounts,
@@ -73,6 +74,8 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
   let seed: SeedResult;
   let user: Keypair;
   let userSession: string;
+  /** The market's dollar: Circle's USDC on testnet, the stack's TUSD on the local network. */
+  let dollar: string;
 
   type Order = { id: string; status: string; [k: string]: unknown };
   const order = (session: string, id: string) =>
@@ -95,6 +98,7 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
     }
     accounts = newDevAccounts();
     const market = await setUpDevMarket(chain, accounts);
+    dollar = devDollar(chain, market).symbol;
     const env = localApiEnv({
       // A placeholder: the app below listens on a free port.
       port: 4999,
@@ -134,7 +138,7 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
       'POST',
       '/v1/app/activate',
       session,
-      { token: 'TUSD' },
+      { token: dollar },
     );
     await signAndSubmit(api, session, 'app', transaction, friend, chain.passphrase);
     const after = await api.call<{
@@ -144,9 +148,9 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
     }>('GET', '/v1/app/balances', session);
     expect(after.account.exists).toBe(true);
     expect(after.xlm).toBe('0');
-    expect(after.tokens.find((t) => t.symbol === 'TUSD')?.trustline).toBe(true);
+    expect(after.tokens.find((t) => t.symbol === dollar)?.trustline).toBe(true);
     const again = await api.call<{ transaction: unknown }>('POST', '/v1/app/activate', session, {
-      token: 'TUSD',
+      token: dollar,
     });
     expect(again.transaction).toBeNull();
 
@@ -158,7 +162,7 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
       transaction: { xdr: string; network: string };
     }>('POST', '/v1/app/transfers', userSession, {
       to: `@${handle}`,
-      token: 'TUSD',
+      token: dollar,
       amount: (2n * U).toString(),
       note: 'empanadas',
     });
@@ -189,7 +193,7 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
       {
         side: 'BUY',
         network: chain.network,
-        token: 'TUSD',
+        token: dollar,
         currency: 'ARS',
         rail: 'ar_bank_transfer',
         fiatAmount: '12500',
@@ -214,7 +218,7 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
     const quote = await api.call<{ id: string }>('POST', '/v1/app/quotes', userSession, {
       side: 'SELL',
       network: chain.network,
-      token: 'TUSD',
+      token: dollar,
       currency: 'ARS',
       rail: 'ar_bank_transfer',
       fiatAmount: '11800',
@@ -251,7 +255,7 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
       'POST',
       '/v1/app/quotes',
       userSession,
-      { kind: 'QR_PAY', network: chain.network, token: 'TUSD', qr },
+      { kind: 'QR_PAY', network: chain.network, token: dollar, qr },
     );
     expect(quote).toMatchObject({ kind: 'QR_PAY', qr: { merchantName: 'PANADERIA SALTENA' } });
     const created = await api.call<Order & { transactions: { xdr: string; network: string }[] }>(
@@ -297,7 +301,7 @@ describe.skipIf(NETWORK !== 'testnet' && NETWORK !== 'local')('the market on Ste
     const paid = await api.call<{
       payment: { id: string; status: string };
       transaction: { xdr: string; network: string };
-    }>('POST', `/v1/app/charges/${seed.charge.id}/payments`, userSession, { token: 'TUSD' });
+    }>('POST', `/v1/app/charges/${seed.charge.id}/payments`, userSession, { token: dollar });
     expect(paid.payment.status).toBe('PENDING');
     await signAndSubmit(api, userSession, 'app', paid.transaction, user, chain.passphrase);
     const asBusiness = await until(

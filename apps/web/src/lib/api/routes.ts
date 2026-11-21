@@ -60,6 +60,11 @@ export const ROUTES = {
   appOrderAction: (id: string, action: 'paid' | 'cancel' | 'dispute') =>
     `/v1/app/orders/${enc(id)}/${action}`,
   appOrderTransactions: (id: string) => `/v1/app/orders/${enc(id)}/transactions`,
+  /* An order's chat: the app wallet's, an integrator's (creator) or the merchant's side. */
+  orderMessages: (scope: 'app' | 'org' | 'merchant', id: string) =>
+    `${scope === 'app' ? '/v1/app/orders' : scope === 'org' ? '/v1/p2p/orders' : '/v1/p2p/merchant/orders'}/${enc(id)}/messages`,
+  orderMessageAttachment: (scope: 'app' | 'org' | 'merchant', id: string, messageId: string) =>
+    `${scope === 'app' ? '/v1/app/orders' : scope === 'org' ? '/v1/p2p/orders' : '/v1/p2p/merchant/orders'}/${enc(id)}/messages/${enc(messageId)}/attachment`,
   // Development only (the local network): the merchant bot's part of a purchase, simulated.
   devSimulateTransfer: (id: string) => `/v1/dev/orders/${enc(id)}/simulate-transfer`,
 

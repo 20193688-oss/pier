@@ -9,7 +9,9 @@ import {
   fetchTransport,
   itemOf,
   listOf,
+  request,
   setTransport,
+  setUnauthorizedHandler,
   type ApiRequest,
 } from '@/lib/api/client';
 import { apiKeys, auth, checkout, market, trade, webhooks } from '@/lib/api/endpoints';
@@ -394,4 +396,62 @@ test('app calls: handles resolve or are null, transfers carry base units and the
     note: 'Café',
   });
   assert.equal(await app.activate('testnet', 'USDC'), null, 'nothing to activate');
+});
+
+test('a write asked again while the first is in flight goes out once; reads and later writes do not', async () => {
+  const seen: string[] = [];
+  // The writes wait until let go, in the order they went out.
+  const waiting: (() => void)[] = [];
+  const open = () => waiting.splice(0).forEach((r) => r());
+  setTransport(async (req) => {
+    seen.push(`${req.method} ${req.path} ${JSON.stringify(req.body ?? null)}`);
+    if (req.method === 'POST') await new Promise<void>((r) => waiting.push(r));
+    return { status: 200, json: { ok: seen.length } };
+  });
+  const body = { action: 'release' };
+  // A double tap: two identical writes at once share one request and one answer.
+  const a = request({ method: 'POST', path: '/v1/app/orders/o1/transactions', body });
+  const b = request({ method: 'POST', path: '/v1/app/orders/o1/transactions', body });
+  assert.equal(a, b, 'the same promise');
+  // Another write (another body) is its own request.
+  const c = request({
+    method: 'POST',
+    path: '/v1/app/orders/o1/transactions',
+    body: { action: 'dispute' },
+  });
+  // Reads are never shared.
+  await Promise.all([
+    request({ method: 'GET', path: '/v1/app/orders/o1' }),
+    request({ method: 'GET', path: '/v1/app/orders/o1' }),
+  ]);
+  await new Promise((r) => setTimeout(r, 0));
+  open();
+  await Promise.all([a, b, c]);
+  assert.equal(seen.filter((x) => x.includes('release')).length, 1);
+  assert.equal(seen.filter((x) => x.includes('dispute')).length, 1);
+  assert.equal(seen.filter((x) => x.startsWith('GET')).length, 2);
+  // Once answered, the same write may go out again (a deliberate retry).
+  const d = request({ method: 'POST', path: '/v1/app/orders/o1/transactions', body });
+  await new Promise((r) => setTimeout(r, 0));
+  open();
+  await d;
+  assert.equal(seen.filter((x) => x.includes('release')).length, 2);
+});
+
+test("a 401 from any screen's call tells the session; sign-in's own routes do not", async () => {
+  let told = 0;
+  setUnauthorizedHandler(() => told++);
+  setTransport(async () => ({ status: 401, json: { error: { code: 'unauthenticated' } } }));
+  try {
+    await assert.rejects(() => request({ method: 'GET', path: '/v1/app/activity' }));
+    assert.equal(told, 1);
+    await assert.rejects(() => request({ method: 'GET', path: '/v1/auth/session' }));
+    await assert.rejects(() => request({ method: 'POST', path: '/v1/auth/verify', body: {} }));
+    assert.equal(told, 1, 'sign-in answers its own 401s');
+    setTransport(async () => ({ status: 403, json: {} }));
+    await assert.rejects(() => request({ method: 'GET', path: '/v1/app/activity' }));
+    assert.equal(told, 1, 'only a 401');
+  } finally {
+    setUnauthorizedHandler(null);
+  }
 });

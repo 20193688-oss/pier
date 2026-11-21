@@ -8,6 +8,7 @@
    (src/lib/p2p/checkout.ts). */
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
+import { isPayer, recall, recallEmail, remember, rememberEmail } from '@/lib/app/remember';
 import { fmt, useDocumentMeta, useI18n } from '@/i18n';
 import { checkout } from '@/lib/api/endpoints';
 import { ApiError } from '@/lib/api/client';
@@ -23,6 +24,7 @@ import { Icon } from '@/components/ui/Icon';
 import { CopyRow, figureSize, useNow } from '@/components/ui/misc';
 import { accountRows, errorText, railName } from '@/components/p2p/parts';
 import { LangToggle, ThemeToggle } from '@/components/layout/SiteFrame';
+import { useGuard } from '@/lib/use-action';
 
 export default function ChargePage() {
   const { t, lang } = useI18n();
@@ -56,16 +58,16 @@ export default function ChargePage() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <header className="mx-auto flex w-full max-w-xl items-center justify-between px-4 py-4">
+      <header className="mx-auto flex w-full max-w-xl items-center justify-between px-6 py-4">
         <Link to="/" aria-label={t.common.nav.home} className="rounded-[10px]">
-          <Logo size={26} />
+          <Logo size={20} />
         </Link>
         <div className="flex items-center gap-1">
           <LangToggle />
           <ThemeToggle />
         </div>
       </header>
-      <main id="main" className="mx-auto w-full max-w-xl flex-1 px-4 pb-16">
+      <main id="main" className="mx-auto w-full max-w-xl flex-1 px-6 pb-16">
         {charge === undefined && !loadError && (
           <div className="slip flex flex-col gap-4 p-6" aria-busy="true">
             <Skeleton className="h-5 w-1/3" />
@@ -75,7 +77,7 @@ export default function ChargePage() {
         )}
         {loadError && (
           <div className="slip flex flex-col items-start gap-3 p-6">
-            <Notice tone="error">{loadError}</Notice>
+            <Notice tone="error" stay>{loadError}</Notice>
             <button type="button" className="btn btn-line" onClick={load}>
               {t.common.actions.retry}
             </button>
@@ -166,11 +168,16 @@ function PayerForm({
   const c = t.charge;
   const p = t.p2p;
   const rails = accountRails(charge.rails);
-  const [form, setForm] = useState({
-    name: '',
-    document: '',
-    email: '',
-    rail: rails[0] ?? '',
+  // Filled in as this device last sent them (src/lib/app/remember): the payer for this currency and
+  // the email last used.
+  const [form, setForm] = useState(() => {
+    const known = recall(`payer.${charge.currency}`, isPayer);
+    return {
+      name: known?.name ?? '',
+      document: known?.document ?? '',
+      email: recallEmail() ?? '',
+      rail: rails[0] ?? '',
+    };
   });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
@@ -183,27 +190,34 @@ function PayerForm({
   const show = (k: keyof typeof errors) => (touched[k] ? errors[k] : null);
   const leave = (k: string) => () => setTouched((x) => ({ ...x, [k]: true }));
 
-  const submit = async () => {
-    setTouched({ name: true, document: true, email: true });
-    if (Object.values(errors).some(Boolean) || !form.rail) {
-      setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(), 0);
-      return;
-    }
-    setBusy(true);
-    setError('');
-    try {
-      const { order, payerToken } = await checkout.open(charge.id, form);
-      onOpened({ orderId: order.id, payerToken });
-    } catch (e) {
-      setError(
-        e instanceof ApiError && e.code === 'charge_busy'
-          ? c.payer.busy
-          : errorMessage(t.common, e, c.payer.failed),
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const submit = () =>
+    guard(async () => {
+      setTouched({ name: true, document: true, email: true });
+      if (Object.values(errors).some(Boolean) || !form.rail) {
+        setTimeout(() => document.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus(), 0);
+        return;
+      }
+      setBusy(true);
+      setError('');
+      try {
+        const { order, payerToken } = await checkout.open(charge.id, form);
+        remember(`payer.${charge.currency}`, {
+          name: form.name.trim(),
+          document: form.document.trim(),
+        });
+        rememberEmail(form.email);
+        onOpened({ orderId: order.id, payerToken });
+      } catch (e) {
+        setError(
+          e instanceof ApiError && e.code === 'charge_busy'
+            ? c.payer.busy
+            : errorMessage(t.common, e, c.payer.failed),
+        );
+      } finally {
+        setBusy(false);
+      }
+    });
 
   if (!rails.length)
     return (
@@ -317,6 +331,7 @@ function PayerOrder({
   }, [session]);
 
   const now = useNow(!!order && !isTerminal(order.status));
+  const guard = useGuard();
 
   if (order === undefined || (order && order.status === 'pending'))
     return (
@@ -335,24 +350,25 @@ function PayerOrder({
       </div>
     );
 
-  const act = async (action: 'paid' | 'cancel') => {
-    setBusy(true);
-    setError('');
-    try {
-      setOrder(
-        action === 'paid'
-          ? await checkout.paid(order.id, session.payerToken, reference)
-          : await checkout.cancel(order.id, session.payerToken),
-      );
-      setConfirmCancel(false);
-    } catch (e) {
-      setError(
-        errorMessage(t.common, e, action === 'paid' ? c.transfer.failed : c.transfer.cancelFailed),
-      );
-    } finally {
-      setBusy(false);
-    }
-  };
+  const act = (action: 'paid' | 'cancel') =>
+    guard(async () => {
+      setBusy(true);
+      setError('');
+      try {
+        setOrder(
+          action === 'paid'
+            ? await checkout.paid(order.id, session.payerToken, reference)
+            : await checkout.cancel(order.id, session.payerToken),
+        );
+        setConfirmCancel(false);
+      } catch (e) {
+        setError(
+          errorMessage(t.common, e, action === 'paid' ? c.transfer.failed : c.transfer.cancelFailed),
+        );
+      } finally {
+        setBusy(false);
+      }
+    });
 
   if (order.status === 'awaiting_payment') {
     const left = msLeft(order.payBy, now);

@@ -29,6 +29,8 @@ const trade: typeof es = {
   merchant: 'Merchant',
   validFor: 'Price valid for {time}',
   refreshing: 'Updating the price…',
+  priceUpdated: 'The price was updated: 1 {token} = {price} {currency} (was {before}).',
+  priceUpdatedConfirm: 'The price was updated. Check the new amount and confirm again.',
   quoteUntrusted:
     'This price comes with terms we cannot check, so we do not use it. Try another amount.',
   quoteFailed: 'No merchant can take this amount right now. Try another amount or payment method.',
@@ -40,6 +42,7 @@ const trade: typeof es = {
     badAmount: 'Use at most {n} decimals',
     method: 'Choose a payment method',
     quoting: 'Getting a price…',
+    sessionEnded: 'Your session ended',
     noQuote: 'No price for this amount',
     continue: 'Continue',
   },
@@ -59,8 +62,15 @@ const trade: typeof es = {
     body: 'The merchant checks that the transfer comes from this person. Use an account in your name.',
     name: 'Full name',
     document: 'ID number',
-    documentHint: 'DNI or CUIT, CPF, RFC or CURP, cédula, RUT: your country’s.',
+    documentHint: 'CI or NIT, DNI or CUIT, CPF, RFC or CURP, cédula, RUT: your country’s.',
     receiveTo: 'USDC arrives in',
+  },
+  other: {
+    title: 'Which account it goes to',
+    body: 'The account of the person who receives it and their name. The merchant transfers there and sends you the receipt.',
+    theyReceive: 'They receive',
+    youSend: 'You send',
+    receiveIn: 'They receive by',
   },
   seller: {
     title: 'Where you receive the money',
@@ -73,6 +83,7 @@ const trade: typeof es = {
     pay: 'You pay',
     sell: 'You sell',
     receive: 'You receive',
+    receives: '{name} receives',
     merchant: 'Merchant',
     network: 'Network',
     method: 'Payment method',
@@ -95,9 +106,13 @@ const trade: typeof es = {
       'The merchant checks your transfer and releases the USDC to your wallet. This page updates on its own.',
     waitingMerchant: 'Waiting for a merchant to accept the order.',
     merchantPaying: 'The merchant is sending {amount} {currency} to your account.',
+    merchantPayingOther: 'The merchant is sending {amount} {currency} to {name}.',
     confirmTitle: 'Check your account',
+    confirmTitleOther: 'Confirm it arrived',
     confirmBody:
       'The merchant marked it paid. Release the USDC only once {amount} {currency} is in your account.',
+    confirmBodyOther:
+      'The merchant marked it paid and left the receipt in the chat. Release the USDC once {name} confirms they received {amount} {currency}.',
     release: 'Release {token}',
     sign: 'Lock your USDC in the order',
     signBody:

@@ -6,13 +6,25 @@
  *   2. Stellar: the local quickstart network (`stellar container start
  *      local`) when a Docker daemon answers, else testnet with friendbot.
  *   3. Dev accounts (owner, arbiter, treasury, matcher, sponsor, SEP-10 signer,
- *      merchant, business, user, TUSD issuer), the dev dollar TUSD minted, and
- *      the market deployed (first run, --reset, or when the network lost it).
+ *      merchant, business, user, TUSD issuer) and the market deployed (first
+ *      run, --reset, or when the network lost it).
  *   4. The API (matcher, indexer, expiry, submission and webhook jobs on),
  *      seeded through its own routes: a merchant with liquidity, offers (QR
- *      payments included) and payment methods, a business with a test API key
- *      and a charge, and the user's account activated by the sponsor.
+ *      payments included) and payment methods (Bolivia first), a business with
+ *      a test API key and a charge in bolivianos, and the user's account
+ *      activated by the sponsor. On testnet the market lists Circle's USDC
+ *      (bought with test lumens on the DEX) and the native lumen (XLM); the
+ *      local network, which has no Circle, lists the dev dollar TUSD (minted)
+ *      and XLM. A restart syncs an existing seed (what it lacks is added,
+ *      offers in a token no longer listed are deactivated).
  *   5. The web app, when apps/web has a `dev` script.
+ *   6. Three automated test merchants (Andes Cambio, Pampa Pagos, Río
+ *      Express), set up through the API on the first run and reused after,
+ *      each run by a simulated-merchant bot (the SDK's) that accepts, marks
+ *      paid and releases its orders a few seconds later; and live prices:
+ *      every minute the four merchants' offers are repriced from mainnet
+ *      references (CriptoYa, an FX fallback, and the XLM/USDC book on the
+ *      public Horizon), each merchant with its own spread.
  *
  * State persists in .dev-stack/ (a restart resumes); `--reset` starts over.
  * Stop with Ctrl+C, or from another terminal with `npm run dev:stack -- --stop`.
@@ -35,12 +47,18 @@ import {
 } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import type { DevAccounts, DevChain, DevMarket, SeedResult } from '@midpoint/api/dev';
+import type { BotMerchant, DevAccounts, DevChain, DevMarket, SeedResult } from '@midpoint/api/dev';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STATE_DIR = join(ROOT, '.dev-stack');
 const STOP_FILE = join(STATE_DIR, 'stop');
 const STACK_FILE = join(STATE_DIR, 'stack.json');
+/** The automated test merchants' keys and set-up progress (test keys). */
+const MERCHANTS_FILE = join(STATE_DIR, 'merchants.json');
+/** How often the merchants' offers are repriced from the live references. */
+const PRICE_EVERY_MS = 60_000;
+/** The SDK's simulated merchant: one process per automated test merchant. */
+const BOT_ENTRY = join(ROOT, 'packages', 'sdk', 'dist', 'bot', 'simulated-merchant.js');
 
 const args = process.argv.slice(2);
 const flags = new Set(args.filter((a) => a.startsWith('--')));
@@ -146,7 +164,7 @@ async function main(): Promise<void> {
   rmSync(STOP_FILE, { force: true });
 
   if (!flags.has('--no-build')) {
-    log('building contracts, payment-qr and the API');
+    log('building contracts, payment-qr, the API and the SDK (its simulated merchant)');
     run('npm', [
       'run',
       'build',
@@ -156,6 +174,8 @@ async function main(): Promise<void> {
       '@midpoint/payment-qr',
       '-w',
       '@midpoint/api',
+      '-w',
+      '@midpoint/sdk',
     ]);
   }
   const dev = await import('@midpoint/api/dev');
@@ -173,6 +193,7 @@ async function main(): Promise<void> {
   if (flags.has('--reset')) {
     log('--reset: starting over');
     rmSync(STACK_FILE, { force: true });
+    rmSync(MERCHANTS_FILE, { force: true });
   }
   let state: StackState | null = existsSync(STACK_FILE)
     ? (JSON.parse(readFileSync(STACK_FILE, 'utf8')) as StackState)
@@ -244,12 +265,16 @@ async function main(): Promise<void> {
 
   let api: ChildProcess | undefined;
   let web: ChildProcess | undefined;
+  const bots = new Map<string, ChildProcess>();
   let stopping = false;
   let watcher: NodeJS.Timeout | undefined;
+  let prices: NodeJS.Timeout | undefined;
   const shutdown = async (reason: string, code = 0) => {
     if (stopping) return;
     stopping = true;
     log(`stopping (${reason})`);
+    if (prices) clearInterval(prices);
+    await Promise.all([...bots.values()].map((bot) => stopChild(bot, false)));
     await stopChild(web, true);
     await stopChild(api, false);
     await stopPostgres().catch((err: unknown) => log(`Postgres stop: ${String(err)}`));
@@ -274,6 +299,14 @@ async function main(): Promise<void> {
     const accounts = state?.accounts ?? dev.newDevAccounts();
     const market =
       state?.market ?? (await dev.setUpDevMarket(chain, accounts, { log: (m) => log(m) }));
+    // A market deployed before XLM was listed: its owner allows the native lumen's SAC now,
+    // before the API checks which tokens the contract allows.
+    await dev.allowNativeToken(chain, accounts.owner, market.contract).then(
+      (changed) => {
+        if (changed) log('the market now allows the native lumen (XLM)');
+      },
+      (err: unknown) => log(`XLM could not be allowed on the market (left out): ${String(err)}`),
+    );
     const dataEncryptionKey = state?.dataEncryptionKey ?? randomBytes(32).toString('hex');
     const env = dev.localApiEnv({
       port: API_PORT,
@@ -323,9 +356,8 @@ async function main(): Promise<void> {
       writeFileSync(STACK_FILE, JSON.stringify(state, null, 2));
     } else {
       seed = state.seed;
-      const n = await dev.refreshDevPrices(API_URL, WEB_ORIGIN, seed.merchant.apiKey);
-      log(`resumed; refreshed ${n} offer prices`);
     }
+    const resumed = !fresh;
 
     const webPackage = join(ROOT, 'apps', 'web', 'package.json');
     const webDev =
@@ -359,8 +391,149 @@ async function main(): Promise<void> {
       pipeOutput(web, 'web');
     }
 
+    watcher = setInterval(() => {
+      if (existsSync(STOP_FILE)) void shutdown('stop requested');
+      if (api && api.exitCode !== null) void shutdown(`the API exited with ${api.exitCode}`, 1);
+    }, 1_000);
+
+    if (resumed) {
+      // A stack seeded earlier catches up (idempotent): what the seeded merchant lacks, its
+      // offers in a token no longer listed deactivated, its liquidity, the user's dollars and
+      // the charge's token. The web is already up meanwhile.
+      try {
+        const synced = await dev.syncDevSeed({
+          apiUrl: API_URL,
+          webOrigin: WEB_ORIGIN,
+          chain,
+          market,
+          accounts,
+          seed,
+          log: (m) => log(m),
+        });
+        if (synced !== seed) {
+          seed = synced;
+          writeFileSync(
+            STACK_FILE,
+            JSON.stringify({ chain, accounts, market, dataEncryptionKey, seed }, null, 2),
+          );
+        }
+      } catch (err) {
+        log(`the seed could not be synced (a restart retries): ${String(err)}`);
+      }
+      const n = await dev.refreshDevPrices(API_URL, WEB_ORIGIN, seed.merchant.apiKey);
+      log(`resumed; refreshed ${n} offer prices`);
+    }
+
+    // --- live prices and the automated test merchants ----------------------------
+    const plog = (m: string) => console.log(`[prices] ${m}`);
+    const mlog = (m: string) => console.log(`[merchants] ${m}`);
+    const feed = new dev.PriceFeed({ log: plog });
+    await feed.refresh();
+    plog(feed.describe());
+    const previous = existsSync(MERCHANTS_FILE)
+      ? (JSON.parse(readFileSync(MERCHANTS_FILE, 'utf8')) as BotMerchant[])
+      : null;
+    if (!previous || !previous.every(dev.botMerchantReady)) {
+      mlog('setting up the automated test merchants (on testnet the first run takes minutes)');
+    }
+    const merchants = await dev
+      .setUpBotMerchants({
+        apiUrl: API_URL,
+        webOrigin: WEB_ORIGIN,
+        chain,
+        market,
+        accounts,
+        feed,
+        previous,
+        freshDatabase: fresh,
+        save: (list) => writeFileSync(MERCHANTS_FILE, JSON.stringify(list, null, 2)),
+        log: mlog,
+      })
+      .catch((err: unknown): BotMerchant[] => {
+        mlog(`not set up (the stack runs without them; a restart retries): ${String(err)}`);
+        return [];
+      });
+    const ready = merchants.filter(dev.botMerchantReady);
+    if (stopping) return;
+
+    const startBot = (m: BotMerchant): void => {
+      if (stopping || !m.api) return;
+      const bot = spawn(process.execPath, [BOT_ENTRY], {
+        cwd: ROOT,
+        env: {
+          ...process.env,
+          MIDPOINT_API_URL: API_URL,
+          MIDPOINT_API_KEY: m.api.apiKey,
+          BOT_SECRET: m.secret,
+          MARKET_CONTRACT: `${chain.network}=${market.contract}`,
+          BOT_NAME: m.displayName,
+          PAY_DELAY_SECONDS: '5',
+          RELEASE_DELAY_SECONDS: '5',
+          POLL_SECONDS: '3',
+        },
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+      });
+      pipeOutput(bot, `bot-${m.slug}`);
+      bots.set(m.slug, bot);
+      bot.once('exit', (exitCode) => {
+        if (stopping) return;
+        mlog(`${m.displayName}'s bot exited (${exitCode}): restarting it in 5 s`);
+        setTimeout(() => startBot(m), 5_000);
+      });
+    };
+    if (!existsSync(BOT_ENTRY)) {
+      mlog(`no bots: ${BOT_ENTRY} is missing (build the SDK: npm run build -w @midpoint/sdk)`);
+    } else {
+      for (const m of ready) startBot(m);
+    }
+
+    // Every minute: read the references again, then reprice the four merchants' offers.
+    const priced = [
+      {
+        name: 'Pampa Cambio (seeded)',
+        apiKey: seed.merchant.apiKey,
+        spreadBps: dev.SEEDED_MERCHANT_SPREAD_BPS,
+      },
+      ...ready.map((m) => ({
+        name: m.displayName,
+        apiKey: m.api?.apiKey ?? '',
+        spreadBps: m.spreadBps,
+      })),
+    ];
+    const priceApi = new dev.DevApi(API_URL, WEB_ORIGIN);
+    let pricing = false;
+    const reprice = async (refresh: boolean): Promise<void> => {
+      if (pricing || stopping) return;
+      pricing = true;
+      try {
+        if (refresh) await feed.refresh();
+        const total = { priced: 0, kept: 0, failed: 0 };
+        for (const p of priced) {
+          const r = await dev
+            .refreshOfferPrices(priceApi, p.apiKey, feed, p.spreadBps)
+            .catch((err: unknown) => {
+              plog(`${p.name}: offers not repriced: ${String(err)}`);
+              return { priced: 0, kept: 0, failed: 1 };
+            });
+          total.priced += r.priced;
+          total.kept += r.kept;
+          total.failed += r.failed;
+        }
+        plog(
+          `${feed.describe()} | ${total.priced} offers repriced, ${total.kept} kept, ${total.failed} failed`,
+        );
+      } finally {
+        pricing = false;
+      }
+    };
+    await reprice(false);
+    prices = setInterval(() => void reprice(true), PRICE_EVERY_MS);
+
     const explorer =
       chain.network === 'testnet' ? 'https://stellar.expert/explorer/testnet' : '(none on local)';
+    const dollar = dev.devDollar(chain, market);
+    const percent = (bps: number) => `${(bps / 100).toFixed(2)} %`;
     const lines = [
       '',
       '================ Midpoint dev stack ================',
@@ -371,17 +544,37 @@ async function main(): Promise<void> {
       `Stellar        ${chain.network}   RPC ${chain.rpcUrl}`,
       `Explorer       ${explorer}`,
       `P2PMarket      ${market.contract}`,
-      `TUSD           ${market.tusd.code}:${market.tusd.issuer}  (SAC ${market.tusd.contract})`,
+      `${dollar.symbol.padEnd(15)}${dollar.asset.getCode()}:${dollar.asset.getIssuer()}  (SAC ${dollar.contract}; ${
+        dollar.source === 'dex'
+          ? "Circle's, bought with test lumens on the DEX"
+          : 'the dev dollar, minted'
+      })`,
+      'XLM            the native lumen, through its SAC (no trustline)',
+      `Prices         live mainnet references; offers repriced every ${PRICE_EVERY_MS / 1000} s`,
       '',
       'API keys (test tier):',
       `  merchant  ${seed.merchant.apiKey}`,
       `  business  ${seed.business.apiKey}`,
+      ...ready.map((m) => `  ${m.slug.padEnd(8)}  ${m.api?.apiKey ?? ''}`),
+      '',
+      'Merchants (spread each way; the bots accept, mark paid and release 5 s later):',
+      `  Pampa Cambio   ${percent(dev.SEEDED_MERCHANT_SPREAD_BPS)}  the seeded "merchant" above, manual (npm run dev:simulate)`,
+      ...merchants.map(
+        (m) =>
+          `  ${m.displayName.padEnd(13)}  ${percent(m.spreadBps)}  ${m.publicKey}  ${m.secret}  ` +
+          (dev.botMerchantReady(m)
+            ? `bot on; liquidity ${Object.entries(m.liquidity ?? {})
+                .map(([symbol, units]) => `${(BigInt(units) / 10_000_000n).toString()} ${symbol}`)
+                .join(', ')}`
+            : 'set-up unfinished: restart the stack to resume it'),
+      ),
+      `  Their keys and set-up: ${MERCHANTS_FILE} (test keys, ${chain.network.toUpperCase()} ONLY)`,
       '',
       `Dev accounts (${chain.network.toUpperCase()} ONLY: these are test keys, never use them on mainnet):`,
       ...Object.values(accounts).map((a) => `  ${a.role.padEnd(9)} ${a.publicKey}  ${a.secret}`),
       '',
       'Sign in on the web with a dev key (the web’s dev-key wallet), e.g. the "user" secret above:',
-      'it holds TUSD, its account was created and its trustline opened by the sponsor.',
+      `it holds ${dollar.symbol}, its account was created and its trustline opened by the sponsor.`,
       '',
       'Simulate a bank transfer for an order:',
       `  npm run dev:simulate -- <orderId> --api ${API_URL}`,
@@ -391,11 +584,6 @@ async function main(): Promise<void> {
       '',
     ];
     console.log(lines.join('\n'));
-
-    watcher = setInterval(() => {
-      if (existsSync(STOP_FILE)) void shutdown('stop requested');
-      if (api && api.exitCode !== null) void shutdown(`the API exited with ${api.exitCode}`, 1);
-    }, 1_000);
   } catch (err) {
     console.error(err);
     await shutdown('error', 1);

@@ -26,7 +26,8 @@ async function emailCode(
 }
 
 /** Sign up (a new wallet) or sign in to the payments app as a demo persona (SEP-10 against the
-    mock API), skipping the handle offer unless asked to keep it. */
+    mock API), then keep the @handle the app suggests from the email (`<persona>`), unless the
+    test claims one itself. */
 export async function appSignIn(
   page: Page,
   lang: 'es' | 'en',
@@ -40,11 +41,13 @@ export async function appSignIn(
   const final = persona === 'fresh' ? w.signUp : w.signIn;
   await page.getByRole('button', { name: final, exact: true }).click();
   await emailCode(page, lang, persona, final);
-  if (!opts.keepHandleOffer && (opts.path ?? '/app') === '/app') {
-    const skip = page.getByRole('button', { name: lang === 'es' ? 'Ahora no' : 'Not now' });
-    await skip.click({ timeout: 15_000 });
+  if (opts.keepHandleOffer) return;
+  // Without an @handle the app asks for one next, filled in from the email: keep it.
+  await page
+    .getByRole('button', { name: lang === 'es' ? 'Guardar @usuario' : 'Save @handle' })
+    .click({ timeout: 15_000 });
+  if ((opts.path ?? '/app') === '/app')
     await expect(page.getByTestId('balance')).toBeVisible({ timeout: 15_000 });
-  }
 }
 
 /** Sign in on the dashboard's sign-in page as a demo persona. */
@@ -77,7 +80,7 @@ export function trackErrors(page: Page): string[] {
 /** A merchant QR the demo knows, built like the mock's (src/lib/mock/qr.ts). */
 export async function demoQr(
   page: Page,
-  which: 'cafe' | 'kiosk' | 'pix' = 'cafe',
+  which: 'cafe' | 'kiosk' | 'pix' | 'yape' = 'cafe',
 ): Promise<string> {
   // Imported inside the page from the dev server (mock mode serves the source).
   return page.evaluate(

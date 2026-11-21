@@ -20,9 +20,12 @@ export {
   DEV_ROLES,
   DEV_TOKEN_CODE,
   UNFUNDED_ROLES,
+  allowNativeToken,
   devChain,
   fund,
   keypair,
+  listsTusd,
+  marketBalanceOf,
   mintTusd,
   newDevAccounts,
   refuseMainnet,
@@ -38,13 +41,35 @@ export {
 export { localApiEnv } from '@/dev/local-env';
 export {
   DevApi,
-  refreshDevPrices,
+  organizationWithKey,
   registerAccount,
-  seedDevMarket,
   signAndSubmit,
   signIn,
   signXdr,
-  type SeedResult,
   type Submission,
+} from '@/dev/dev-api';
+export { devDollar, walletBalances, type DevDollar } from '@/dev/dev-dollars';
+export {
+  SEEDED_MERCHANT_NAME,
+  refreshDevPrices,
+  seedDevMarket,
+  syncDevSeed,
+  type SeedResult,
 } from '@/dev/seed';
 export { rpcFor, submitOps } from '@/chain/market-deploy';
+export {
+  PRICE_CURRENCIES,
+  PriceFeed,
+  offerPrice,
+  refreshOfferPrices,
+  type OfferRefresh,
+  type PriceSnapshot,
+} from '@/dev/price-feed';
+export {
+  BOT_MERCHANTS,
+  SEEDED_MERCHANT_SPREAD_BPS,
+  botMerchantReady,
+  setUpBotMerchants,
+  type BotMerchant,
+  type BotMerchantSlug,
+} from '@/dev/bot-merchants';

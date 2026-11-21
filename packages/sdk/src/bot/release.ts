@@ -9,7 +9,7 @@ import {
   type Transaction as StellarTransaction,
 } from '@stellar/stellar-sdk';
 import { unwrap, type MidpointClient } from '@/client';
-import type { Transaction, TransferMatch } from '@/types';
+import type { MerchantOrder, Transaction, TransferMatch } from '@/types';
 
 /**
  * The networks the bot signs for, with their passphrases pinned HERE (never
@@ -42,12 +42,26 @@ export interface ReleaseCheck {
   now?: number;
 }
 
-/** The one call the bot signs: `release(signer, id)` on `contract`, as an auth function. */
-function expectedAuthFunction(contract: string, signer: string, id: bigint): string {
+/**
+ * The market calls a merchant's bot signs on one order, each `fn(caller, id)`
+ * by the order's merchant: `accept` a sale or a QR payment (locks its bond
+ * from its balance), `mark_paid` once it paid the local money, `release` a
+ * purchase once the local money arrived.
+ */
+export const MERCHANT_ORDER_ACTIONS = ['accept', 'mark_paid', 'release'] as const;
+export type MerchantOrderAction = (typeof MERCHANT_ORDER_ACTIONS)[number];
+
+/** The one call the bot signs: `fn(signer, id)` on `contract`, as an auth function. */
+function expectedAuthFunction(
+  contract: string,
+  fn: MerchantOrderAction,
+  signer: string,
+  id: bigint,
+): string {
   return xdr.SorobanAuthorizedFunction.sorobanAuthorizedFunctionTypeContractFn(
     new xdr.InvokeContractArgs({
       contractAddress: new Address(contract).toScAddress(),
-      functionName: 'release',
+      functionName: fn,
       args: [new Address(signer).toScVal(), xdr.ScVal.scvU64(id)],
     }),
   ).toXdr('base64');
@@ -64,7 +78,25 @@ function expectedAuthFunction(contract: string, signer: string, id: bigint): str
  * sub-invocation could move the bot's tokens).
  */
 export function releaseProblem(match: TransferMatch, check: ReleaseCheck): string | null {
-  const { order, transaction } = match;
+  return orderActionProblem(match, 'release', check);
+}
+
+/**
+ * {@link releaseProblem} for any of the merchant's order calls
+ * ({@link MERCHANT_ORDER_ACTIONS}): the transaction must be exactly ONE
+ * `fn(<the bot's account>, <the order's on-chain id>)` on the bot's own market
+ * contract, under the same rules (source, memo, bounds, fee, auth with no
+ * sub-invocations).
+ */
+export function orderActionProblem(
+  subject: {
+    order: Pick<MerchantOrder, 'network' | 'onchainId'>;
+    transaction: Transaction;
+  },
+  fn: MerchantOrderAction,
+  check: ReleaseCheck,
+): string | null {
+  const { order, transaction } = subject;
   const network = BOT_NETWORKS[check.network];
   if (!network) return `the bot does not sign for the network ${check.network}`;
   if (network.tier !== check.tier) {
@@ -122,12 +154,12 @@ export function releaseProblem(match: TransferMatch, check: ReleaseCheck): strin
   }
   const args = call.args.map((a) => scValToNative(a) as unknown);
   if (
-    String(call.functionName) !== 'release' ||
+    String(call.functionName) !== fn ||
     args.length !== 2 ||
     args[0] !== check.signer ||
     args[1] !== id
   ) {
-    return `the call is not release(${check.signer}, ${order.onchainId})`;
+    return `the call is not ${fn}(${check.signer}, ${order.onchainId})`;
   }
   const auth = op.auth ?? [];
   if (auth.length > 1) return 'the call carries more than one authorization';
@@ -140,7 +172,7 @@ export function releaseProblem(match: TransferMatch, check: ReleaseCheck): strin
     if (root.subInvocations.length > 0) {
       return 'the authorization covers sub-invocations';
     }
-    if (root.function.toXdr('base64') !== expectedAuthFunction(contract, check.signer, id)) {
+    if (root.function.toXdr('base64') !== expectedAuthFunction(contract, fn, check.signer, id)) {
       return 'the authorization is for another call';
     }
   }

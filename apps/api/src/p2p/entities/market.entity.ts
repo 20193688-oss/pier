@@ -2,20 +2,22 @@ import { ApiProperty, ApiSchema } from '@nestjs/swagger';
 
 @ApiSchema({
   description:
-    'A stablecoin the P2P market trades on one network: a classic Stellar asset, used on-chain through its Stellar Asset Contract.',
+    'A token the P2P market trades on one network, used on-chain through its Stellar Asset Contract: a classic Stellar asset (a stablecoin such as USDC), or the native lumen (`XLM`, `issuer: null`, no trustline needed).',
 })
 export class TokenView {
   @ApiProperty({ example: 'USDC', description: 'Its symbol.' })
   symbol!: string;
 
-  @ApiProperty({ example: 'USDC', description: 'The asset code.' })
+  @ApiProperty({ example: 'USDC', description: 'The asset code (`XLM` for the native lumen).' })
   code!: string;
 
   @ApiProperty({
+    type: String,
+    nullable: true,
     example: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
-    description: 'The issuing account (G...).',
+    description: 'The issuing account (G...); null only for the native lumen (`XLM`).',
   })
-  issuer!: string;
+  issuer!: string | null;
 
   @ApiProperty({
     example: 'CBIELTK6YBZJU5UP2WWQEUCYKLPU6AUNZ2BQ4WWFEIE3USCIHMXQDAMA',
@@ -119,8 +121,18 @@ export class RailFieldView {
   })
   description!: string;
 
-  @ApiProperty({ example: false, description: 'Whether it must be given.' })
+  @ApiProperty({
+    example: false,
+    description: 'Whether a merchant’s payment method (`/v1/p2p/payment-methods`) must give it.',
+  })
   required!: boolean;
+
+  @ApiProperty({
+    example: false,
+    description:
+      'Whether an order’s beneficiary (a sale’s, a payout’s) must give it: as `required`, but the holder’s ID only where the rail’s transfer needs it.',
+  })
+  beneficiaryRequired!: boolean;
 
   @ApiProperty({
     type: [String],
@@ -155,6 +167,13 @@ export class RailView {
 
   @ApiProperty({ type: [RailFieldView] })
   fields!: RailFieldView[];
+
+  @ApiProperty({
+    example: false,
+    description:
+      'Whether an order’s beneficiary must give the holder’s ID (the beneficiary’s `document` and the ID fields): true only where the transfer system needs it (Chile, Colombia).',
+  })
+  beneficiaryIdRequired!: boolean;
 }
 
 @ApiSchema({

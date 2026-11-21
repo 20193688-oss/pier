@@ -122,7 +122,33 @@ export function errorFrom(
   );
 }
 
-export async function request<T = unknown>(req: ApiRequest): Promise<T> {
+/* Told of every 401 but sign-in's own (`/v1/auth/*`): the session provider renews the session
+   silently or ends it, whichever screen made the call (src/lib/session.tsx). */
+let onUnauthorized: (() => void) | null = null;
+export function setUnauthorizedHandler(fn: (() => void) | null) {
+  onUnauthorized = fn;
+}
+
+/* Writes still in flight, by what they send: the same one asked again while the first is under way
+   (a double tap, two handlers) shares the first's answer instead of going out twice. */
+const inFlight = new Map<string, Promise<unknown>>();
+
+const writeKey = (req: ApiRequest) =>
+  req.method === 'GET'
+    ? null
+    : JSON.stringify([req.method, req.path, req.query ?? null, req.body ?? null, req.headers ?? null]);
+
+export function request<T = unknown>(req: ApiRequest): Promise<T> {
+  const key = writeKey(req);
+  if (!key) return send<T>(req);
+  const running = inFlight.get(key);
+  if (running) return running as Promise<T>;
+  const p = send<T>(req).finally(() => inFlight.delete(key));
+  inFlight.set(key, p);
+  return p;
+}
+
+async function send<T>(req: ApiRequest): Promise<T> {
   let res: ApiResponse;
   try {
     res = await transport(req);
@@ -130,6 +156,7 @@ export async function request<T = unknown>(req: ApiRequest): Promise<T> {
     throw new ApiError(0, 'network', 'Network error');
   }
   if (res.status >= 200 && res.status < 300) return res.json as T;
+  if (res.status === 401 && !req.path.startsWith('/v1/auth/')) onUnauthorized?.();
   throw errorFrom(res.status, res.json, res.headers);
 }
 

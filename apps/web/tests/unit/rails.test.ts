@@ -25,7 +25,12 @@ import {
   checkDniRuc,
   checkRut,
   checkNitCc,
+  checkCiNit,
+  idOptional,
+  withoutId,
   checkAccount,
+  defaultCurrency,
+  HOME_CURRENCY,
   normalizeDetails,
   checkPayerDocument,
   checkEmail,
@@ -33,18 +38,21 @@ import {
   isRailId,
   checkBeneficiary,
   documentOf,
+  oneOfKey,
 } from '@/lib/p2p/rails';
 
 test('the rail table names each rail once, with its currency and a document', () => {
   assert.deepEqual([...RAIL_IDS].sort(), [
     'ar_bank_transfer',
     'ar_qr',
+    'bo_bank_transfer',
     'br_pix',
     'br_pix_qr',
     'cl_bank_transfer',
     'co_bank_transfer',
     'mx_spei',
     'pe_bank_transfer',
+    'pe_qr',
   ]);
   for (const id of RAIL_IDS) {
     assert.equal(RAILS[id].id, id);
@@ -287,4 +295,107 @@ test('the QR rails: ARS and BRL, never an account, kept out of account pickers',
     'ar_bank_transfer',
     'br_pix',
   ]);
+});
+
+test('Bolivia: a bank account with the holder CI or NIT, kept as the API keeps it', () => {
+  const details = {
+    bank: 'Banco Unión',
+    accountType: 'savings',
+    accountNumber: '1000-0234-5678',
+    documentType: 'CI',
+    documentNumber: '6543210-1a',
+  };
+  assert.deepEqual(
+    railsFor('BOB').map((r) => r.id),
+    ['bo_bank_transfer'],
+  );
+  assert.deepEqual(checkAccount('bo_bank_transfer', { holderName: 'Ana Quispe', details }), {});
+  assert.deepEqual(normalizeDetails('bo_bank_transfer', details), {
+    ...details,
+    accountNumber: '100002345678',
+    documentNumber: '65432101A',
+  });
+  assert.equal(documentOf('bo_bank_transfer', details), '6543210-1a');
+  const bad = checkAccount('bo_bank_transfer', {
+    holderName: 'Ana Quispe',
+    details: { ...details, accountType: 'vista', accountNumber: '123', documentType: 'DNI' },
+  });
+  assert.deepEqual(Object.keys(bad).sort(), ['accountNumber', 'accountType', 'documentType']);
+  assert.equal(
+    checkAccount('bo_bank_transfer', {
+      holderName: 'Ana Quispe',
+      details: { ...details, documentNumber: '12/34' },
+    }).documentNumber,
+    'format',
+  );
+});
+
+test('Bolivia: a CI (with its complement or department) or a NIT pays', () => {
+  for (const ok of ['6543210', '6543210-1A', '6543210 LP', '1020304025', '1023456789012'])
+    assert.equal(checkCiNit(ok), null, ok);
+  for (const bad of ['1234', '12345678901234', 'ABC1234', '6543210-ABC'])
+    assert.equal(checkCiNit(bad), 'format', bad);
+  assert.equal(checkPayerDocument('BOB', '6543210 LP'), null);
+  assert.equal(checkPayerDocument('BOB', 'GODE561231GR8'), 'format');
+});
+
+test('the boliviano is preselected wherever the market lists it', () => {
+  assert.equal(HOME_CURRENCY, 'BOB');
+  assert.equal(defaultCurrency([{ code: 'ARS' }, { code: 'BOB' }]), 'BOB');
+  assert.equal(defaultCurrency([{ code: 'ARS' }, { code: 'BRL' }]), 'ARS');
+  assert.equal(defaultCurrency([]), '');
+});
+
+test("a third party's ID: optional where the rail's transfers do not need it, checked when given", () => {
+  for (const r of ['ar_bank_transfer', 'pe_bank_transfer', 'bo_bank_transfer', 'br_pix', 'mx_spei'])
+    assert.ok(idOptional(r), r);
+  for (const r of ['cl_bank_transfer', 'co_bank_transfer', 'nope']) assert.ok(!idOptional(r), r);
+  // An Argentine CVU with only the holder's name: refused as one's own account, fine for someone else.
+  const cvu = { holderName: 'Martín Gómez', details: { cbu: '0000003100012345678907' } };
+  assert.deepEqual(Object.keys(checkBeneficiary('ar_bank_transfer', cvu)).sort(), [
+    'cuit',
+    'document',
+  ]);
+  assert.deepEqual(checkBeneficiary('ar_bank_transfer', cvu, { idOptional: true }), {});
+  // Given anyway, it is still checked.
+  assert.equal(
+    checkBeneficiary(
+      'ar_bank_transfer',
+      { ...cvu, details: { ...cvu.details, cuit: '20329642331' } },
+      { idOptional: true },
+    ).cuit,
+    'checksum',
+  );
+  // A CCI without the document type and number the form no longer shows.
+  const cci = { cci: '00219300123456789012', documentType: 'DNI', documentNumber: '' };
+  assert.deepEqual(withoutId('pe_bank_transfer', cci), { cci: '00219300123456789012' });
+  assert.deepEqual(
+    checkBeneficiary(
+      'pe_bank_transfer',
+      { holderName: 'Rosa Quispe', details: withoutId('pe_bank_transfer', cci) },
+      { idOptional: true },
+    ),
+    {},
+  );
+  // Chile still needs the RUT, even of someone else.
+  const rut = checkBeneficiary(
+    'cl_bank_transfer',
+    {
+      holderName: 'Ana Soto',
+      details: { bank: 'Banco Estado', accountType: 'checking', accountNumber: '12345678' },
+    },
+    { idOptional: true },
+  );
+  assert.equal(rut.rut, 'required');
+  assert.equal(rut.document, 'required');
+});
+
+test('one field for a CBU, a CVU or an alias: what is typed goes to its own detail', () => {
+  const members = RAILS.ar_bank_transfer.fields.filter((f) => f.oneOf === 'account');
+  assert.equal(oneOfKey(members, '0000003100012345678907'), 'cbu');
+  assert.equal(oneOfKey(members, '0000 0031 0001-2345.678907'), 'cbu', 'spaced or dotted digits');
+  assert.equal(oneOfKey(members, '00000031'), 'cbu', 'digits still being typed');
+  assert.equal(oneOfKey(members, 'ana.gomez.mp'), 'alias');
+  assert.equal(oneOfKey(members, 'ana2024'), 'alias', 'letters and digits: an alias');
+  assert.equal(oneOfKey(members, ''), 'alias', 'nothing typed');
 });

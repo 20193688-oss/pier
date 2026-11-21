@@ -187,11 +187,13 @@ export function parsePayoutCsv(text: string, allowedCurrencies?: readonly string
       if (!row.document) row.document = documentOf(rail, row.details);
       Object.assign(
         row.errors,
-        checkBeneficiary(rail, {
-          holderName: row.holderName,
-          document: row.document,
-          details: row.details,
-        }),
+        // A payout pays someone else: their ID is optional where the rail's transfers do not
+        // need it (the API's rule too), and checked when the file gives it.
+        checkBeneficiary(
+          rail,
+          { holderName: row.holderName, document: row.document, details: row.details },
+          { idOptional: true },
+        ),
       );
     } else if (!row.holderName) row.errors.holderName = 'required';
     if (row.externalReference) {

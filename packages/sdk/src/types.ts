@@ -32,6 +32,14 @@ export type Offer = Schemas['OfferView'];
 export type PaymentMethod = Schemas['PaymentMethodView'];
 export type PayoutBatch = Schemas['PayoutBatchView'];
 export type WebhookEndpoint = Schemas['WebhookEndpoint'];
+/** One message of an order's chat (`kind: receipt` when it carries a file). */
+export type OrderMessage = Schemas['OrderMessageView'];
+/** What a new chat message carries: a text, a file (a transfer receipt), or both. */
+export type NewOrderMessage = Schemas['CreateOrderMessage'];
+/** A chat message's file, its bytes in base64. */
+export type OrderMessageAttachment = Schemas['OrderMessageAttachment'];
+/** An order's chat at a glance, on every order view. */
+export type OrderChatSummary = Schemas['OrderChatSummary'];
 
 /** The order kinds: BUY, SELL, CHARGE and PAYOUT. */
 export type OrderKind = Order['kind'];

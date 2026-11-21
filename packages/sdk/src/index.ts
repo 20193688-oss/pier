@@ -15,6 +15,12 @@ export {
   type Unwrapped,
 } from '@/client';
 export {
+  getOrderMessageAttachment,
+  listOrderMessages,
+  sendOrderMessage,
+  type OrderChatRoutes,
+} from '@/chat';
+export {
   DEFAULT_WEBHOOK_TOLERANCE_SECONDS,
   parseWebhook,
   MIDPOINT_SIGNATURE_HEADER,

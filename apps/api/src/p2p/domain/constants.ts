@@ -127,9 +127,11 @@ export const P2P_PRICE_DECIMALS = 6;
 
 /**
  * The local currencies the market prices, with their minor units. A payment
- * rail names one of them; a new currency is one entry here.
+ * rail names one of them; a new currency is one entry here. The market lists
+ * them in this order (Bolivia first).
  */
 export const P2P_CURRENCIES = {
+  BOB: { decimals: 2, country: 'BO' },
   ARS: { decimals: 2, country: 'AR' },
   BRL: { decimals: 2, country: 'BR' },
   MXN: { decimals: 2, country: 'MX' },

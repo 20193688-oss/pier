@@ -6,6 +6,7 @@ import {
   NETWORKS,
   TIERS,
   isNetworkId,
+  nativeTokenOf,
   tableTokens,
   tokenOf,
   type NetworkId,
@@ -32,7 +33,7 @@ export interface NetworkConfig {
   contract: string | null;
   /** `P2P_<NET>_START_LEDGER`: where the indexer starts when it has no cursor. */
   startLedger: number | null;
-  /** The table's tokens plus `P2P_<NET>_TOKENS` (never on mainnet). */
+  /** The table's tokens plus `P2P_<NET>_TOKENS` (never on mainnet), the native lumen included when listed. */
   tokens: Token[];
 }
 
@@ -209,16 +210,42 @@ const contract = z
   .optional()
   .refine((v) => !v || isContractAddress(v), 'must be a contract address (C...)')
   .transform((v) => v || null);
-const extraTokens = json(
-  z.array(
-    z.object({
-      code: z.string().regex(/^[A-Za-z0-9]{1,12}$/, 'an asset code of 1 to 12 letters or digits'),
-      issuer: z.string().refine((v) => isAccountAddress(v), 'must be an account address (G...)'),
-      symbol: z.string().min(1).max(12).optional(),
-    }),
-  ),
-  [],
-);
+/**
+ * `P2P_<NET>_TOKENS`: extra tokens of a test network, as JSON, listed after
+ * the table's (Circle's USDC where it exists). A classic asset is
+ * `{"code":"TUSD","issuer":"G..."}` (the dev stack lists its own TUSD only on
+ * the local network, which has no Circle); the native lumen is
+ * `{"native":true}` (listed as `XLM`, through its Stellar Asset Contract, with
+ * no trustline). The dev stack's testnet market lists `[{"native":true}]`:
+ * USDC and XLM.
+ */
+export const extraTokenSchema = z.union([
+  z.strictObject({
+    native: z.literal(true),
+    symbol: z.string().min(1).max(12).optional(),
+  }),
+  z.object({
+    code: z.string().regex(/^[A-Za-z0-9]{1,12}$/, 'an asset code of 1 to 12 letters or digits'),
+    issuer: z.string().refine((v) => isAccountAddress(v), 'must be an account address (G...)'),
+    symbol: z.string().min(1).max(12).optional(),
+  }),
+]);
+export type ExtraToken = z.infer<typeof extraTokenSchema>;
+const extraTokens = json(z.array(extraTokenSchema), []);
+
+/** A `P2P_<NET>_TOKENS` entry as the token it lists on `network`. */
+export function extraTokenOf(network: NetworkId, entry: ExtraToken): Token {
+  return 'native' in entry
+    ? nativeTokenOf(network, entry.symbol)
+    : tokenOf(network, entry.code, entry.issuer, entry.symbol ?? entry.code);
+}
+
+/** A token as its `P2P_<NET>_TOKENS` entry (what the deploy CLI prints). */
+export function extraTokenEntry(token: Token): ExtraToken {
+  return token.issuer === null
+    ? { native: true, symbol: token.symbol }
+    : { code: token.code, issuer: token.issuer, symbol: token.symbol };
+}
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -329,7 +356,7 @@ export function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
     const extra = id === 'mainnet' ? [] : e[`P2P_${n as 'LOCAL' | 'TESTNET'}_TOKENS`];
     const tokens = [...tableTokens(id)];
     for (const t of extra) {
-      const token = tokenOf(id, t.code, t.issuer, t.symbol ?? t.code);
+      const token = extraTokenOf(id, t);
       if (tokens.some((x) => x.symbol === token.symbol || x.contract === token.contract)) {
         problems.push(`P2P_${n}_TOKENS: ${token.symbol} is listed twice`);
         continue;

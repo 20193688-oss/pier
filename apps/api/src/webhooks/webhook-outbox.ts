@@ -12,6 +12,8 @@ export const WEBHOOK_EVENT_TYPES = [
   'P2P_ORDER_DISPUTED',
   'P2P_ORDER_RESOLVED',
   'P2P_ORDER_FAILED',
+  // A message on an order's chat, for the other side (its text and file are read on the route).
+  'P2P_ORDER_MESSAGE',
   'P2P_CHARGE_SUCCEEDED',
   'P2P_PAYOUT_BATCH_COMPLETED',
 ] as const;

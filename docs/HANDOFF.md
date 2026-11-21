@@ -86,11 +86,56 @@ npm run dev:mock -w @midpoint/web        # the whole web with no backend (demo w
   (quickstart) only when a Docker daemon already answers, otherwise **testnet with friendbot**
   (`--testnet` forces it). Docker Desktop is never started.
 - It creates and keeps in `.dev-stack/` the owner, arbiter, treasury, matcher, sponsor, SEP-10
-  signer, merchant, business, user and a `TUSD` issuer; mints TUSD; deploys the market and TUSD's
-  SAC; seeds through the API (organizations, `pk_test_` keys, SEP-10 wallet proofs, payment
-  methods, ARS/BRL offers and `ar_qr`/`br_pix_qr` QR offers, 100 000 TUSD of liquidity, the
-  matcher authorised, a charge, the user activated by the sponsor with 5 000 TUSD). It prints the
-  URLs, keys and the dev secret keys (testnet only).
+  signer, merchant, business, user and a `TUSD` issuer; deploys the market; seeds through the API
+  (organizations, `pk_test_` keys, SEP-10 wallet proofs, payment methods, BOB/ARS/BRL offers and
+  `ar_qr`/`br_pix_qr` QR offers in the dollar and XLM, liquidity, the matcher authorised, a
+  charge of 150 BOB, the user activated by the sponsor and given dollars). It prints the URLs,
+  keys and the dev secret keys (testnet only).
+- **Tokens (since 2026-11-20, for the Bolivia hackathon): the testnet market lists only Circle's
+  USDC and XLM.** `P2P_TESTNET_TOKENS` is `[{"native":true}]` (USDC comes from the network table;
+  XLM through its SAC, `issuer: null`, no trustline; the stack's owner key allows it on a market
+  deployed before). The stack's USDC is real testnet USDC bought with test lumens on the testnet
+  DEX (`apps/api/src/dev/dev-dollars.ts`: a throwaway friendbot account path-pays XLM→USDC
+  straight to the merchant, then merges its leftover lumens into it; the DEX is deep, ~0.71 USDC
+  per XLM). Each merchant keeps **5 000 USDC** of liquidity (the seeded one too) and the dev user
+  1 000 USDC. TUSD (minted by the stack's issuer) is listed only on the fully local quickstart
+  network, which has no Circle USDC; it stays allowed on the contract of a testnet market
+  deployed before, unlisted, and the TUSD already deposited there was not withdrawn.
+- **Currencies: the boliviano (BOB) is the main one** and the market lists it first (`BOB`,
+  2 decimals, country `BO`, then ARS, BRL, MXN, COP, PEN, CLP). Its one rail is
+  `bo_bank_transfer` ("Bank transfer"): `bank` (bank name), `accountType` (`savings` |
+  `checking`), `accountNumber` (spaces, dots and hyphens dropped, then 6 to 20 digits),
+  `documentType` (`CI` | `NIT` | `CE` | `PP`) and `documentNumber` (spaces, dots and hyphens
+  dropped, then 5 to 15 letters or digits, uppercased: a CI with complement `1234567-1A` becomes
+  `12345671A`), all required; summary `<bank> ••••1234`. No Bolivian QR rail yet.
+- The stack runs **three automated test merchants**: Andes Cambio, Pampa Pagos and Río Express
+  (keys and set-up in `.dev-stack/merchants.json`, created on the first run and reused after).
+  Each has its own organization, `pk_test_` key, payment methods (a Bolivian bank transfer first
+  — Banco Unión, Banco Mercantil Santa Cruz, Banco BISA, company NITs — then ARS, BRL, MXN, COP,
+  PEN, CLP between them, plus `ar_qr` / `br_pix_qr` and, all three, `pe_qr`: Peru's
+  interoperable QR of Yape, Plin and the banks, whose static QRs carry the account as an opaque
+  token and no amount, so the person types it), offers in USDC and XLM (dollar orders up to
+  2 000 USD), liquidity and the matcher. The seeded merchant (Pampa Cambio) collects in BOB
+  (Banco Nacional de Bolivia), ARS and BRL. **Every start syncs the seed and the merchants,
+  idempotently, without a reset** (`apps/api/src/dev/merchant-sync.ts`): missing payment methods
+  and offers are added, active offers in a token no longer listed (TUSD) are deactivated through
+  the API (never deleted), offer bounds that drifted are resized, dollar liquidity below 90 % of
+  its target is topped up and spare lumens deposited, the user gets its dollars and a charge in
+  an unlisted token is replaced. A bot per merchant (`packages/sdk` simulated merchant,
+  `[bot-<slug>]` in the log) accepts sales and QR payments and marks them paid, and releases
+  paid purchases, 5 s later. On the order's chat it sends the person a PDF transfer receipt
+  ("Comprobante de transferencia", written by `packages/sdk/src/bot/receipt.ts`) right after it
+  marks a sale or a QR payment paid, and answers the person's first message on an order once,
+  3 s later (`REPLY_DELAY_SECONDS`). Every minute the four merchants' active offers are repriced from
+  live mainnet references (CriptoYa USDT quotes per currency, `usdt/bob` included, with an FX
+  fallback; the XLM/USDC book on the public Horizon) with spreads of 0.6 / 0.9 / 1.2 % and
+  1.5 % for the seeded (manual) merchant, so the automated ones usually win the match;
+  deactivated offers are left alone. XLM is not on mainnet:
+  adding `nativeTokenOf('mainnet')` to `tableTokens` lists it there. The web's `tx-verify.ts`
+  checks the XLM shapes: a send is the SAC's `transfer` to any destination with no memo on chain
+  (the person's note stays off chain), and the activation is only the missing account (begin,
+  create with nothing in it, end, as the sponsor's transaction). The app's home screen shows a
+  chip per listed token; the person's pick is remembered (`midpoint.app.token`).
 - Clicking through: open the web's `/app` and sign up or sign in with Pollar (email code or
   Google; needs `VITE_POLLAR_PUBLISHABLE_KEY`, section 8, and the web on an origin the Pollar app
   allows, today `http://localhost:3300`). To use a printed dev secret instead, open
@@ -197,8 +242,9 @@ offered to liquidity merchants.
 ### 6.4 Web and the payments app
 
 - `/app/*` (the payments app): welcome/sign-in, handle, home, scan, send, receive, add (BUY),
-  withdraw (SELL), pay a shop QR, pay a charge, order and activity detail, me. Phone-width column
-  on desktop, a floating dock for the tabs with the scan button at its centre. PWA: manifest
+  withdraw (SELL), send to a bank account (SELL to a third party), pay a shop QR, pay a charge,
+  order (with its chat) and activity detail, me. A floating dock for the tabs on phones, a side
+  navigation from tablets up. PWA: manifest
   named from `src/lib/brand.ts`, icons from `scripts/gen-icons.mjs`, hand-written `pwa/sw.js`
   (never caches `/v1` or `/.well-known`), install prompts, offline page.
 - Also: `/` landing, `/dashboard` (liquidity, offers incl. QR rails, payment methods, orders incl.
@@ -208,6 +254,122 @@ offered to liquidity merchants.
   through Pollar's built-in adapters), `demo` (mock mode only), `dev-key` (dev builds only). The
   app's token is `VITE_APP_TOKEN`, else the one the wallet holds, else USDC.
 - The brand name lives in `apps/web/src/lib/brand.ts` and the API's `BRAND_NAME`.
+- App behaviour (2026-11-20, the owner's asks):
+  - **Sign in first, then the @handle**, a required step: a signed-in person without one is sent
+    to `/app/handle?next=…` from any screen but the profile, offered a handle made from the
+    sign-in email, then taken on to where they were going.
+  - **Paste a QR** on the scan screen: a "Paste QR" button reads the clipboard (an image is
+    decoded, text read as is), and Ctrl+V works anywhere on that screen.
+  - **Paying a shop QR** takes the QR's own amount. When the balance cannot cover it at the
+    market's approximate price (`approxPrice` / `usePrice` in `features/app/data.tsx`), the
+    screen says so before any quote, with "Add money" opening `/app/add?currency=…&amount=…`
+    already filled with what is missing (2 % over).
+  - **Autofill** (`src/lib/app/remember.ts`, localStorage `midpoint.fill.*`, cleared on
+    sign-out): the payer per currency and the payout account per rail come back in add money,
+    withdraw and the charge page; the sign-in email fills email fields and suggests the handle.
+  - **Layout and motion**: phones get the floating dock and 24px gutters. From 768px up there is
+    a side navigation with the logo and a centred column of up to 820px, with 32px gutters.
+    Screens enter forward from the right, back from the left, and tab switches fade. There is
+    no tap highlight, and every control shows its own press.
+- More of the owner's asks (2026-11-20, later; the hackathon is in Bolivia):
+  - **Bolivia first.** BOB is the default currency everywhere (`HOME_CURRENCY` /
+    `defaultCurrency` in `src/lib/p2p/rails.ts`; the app's pick is stored under
+    `midpoint.app.currency.v2`). The rail is `bo_bank_transfer` (CI/NIT as the payer's document).
+    The testnet market lists USDC and XLM only (no TUSD).
+  - **Flags.** Each currency shows its country's round flag (`CurrencyMark` in
+    `components/p2p/parts.tsx`, from `country-flag-icons`). Home's local-value line and the
+    profile open a flag picker (`useCurrencyPicker`).
+  - **Order chat and receipts.** Each order has a chat between the person and the merchant
+    (`components/p2p/OrderChat.tsx`, `lib/p2p/chat.ts`, `lib/api/chat.ts`; routes
+    `…/orders/:id/messages` for the app, an integrator and the merchant). Images or PDFs up to
+    2 MB travel as base64 in JSON, and the browser checks their first bytes again before showing
+    one.
+    - Placement: beside the order on wide screens, below it on phones, and in the activity
+      detail. The dashboard has a Chat button per order (an unread dot reads the per-browser
+      seen marks in `lib/p2p/chat-seen.ts`), and the chat opens by itself right after a
+      merchant marks an order paid, for the receipt.
+    - The bots send a PDF receipt when they pay and answer a person's first message once.
+  - **Errors are toasts, not lines on the screen** (the owner asked twice). A
+    `Notice tone="error"` is only a toast (`components/ui/Toast.tsx`: tones ok/info/error,
+    de-duplicated, a top-layer popover so it shows over dialogs, at the top on phones). Only an
+    error that is a state of the screen keeps its line (`<Notice tone="error" stay>`): could not
+    load, a QR not taken, a quote or sale that failed its check, a payout file missing columns,
+    a suspended wallet. Form fields keep their own validation under them.
+  - **Google login** (Pollar's hosted OAuth in a new tab): the redirect is the page's origin,
+    registered in Pollar's dashboard under Developers > Websites > Allowed redirect URIs
+    (`http://localhost:3300`; Google itself needs nothing, Pollar uses its own credentials). The
+    waiting screen can cancel it instead of waiting out Pollar's 5-minute `LOGIN_TIMEOUT`.
+  - **A sale's opening is built when the seller signs.** One simulated at creation goes stale
+    when another order takes the order id its footprint names: that was the owner's failed sale
+    (`scecExceededLimit`, "outside of the footprint"). `SignFlow` asks
+    `POST /v1/app/orders/:id/transactions { action: 'open' }` and, if the network still refuses
+    it, builds and sends it once more (`retryOnFail`).
+  - **Re-quote before opening.** A price with under 15 s left is asked for again first. A worse
+    one stops with "the price was updated" (the person confirms again); a refused quote
+    (`quote_expired`, `quote_not_found`, `no_match`) says the same instead of an error.
+  - **Sessions are not interrupted** (`src/lib/session.tsx`).
+    - A 401, a session near its end (a day before, or halfway when it is shorter) or a page
+      that comes back without its session renews the API session silently through the wallet
+      at hand: Pollar's embedded signer signs the SEP-10 challenge.
+    - While that runs, actions wait ("Connecting your wallet…"). If it cannot be done, no screen
+      stays up without a session: the app and the dashboard show the sign-in, which says the
+      session ended (`sessionGate`), and land back on the same screen after it. So does a page
+      that comes back without its session when its wallet cannot renew it. Any 401 from any
+      screen goes through it (`setUnauthorizedHandler` in `src/lib/api/client.ts`), and the error
+      toasts that screen raised are cleared (the owner, 2026-11-20).
+    - A session whose wallet did not come back (Pollar lost its own, a new tab with a dev key)
+      is ended too: nothing could be signed with it. While the wallet is still coming back the
+      screen waits on the loading view. An ended session loads nothing in the background
+      (`useAppData` reads no address), checked live: no API call while the sign-in is up.
+    - What the session says ("your session ended", "sign in again to sign") is a toast, not a
+      line in the form (`useToastWhen` in `components/ui/Toast.tsx`).
+    - The wallet kind is kept in localStorage, so a new tab keeps it.
+  - **Peru's QR** (Yape, Plin, the banks) is the rail `pe_qr`. Yape puts its account in field 39
+    as an opaque token, which `@midpoint/payment-qr` accepts for PE only.
+  - **Send to a bank account abroad** (`/app/send/bank`): a sale whose beneficiary is someone
+    else (`TradeForm recipient="other"`).
+    - A CBU, CVU, alias, CCI or CLABE typed in Send's "To" is recognised and opens it filled in
+      (`lib/app/bank-recipient.ts`).
+    - A third party's ID is not asked where the rail's transfers do not need it (AR, PE, BO,
+      BR, MX; the owner: their bank already did the KYC). Chile's RUT and Colombia's document
+      are still asked. The API applies the same rule to sale and payout beneficiaries.
+  - **Amounts in local money.** A sale can be typed either way (`TradeForm`: both figures are
+    fields, the one typed drives the quote, `fiatAmount` or `tokenAmount`). Sending to a bank
+    account starts in what arrives ("20 PEN") with the dollars under it; withdraw starts in USDC.
+    Receive asks in any unit from one picker: a token of the network (USDC, XLM: the request is
+    in that token) or any currency the market pays out in, which becomes the wallet's token at the
+    market price, rounded up to the cent (`tokensForLocal` in `src/lib/app/money.ts`), saying what
+    reaches the wallet. The request itself (link, SEP-7) always carries a token amount.
+  - **An Argentine account is one field** ("CBU, CVU o alias"): what is typed goes to `cbu` (digits)
+    or `alias` (anything else) by `oneOfKey` in `src/lib/p2p/rails.ts`; the API still gets one of
+    the two keys, never both.
+  - **The highlighter covers the whole amount** (`.marker` in `global.css`: wider padding given
+    back by a negative margin, so nothing moves).
+  - **`{brand}` never shows**: the i18n context's fallback is the filled catalog too (a context left
+    behind by a hot reload used to read the raw one).
+  - **Activity rows that moved nothing** (an order failed, cancelled, expired or rejected; a failed
+    transfer) are struck through in red and say their status in plain words instead of a pill. An
+    order that never opened (`failed`) reads "Cancelada" everywhere. A send to someone else's
+    account reads "Enviaste a {name}" on the device that sent it.
+  - **Every action goes out once** (the owner: no spamming a button, and a retry of something
+    done is not an error).
+    - Web: `useAction` / `useGuard` (`src/lib/use-action.ts`) drop a second tap with a ref, before
+      any render; `SignFlow` has the same guard. After an action went through, the order screen,
+      the QR payment and the dashboard's orders keep its buttons off ("sent, waiting for the
+      network") until the order's status moves. `request()` (`src/lib/api/client.ts`) shares one
+      answer between identical writes in flight.
+    - API: a retried order action that already happened answers `409 already_done` (a transaction
+      build, `details: ['status: …']`) or `200` with the order (a buyer's act), checked against
+      the stored status and, when simulation reverts, the chain (`domain/action-outcome.ts`,
+      `p2p/order-outcome.ts`). `SignFlow` counts `already_done` as a settled step.
+  - **Receipts are files with a preview** (`src/components/p2p/ReceiptFile.tsx`): an image is
+    drawn as it is; a PDF in the browser's own viewer where it has one inline
+    (`navigator.pdfViewerEnabled`: desktop, iPhone), a document card elsewhere (Android). A
+    merchant marks an order paid in the dashboard only with the receipt attached (previewed); it
+    goes to the customer's chat once the order is paid. pdf.js would draw PDFs on every phone but
+    is not a dependency yet (its install needs the owner's OK).
+  - **Restarting the API** means restarting the whole stack (`npm run dev:stack -- --stop`, then
+    the same start command): the launcher's watcher stops everything when the API process exits.
 - The look ("night and aura", 2026-11-20, after a Dribbble banking-app reference the owner chose)
   is defined in `apps/web/src/styles/global.css`: near-black ink on a cool white page with white
   sheets; one atmospheric gradient textured with halftone dots and grain (`.aura`,
@@ -217,11 +379,13 @@ offered to liquidity merchants.
   buttons (`.btn-white`, `.btn-glass` on the aura);
   action `.tile`s with tracked capitals (`.caps`); wide uppercase `.display` headlines on the aura;
   an ice highlighter (`.marker`) for the exact amount.
-- The mark (2026-11-20, chosen by the owner from the options on the logo canvas): the hero's
-  capital M (Archivo's outline at width 116, weight 720, taken from the app's own font file), cut
-  on a slant with its lower part slid right; flat, the M in paper on an ink tile (no gradient).
-  The wordmark is MIDPOINT in the hero's capitals (`.display`). One geometry in `Logo.tsx`
-  (`M_PATH`, the cut, `M_SLIDE`), `public/favicon.svg` and `scripts/gen-icons.mjs`.
+- The logo (2026-11-20, the owner's choices on the logo canvas): MIDPOINT drawn from the hero's
+  letters (Archivo at width 116, weight 720), every letter cut on a slant with its lower part slid
+  right, POINT at 50 % with its O whole and a dot at its centre. Flat, in the current colour, on
+  no tile (`Logo`); the cut M alone is `LogoGlyph`. Only the favicon and the app icons set the M on
+  an ink tile. The outlines are generated: `python apps/web/scripts/gen-logo.py` (fontTools,
+  brotli, skia-pathops) writes `apps/web/src/components/ui/logo-paths.ts` from the app's own
+  font file, then `npm run icons -w @midpoint/web` redraws `public/favicon.svg` and the PNGs.
 
 ## 7. Security invariants (keep them)
 

@@ -17,6 +17,7 @@ import { useToast } from '@/components/ui/Toast';
 import { useDash } from '@/features/dashboard/context';
 import { LoadState, PageHead, useLoad } from '@/features/dashboard/ui';
 import { isWebhookUrl } from '@/features/dashboard/views/admin-model';
+import { useGuard } from '@/lib/use-action';
 
 const DELIVERY_TONE = { pending: 'pend', delivered: 'ok', failed: 'fail' } as const;
 
@@ -32,32 +33,35 @@ export function WebhooksView() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const setActive = async (endpoint: WebhookEndpoint, active: boolean) => {
-    setError('');
-    load.setData((list) => list?.map((x) => (x.id === endpoint.id ? { ...x, active } : x)));
-    try {
-      await webhooksApi.update(scope, endpoint.id, { active });
-      toast(active ? w.activated : w.deactivated);
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-      load.reload();
-    }
-  };
+  const guard = useGuard();
+  const setActive = (endpoint: WebhookEndpoint, active: boolean) =>
+    guard(async () => {
+      setError('');
+      load.setData((list) => list?.map((x) => (x.id === endpoint.id ? { ...x, active } : x)));
+      try {
+        await webhooksApi.update(scope, endpoint.id, { active });
+        toast(active ? w.activated : w.deactivated);
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+        load.reload();
+      }
+    });
 
-  const remove = async (endpoint: WebhookEndpoint) => {
-    setBusy(true);
-    setError('');
-    try {
-      await webhooksApi.remove(scope, endpoint.id);
-      toast(w.deleted);
-      setDeleting(null);
-      load.reload();
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const remove = (endpoint: WebhookEndpoint) =>
+    guard(async () => {
+      setBusy(true);
+      setError('');
+      try {
+        await webhooksApi.remove(scope, endpoint.id);
+        toast(w.deleted);
+        setDeleting(null);
+        load.reload();
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+      } finally {
+        setBusy(false);
+      }
+    });
 
   return (
     <>
@@ -272,25 +276,27 @@ function CreateEndpoint({
   const urlError = touched && !isWebhookUrl(url) ? w.urlError : null;
   const eventsError = touched && !events.length ? w.eventsError : null;
 
-  const submit = async () => {
-    setTouched(true);
-    if (!isWebhookUrl(url) || !events.length) return;
-    setBusy(true);
-    setError('');
-    try {
-      onCreated(
-        await webhooksApi.create(scope, {
-          url: url.trim(),
-          events,
-          ...(description.trim() ? { description: description.trim() } : {}),
-        }),
-      );
-    } catch (e) {
-      setError(errorMessage(t.common, e));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const guard = useGuard();
+  const submit = () =>
+    guard(async () => {
+      setTouched(true);
+      if (!isWebhookUrl(url) || !events.length) return;
+      setBusy(true);
+      setError('');
+      try {
+        onCreated(
+          await webhooksApi.create(scope, {
+            url: url.trim(),
+            events,
+            ...(description.trim() ? { description: description.trim() } : {}),
+          }),
+        );
+      } catch (e) {
+        setError(errorMessage(t.common, e));
+      } finally {
+        setBusy(false);
+      }
+    });
 
   return (
     <Dialog

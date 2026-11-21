@@ -13,8 +13,16 @@ import {
 } from '@stellar/stellar-sdk';
 import { deployMarket, rpcFor, setTokens, submitOps } from '@/chain/market-deploy';
 import { decodeResult, p2pCall, toMarketConfig } from '@/chain/market-codec';
-import { NETWORKS, isNetworkId, tableTokens, tokenOf, type Token } from '@/chain/networks';
+import {
+  NETWORKS,
+  isNetworkId,
+  nativeTokenOf,
+  tableTokens,
+  tokenOf,
+  type Token,
+} from '@/chain/networks';
 import { isAccountAddress, isContractAddress, isSecretSeed } from '@/common/stellar';
+import { extraTokenEntry } from '@/config/env';
 import { P2P_MAX_PROTOCOL_FEE_BPS } from '@/p2p/domain/constants';
 
 /**
@@ -23,7 +31,7 @@ import { P2P_MAX_PROTOCOL_FEE_BPS } from '@/p2p/domain/constants';
  *
  *   npm run deploy:contract -w @midpoint/api -- --network testnet \
  *     --secrets-file C:/Users/<you>/.midpoint/deployer.json \
- *     --treasury G... --arbiter G... --fee-bps 50 [--owner G...] [--token CODE:ISSUER] [--rpc <url>]
+ *     --treasury G... --arbiter G... --fee-bps 50 [--owner G...] [--token CODE:ISSUER | --token native] [--rpc <url>]
  *   ... --contract C...                       verify only
  *   ... --network mainnet --i-understand-mainnet --owner G... --rpc <url>
  *
@@ -176,8 +184,9 @@ async function main(): Promise<void> {
   const tokens: Token[] = [
     ...tableTokens(network),
     ...(values.token ?? []).map((t) => {
+      if (t.toLowerCase() === 'native') return nativeTokenOf(network);
       const [code, issuer] = t.split(':');
-      if (!code || !isAccountAddress(issuer)) fail(`--token ${t} must be CODE:ISSUER`);
+      if (!code || !isAccountAddress(issuer)) fail(`--token ${t} must be CODE:ISSUER or native`);
       return tokenOf(network, code, issuer);
     }),
   ];
@@ -246,7 +255,7 @@ async function main(): Promise<void> {
   console.log(`P2P_${net}_START_LEDGER=${deployed.ledger}`);
   if (values.token?.length) {
     console.log(
-      `P2P_${net}_TOKENS=${JSON.stringify(tokens.slice(tableTokens(network).length).map((t) => ({ code: t.code, issuer: t.issuer })))}`,
+      `P2P_${net}_TOKENS=${JSON.stringify(tokens.slice(tableTokens(network).length).map(extraTokenEntry))}`,
     );
   }
   if (values.rpc) console.log(`STELLAR_${net}_RPC_URL=<your node URL>`);

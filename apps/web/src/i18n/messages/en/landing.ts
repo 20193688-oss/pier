@@ -11,7 +11,7 @@ const landing: typeof es = {
     open: 'Create account',
     merchant: 'I am a merchant',
     rails:
-      'Bank transfer, CVU or alias in Argentina, PIX in Brazil, SPEI in Mexico, and banks in Colombia, Peru and Chile.',
+      'Bank transfer in Bolivia, CVU or alias in Argentina, PIX in Brazil, SPEI in Mexico, and banks in Colombia, Peru and Chile.',
   },
   slip: {
     caption:
@@ -20,7 +20,7 @@ const landing: typeof es = {
     transfer: 'Transfer exactly',
     to: 'To this account',
     holder: 'Holder',
-    cbu: 'CBU',
+    account: 'Account',
     receive: 'You receive',
     left: 'Time to pay',
     locked: 'Locked in the contract until the merchant confirms',
