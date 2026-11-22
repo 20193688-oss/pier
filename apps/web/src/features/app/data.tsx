@@ -22,8 +22,8 @@ import type { AppBalances, AppProfile } from '@/lib/app/types';
 import { pickToken } from '@/lib/app/token';
 import type { P2pMarket, P2pNetwork, P2pToken } from '@/lib/p2p/types';
 
-// v2 since BOB became the default (2026-11-20): a pick made before that is dropped once.
-const CURRENCY_KEY = 'pier.app.currency.v2';
+// v3 since PEN became the default (2026-11-22): a pick made before that is dropped once.
+const CURRENCY_KEY = 'pier.app.currency.v3';
 const TOKEN_KEY = 'pier.app.token';
 
 interface AppData {
