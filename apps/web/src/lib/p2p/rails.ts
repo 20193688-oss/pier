@@ -220,8 +220,8 @@ export function railsFor(currency: string): Rail[] {
   return RAIL_IDS.map((id) => RAILS[id]).filter((r) => r.currency === currency);
 }
 
-/** The market's main currency, Bolivia's boliviano: preselected wherever a currency is. */
-export const HOME_CURRENCY = 'BOB';
+/** The market's main currency, Peru's sol: preselected wherever a currency is. */
+export const HOME_CURRENCY = 'PEN';
 
 /** The currency to preselect among `currencies`: the main one when listed, else the first. */
 export function defaultCurrency(currencies: readonly { code: string }[]): string {

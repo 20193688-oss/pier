@@ -10,11 +10,11 @@ import { Logo } from '@/components/ui/Logo';
 import { money, units } from '@/lib/format';
 
 const EXAMPLE = {
-  fiat: 1200,
-  price: 11.95,
+  fiat: 380,
+  price: 3.77,
   feeBps: 30,
-  account: 'Banco Unión · 1000 0234 5678',
-  holder: 'Norte Cambios SRL',
+  account: 'BCP · CCI 002 193 00123456789012',
+  holder: 'Norte Cambios SAC',
 };
 
 function OrderSlip() {
@@ -38,7 +38,7 @@ function OrderSlip() {
         <div className="px-6 pt-4 pb-5">
           <p className="text-[0.9375rem] text-ink-2">{s.transfer}</p>
           <p className="figure mt-2 text-[clamp(1.55rem,7.4vw,2.2rem)]">
-            <span className="marker marker-sweep">{money(lang, EXAMPLE.fiat, 'BOB')}</span>
+            <span className="marker marker-sweep">{money(lang, EXAMPLE.fiat, 'PEN')}</span>
           </p>
         </div>
         <div className="tear" />
@@ -244,8 +244,8 @@ export default function LandingPage() {
   -H "Authorization: Bearer $PIER_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "currency": "BOB",
-    "fiatAmount": "350.00",
+    "currency": "PEN",
+    "fiatAmount": "120.00",
     "network": "testnet",
     "token": "USDC",
     "recipient": "acc_...",
