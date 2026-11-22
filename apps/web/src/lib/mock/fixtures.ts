@@ -119,6 +119,7 @@ export const CURRENCIES = [
   {
     code: 'PEN',
     rails: [
+      { id: 'pe_wallet', fields: [field('wallet'), field('phone')] },
       {
         id: 'pe_bank_transfer',
         fields: [field('cci'), field('documentType'), field('documentNumber')],

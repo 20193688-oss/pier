@@ -21,6 +21,7 @@ import {
   checkRfc,
   checkCurp,
   checkCci,
+  checkPePhone,
   checkRuc,
   checkDniRuc,
   checkRut,
@@ -53,6 +54,7 @@ test('the rail table names each rail once, with its currency and a document', ()
     'mx_spei',
     'pe_bank_transfer',
     'pe_qr',
+    'pe_wallet',
   ]);
   for (const id of RAIL_IDS) {
     assert.equal(RAILS[id].id, id);
@@ -339,9 +341,9 @@ test('Bolivia: a CI (with its complement or department) or a NIT pays', () => {
   assert.equal(checkPayerDocument('BOB', 'GODE561231GR8'), 'format');
 });
 
-test('the boliviano is preselected wherever the market lists it', () => {
-  assert.equal(HOME_CURRENCY, 'BOB');
-  assert.equal(defaultCurrency([{ code: 'ARS' }, { code: 'BOB' }]), 'BOB');
+test('the sol is preselected wherever the market lists it', () => {
+  assert.equal(HOME_CURRENCY, 'PEN');
+  assert.equal(defaultCurrency([{ code: 'ARS' }, { code: 'PEN' }]), 'PEN');
   assert.equal(defaultCurrency([{ code: 'ARS' }, { code: 'BRL' }]), 'ARS');
   assert.equal(defaultCurrency([]), '');
 });
@@ -398,4 +400,29 @@ test('one field for a CBU, a CVU or an alias: what is typed goes to its own deta
   assert.equal(oneOfKey(members, 'ana.gomez.mp'), 'alias');
   assert.equal(oneOfKey(members, 'ana2024'), 'alias', 'letters and digits: an alias');
   assert.equal(oneOfKey(members, ''), 'alias', 'nothing typed');
+});
+
+test('Yape and Plin: a wallet and a 9-digit mobile number starting with 9', () => {
+  assert.deepEqual(
+    railsFor('PEN').map((r) => r.id),
+    ['pe_wallet', 'pe_bank_transfer', 'pe_qr'],
+  );
+  assert.equal(checkPePhone('987654321'), null);
+  assert.equal(checkPePhone('+51 987 654 321'), null);
+  assert.equal(checkPePhone('887654321'), 'format');
+  assert.equal(checkPePhone('98765432'), 'format');
+  assert.deepEqual(
+    checkAccount('pe_wallet', {
+      holderName: 'Ana Quispe',
+      details: { wallet: 'yape', phone: '987 654 321' },
+    }),
+    {},
+  );
+  assert.deepEqual(
+    checkAccount('pe_wallet', {
+      holderName: 'Ana Quispe',
+      details: { wallet: 'tunki', phone: '12' },
+    }),
+    { wallet: 'format', phone: 'format' },
+  );
 });

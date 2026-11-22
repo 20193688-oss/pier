@@ -261,7 +261,7 @@ export function AccountFields({
             autoComplete="off"
             spellCheck={false}
             inputMode={
-              ['cbu', 'clabe', 'cci', 'accountNumber', 'cuit'].includes(f.kind)
+              ['cbu', 'clabe', 'cci', 'accountNumber', 'cuit', 'pePhone'].includes(f.kind)
                 ? 'numeric'
                 : undefined
             }
