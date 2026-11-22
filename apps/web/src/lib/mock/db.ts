@@ -266,6 +266,20 @@ function seed(): MockState {
     challenges: {},
     methods: [
       {
+        id: 'pm_pen_yape',
+        _org: 'org_nortecambios',
+        accountId: 'acc_norte_treasury',
+        currency: 'PEN',
+        rail: 'pe_wallet',
+        label: 'Yape',
+        holderName: 'Norte Cambios SAC',
+        document: '20601234567',
+        details: { wallet: 'yape', phone: '987654321' },
+        active: true,
+        createdAt: '2026-09-01T12:30:00.000Z',
+        summary: 'Yape ••••4321',
+      },
+      {
         id: 'pm_pen_main',
         _org: 'org_nortecambios',
         accountId: 'acc_norte_treasury',
@@ -356,7 +370,7 @@ function seed(): MockState {
         token: token('testnet').contract,
         tokenSymbol: 'USDC',
         currency: 'PEN',
-        rails: ['pe_bank_transfer'],
+        rails: ['pe_wallet', 'pe_bank_transfer'],
         price: '3.77',
         priceUpdatedAt: iso(t - 3 * MIN),
         priceTtlSeconds: 3600,
@@ -374,7 +388,7 @@ function seed(): MockState {
         token: token('testnet').contract,
         tokenSymbol: 'USDC',
         currency: 'PEN',
-        rails: ['pe_bank_transfer'],
+        rails: ['pe_wallet', 'pe_bank_transfer'],
         price: '3.7',
         priceUpdatedAt: iso(t - 3 * MIN),
         priceTtlSeconds: 3600,
@@ -1131,6 +1145,9 @@ const RAIL_NAMES: Record<string, string> = {
   ar_qr: 'QR interoperable',
   br_pix: 'PIX',
   br_pix_qr: 'QR de PIX',
+  pe_wallet: 'Yape o Plin',
+  pe_bank_transfer: 'Transferencia con CCI',
+  pe_qr: 'QR interoperable (Yape, Plin)',
 };
 
 /** A chat message on order `o`, `at` milliseconds (a reply shows a few seconds later). */

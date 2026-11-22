@@ -364,3 +364,23 @@ describe('P2P rails: the Bolivian bank transfer (bo_bank_transfer)', () => {
     );
   });
 });
+
+describe('pe_wallet (Yape or Plin)', () => {
+  it('takes a wallet and a 9-digit mobile number starting with 9, without +51', () => {
+    const r = validateRailDetails('pe_wallet', 'PEN', { wallet: 'yape', phone: '+51 987 654 321' });
+    expect(r).toEqual({ ok: true, details: { wallet: 'yape', phone: '987654321' } });
+    expect(P2P_RAILS.pe_wallet.summary({ wallet: 'plin', phone: '987654321' })).toBe(
+      'Plin ••••4321',
+    );
+  });
+
+  it('refuses another wallet or a number that is not a Peruvian mobile', () => {
+    expect(
+      validateRailDetails('pe_wallet', 'PEN', { wallet: 'tunki', phone: '987654321' }).ok,
+    ).toBe(false);
+    expect(validateRailDetails('pe_wallet', 'PEN', { wallet: 'yape', phone: '887654321' }).ok).toBe(
+      false,
+    );
+    expect(validateRailDetails('pe_wallet', 'PEN', { wallet: 'yape' }).ok).toBe(false);
+  });
+});
