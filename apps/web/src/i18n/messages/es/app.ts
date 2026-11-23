@@ -102,8 +102,7 @@ const app = {
     toLabel: '@usuario, dirección de Stellar o cuenta bancaria',
     toPlaceholder: '@usuario, G…, CCI, CVU o alias',
     toBank: 'A una cuenta bancaria',
-    toBankBody:
-      'En Perú con su CCI, o en otro país y en su moneda: CVU o alias, PIX, CLABE o una cuenta de Bolivia.',
+    toBankBody: 'En Perú con su CCI, o en otro país y en su moneda: CVU o alias, PIX, CLABE o una cuenta de Bolivia.',
     bankDetected: 'Enviar al {kind} {account}',
     bankDetectedSub: 'Recibe en {currency} en su cuenta',
     bankKinds: { cbu: 'CBU', cvu: 'CVU', alias: 'alias', cci: 'CCI', clabe: 'CLABE' },

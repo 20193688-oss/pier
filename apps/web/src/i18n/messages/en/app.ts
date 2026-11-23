@@ -100,8 +100,7 @@ const app = {
     toLabel: '@handle, Stellar address or bank account',
     toPlaceholder: '@handle, G…, CCI, CVU or alias',
     toBank: 'To a bank account',
-    toBankBody:
-      'In Peru with their CCI, or in another country in its currency: CVU or alias, PIX, CLABE or a Bolivian account.',
+    toBankBody: 'In Peru with their CCI, or in another country in its currency: CVU or alias, PIX, CLABE or a Bolivian account.',
     bankDetected: 'Send to the {kind} {account}',
     bankDetectedSub: 'They receive {currency} in their account',
     bankKinds: { cbu: 'CBU', cvu: 'CVU', alias: 'alias', cci: 'CCI', clabe: 'CLABE' },

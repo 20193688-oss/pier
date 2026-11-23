@@ -181,12 +181,7 @@ export function activationTx(address: string): P2pTransaction | null {
   const a = chainAccount(address);
   if (a?.exists && a.trust.USDC !== null && a.trust.USDC !== undefined) return null;
   const create = !a?.exists;
-  const ops = activation({
-    sponsor: SPONSOR,
-    account: address,
-    token: USDC,
-    createAccount: create,
-  });
+  const ops = activation({ sponsor: SPONSOR, account: address, token: USDC, createAccount: create });
   return env(create ? SPONSOR : address, ops, 'activate');
 }
 
@@ -241,16 +236,11 @@ export function submitEnvelope(signedXdr: string, allowedSources: readonly strin
   // Who must have signed: the source and every operation's source (the sponsor signs here).
   const signers = new Set([tx.source, ...tx.operations.map((op) => op.source ?? tx.source)]);
   signers.delete(SPONSOR);
-  if (!allowedSources.includes(tx.source) && tx.source !== SPONSOR)
-    return record('FAILED', 'source');
+  if (!allowedSources.includes(tx.source) && tx.source !== SPONSOR) return record('FAILED', 'source');
   for (const a of signers) if (!signedBy(tx, a)) return record('FAILED', 'tx_bad_auth');
   const max = Number(tx.timeBounds?.maxTime ?? 0);
   if (max && max < now() / 1000) return record('FAILED', 'tx_too_late');
-  const snapshot = JSON.stringify({
-    chain: s.chain.accounts,
-    orders: s.orders,
-    accounts: s.accounts,
-  });
+  const snapshot = JSON.stringify({ chain: s.chain.accounts, orders: s.orders, accounts: s.accounts });
   try {
     for (const op of tx.operations) applyOperation(tx, op, hash);
   } catch (e) {
@@ -298,9 +288,7 @@ function applyOperation(tx: Transaction, op: Transaction['operations'][number], 
     case 'invokeHostFunction': {
       const func = (op as { func: xdr.HostFunction }).func;
       if (func.type !== 'hostFunctionTypeInvokeContract') fail('op_malformed');
-      const inv = readInvocation(
-        (func as { invokeContract: xdr.InvokeContractArgs }).invokeContract,
-      );
+      const inv = readInvocation((func as { invokeContract: xdr.InvokeContractArgs }).invokeContract);
       if (!inv) fail('op_malformed');
       if (inv!.contract === USDC.contract) {
         const a = decodeArgs(inv!, SAC_TRANSFER);
@@ -378,13 +366,7 @@ function applyMarket(fn: string, a: Record<string, Decoded>, src: string, hash: 
       const o = byId(a.id);
       if (!o) fail('unknown_order');
       if (a.caller !== src) fail('not_authorized');
-      const key = {
-        mark_paid: 'paid',
-        accept: 'accept',
-        release: 'release',
-        cancel: 'cancel',
-        dispute: 'dispute',
-      }[fn]!;
+      const key = { mark_paid: 'paid', accept: 'accept', release: 'release', cancel: 'cancel', dispute: 'dispute' }[fn]!;
       o!.txHashes = { ...o!.txHashes, [key]: hash };
       o!.updatedAt = iso(t);
       if (fn === 'accept') {
