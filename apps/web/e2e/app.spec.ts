@@ -72,10 +72,7 @@ test('send to a handle with a note: review the resolved address, sign, done (Spa
   await expect(never).toHaveCount(1);
   await expect(never.getByText('Cancelada', { exact: true })).toBeVisible();
   await expect(never.locator('.pill')).toHaveCount(0);
-  await expect(never.getByText('Retiraste a tu cuenta')).toHaveCSS(
-    'text-decoration-line',
-    'line-through',
-  );
+  await expect(never.getByText('Retiraste a tu cuenta')).toHaveCSS('text-decoration-line', 'line-through');
   await expect(page.getByText('Fallida')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -95,9 +92,7 @@ test('receive: a payment link with a handle, or a SEP-7 request (English)', asyn
   await page.getByRole('dialog').getByRole('button', { name: /PEN/ }).click();
   await expect(page.getByTestId('receive-unit')).toHaveAccessibleName(/PEN/);
   await page.getByLabel('Ask for an amount in PEN (optional)').fill('37');
-  await expect(page.getByText('About $10.00 reaches your wallet.')).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page.getByText('About $10.00 reaches your wallet.')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/\/app\/send\?to=%40user&amount=10(\.00)?&asset=USDC/)).toBeVisible();
   // The picker lists the network's tokens and every currency (the mock network has USDC only).
   await page.getByTestId('receive-unit').click();
@@ -367,7 +362,7 @@ test('chat: the merchant sends the transfer receipt; the person writes and gets 
   expect(errors).toEqual([]);
 });
 
-test('a Yape QR from Peru (static, the account an opaque token): typed amount in soles, paid through a merchant (English)', async ({
+test("a Yape QR from Peru (static, the account an opaque token): typed amount in soles, paid through a merchant (English)", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -408,9 +403,7 @@ test('send to a bank account abroad: a CCI typed in "To" opens a sale to that ac
   });
   await expect(page.getByTestId('trade-dollars')).toHaveCount(0);
   await page.getByLabel('They receive', { exact: true }).fill('74');
-  await expect(page.getByLabel('You send', { exact: true })).toHaveValue('20.00', {
-    timeout: 15_000,
-  });
+  await expect(page.getByLabel('You send', { exact: true })).toHaveValue('20.00', { timeout: 15_000 });
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText(/^74\.00\sPEN$/).first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Which account it goes to' })).toBeVisible();
@@ -421,9 +414,7 @@ test('send to a bank account abroad: a CCI typed in "To" opens a sale to that ac
   await page.getByLabel('Account holder').fill('Rosa Quispe');
   await page.getByRole('button', { name: 'Open order' }).click();
   await page.getByRole('button', { name: 'Sign', exact: true }).click({ timeout: 15_000 });
-  await expect(page.getByRole('button', { name: /Transfer receipt/ })).toBeVisible({
-    timeout: 40_000,
-  });
+  await expect(page.getByRole('button', { name: /Transfer receipt/ })).toBeVisible({ timeout: 40_000 });
   expect(errors).toEqual([]);
 });
 
@@ -434,14 +425,10 @@ test("send to someone's CVU in Argentina: their name and account only, no ID ask
   const errors = trackErrors(page);
   await appSignIn(page, 'es');
   await page.goto('/app/send');
-  await page
-    .getByLabel('@usuario, dirección de Stellar o cuenta bancaria')
-    .fill('0000003100012345678907');
+  await page.getByLabel('@usuario, dirección de Stellar o cuenta bancaria').fill('0000003100012345678907');
   await page.getByRole('button', { name: /Enviar al CVU ••••8907/ }).click();
   await page.getByLabel('Recibe', { exact: true }).fill('14520');
-  await expect(page.getByText(/1 USDC = 1452 ARS|1 USDC = 1\.452 ARS/)).toBeVisible({
-    timeout: 15_000,
-  });
+  await expect(page.getByText(/1 USDC = 1452 ARS|1 USDC = 1\.452 ARS/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('trade-dollars')).toHaveText('≈ US$ 10,00');
   await page.getByRole('button', { name: 'Continuar' }).click();
   // One field for the account: a CBU, a CVU or an alias.

@@ -175,19 +175,10 @@ test('a new wallet: create an organization and register the wallet with a SEP-10
   await dashboardSignIn(page, 'es', 'fresh');
   await page.getByLabel('Nombre', { exact: true }).fill('Cambios Salta');
   await page.getByRole('button', { name: /Crear/ }).first().click();
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Resumen', {
-    timeout: 15_000,
-  });
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Resumen', { timeout: 15_000 });
   await page.goto('/dashboard/liquidity');
-  await page
-    .getByRole('button', { name: /Registrar/ })
-    .first()
-    .click();
-  await page
-    .getByRole('dialog')
-    .getByRole('button', { name: /Registrar|Firmar/ })
-    .last()
-    .click();
+  await page.getByRole('button', { name: /Registrar/ }).first().click();
+  await page.getByRole('dialog').getByRole('button', { name: /Registrar|Firmar/ }).last().click();
   await expect(page.getByText('Billetera registrada')).toBeVisible({ timeout: 20_000 });
   expect(errors).toEqual([]);
 });
