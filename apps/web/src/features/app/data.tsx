@@ -93,7 +93,13 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const [market, setMarket] = useState<P2pMarket | null | undefined>(undefined);
   const [offline, setOffline] = useState(false);
   const [profile, setProfile] = useState<AppProfile | null | undefined>(undefined);
-  const [balances, setBalances] = useState<AppBalances | null | undefined>(undefined);
+  // Balances belong to the wallet they were read for: right after a sign-in (or a switch of
+  // account) the new wallet reads as loading, not as the signed-out null, which Home would show
+  // as "could not load your balance".
+  const [loaded, setLoaded] = useState<{
+    address: string | null;
+    balances: AppBalances | null | undefined;
+  }>({ address: null, balances: undefined });
   const [poke, setPoke] = useState(0);
   const [currency, setCurrencyState] = useState(() => {
     try {
@@ -134,6 +140,8 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   const network = market?.networks[0] ?? null;
   // An ended session (or one whose wallet is gone) loads nothing: the sign-in is on screen.
   const address = session && !expired ? session.address : null;
+  const balances =
+    loaded.address === address ? loaded.balances : address ? undefined : null;
   const token = useMemo(
     () => pickToken(network, balances ?? null, undefined, chosen),
     [network, balances, chosen],
@@ -142,7 +150,7 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!address || !network) {
       setProfile(address ? undefined : null);
-      setBalances(address ? undefined : null);
+      setLoaded({ address, balances: address ? undefined : null });
       return;
     }
     let alive = true;
@@ -158,10 +166,10 @@ export function AppDataProvider({ children }: { children: ReactNode }) {
       });
     app
       .balances(network.id)
-      .then((b) => alive && setBalances(b))
+      .then((b) => alive && setLoaded({ address, balances: b }))
       .catch((e) => {
         fail(e);
-        if (alive) setBalances(null);
+        if (alive) setLoaded({ address, balances: null });
       });
     return () => {
       alive = false;
