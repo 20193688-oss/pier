@@ -72,7 +72,10 @@ test('send to a handle with a note: review the resolved address, sign, done (Spa
   await expect(never).toHaveCount(1);
   await expect(never.getByText('Cancelada', { exact: true })).toBeVisible();
   await expect(never.locator('.pill')).toHaveCount(0);
-  await expect(never.getByText('Retiraste a tu cuenta')).toHaveCSS('text-decoration-line', 'line-through');
+  await expect(never.getByText('Retiraste a tu cuenta')).toHaveCSS(
+    'text-decoration-line',
+    'line-through',
+  );
   await expect(page.getByText('Fallida')).toHaveCount(0);
   expect(errors).toEqual([]);
 });
@@ -86,13 +89,15 @@ test('receive: a payment link with a handle, or a SEP-7 request (English)', asyn
   // The handle taken right after sign-in (suggested from user@demo.test) names the payee.
   const link = page.getByText(/\/app\/send\?to=%40user&amount=20&asset=USDC/);
   await expect(link).toBeVisible();
-  await expect(page.getByText(/≈ 237\.00\sBOB/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/≈ 74\.00\sPEN/)).toBeVisible({ timeout: 15_000 });
   // Asked in local money instead: the request carries the dollars, and says what arrives.
   await page.getByTestId('receive-unit').click();
-  await page.getByRole('dialog').getByRole('button', { name: /BOB/ }).click();
-  await expect(page.getByTestId('receive-unit')).toHaveAccessibleName(/BOB/);
-  await page.getByLabel('Ask for an amount in BOB (optional)').fill('118.5');
-  await expect(page.getByText('About $10.00 reaches your wallet.')).toBeVisible({ timeout: 15_000 });
+  await page.getByRole('dialog').getByRole('button', { name: /PEN/ }).click();
+  await expect(page.getByTestId('receive-unit')).toHaveAccessibleName(/PEN/);
+  await page.getByLabel('Ask for an amount in PEN (optional)').fill('37');
+  await expect(page.getByText('About $10.00 reaches your wallet.')).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.getByText(/\/app\/send\?to=%40user&amount=10(\.00)?&asset=USDC/)).toBeVisible();
   // The picker lists the network's tokens and every currency (the mock network has USDC only).
   await page.getByTestId('receive-unit').click();
@@ -228,25 +233,25 @@ test('add money: amount, who pays, the exact transfer, then the USDC arrive (Spa
   const errors = trackErrors(page);
   await appSignIn(page, 'es');
   await page.getByRole('link', { name: 'Agregar' }).click();
-  await page.locator('#trade-amount').fill('1200');
-  await expect(page.getByText('1 USDC = 12,05 BOB')).toBeVisible({ timeout: 15_000 });
+  await page.locator('#trade-amount').fill('377');
+  await expect(page.getByText('1 USDC = 3,77 PEN')).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Continuar' }).click();
   await page.getByLabel('Nombre completo').fill('Sofía Ruiz');
-  await page.getByLabel('Número de documento').fill('6543210 LP');
+  await page.getByLabel('Número de documento').fill('45821736');
   await page.getByRole('button', { name: 'Abrir orden' }).click();
   await expect(page.getByText('Transfiere exactamente')).toBeVisible({ timeout: 15_000 });
-  await expect(page.locator('.marker')).toHaveText(/1200,00\sBOB/);
+  await expect(page.locator('.marker')).toHaveText(/377,00\sPEN/);
   // A double tap reports the transfer once: no error, and the button stays off once it went.
   await page.getByRole('button', { name: 'Ya transferí' }).dblclick();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByText('Orden completada')).toBeVisible({ timeout: 30_000 });
   // The next purchase comes back with the payer filled in.
   await page.goto('/app/add');
-  await page.locator('#trade-amount').fill('1200');
-  await expect(page.getByText('1 USDC = 12,05 BOB')).toBeVisible({ timeout: 15_000 });
+  await page.locator('#trade-amount').fill('377');
+  await expect(page.getByText('1 USDC = 3,77 PEN')).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Continuar' }).click();
   await expect(page.getByLabel('Nombre completo')).toHaveValue('Sofía Ruiz');
-  await expect(page.getByLabel('Número de documento')).toHaveValue('6543210 LP');
+  await expect(page.getByLabel('Número de documento')).toHaveValue('45821736');
   expect(errors).toEqual([]);
 });
 
@@ -258,14 +263,13 @@ test('withdraw: the payout account, one signature, the merchant pays, release (E
   await appSignIn(page, 'en');
   await page.getByRole('link', { name: 'Withdraw' }).click();
   await page.locator('#trade-amount').fill('40');
-  await expect(page.getByText('1 USDC = 11.85 BOB')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('1 USDC = 3.7 PEN')).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Continue' }).click();
+  // Yape or Plin, the first way to get soles: the holder, the wallet and the mobile number.
   await page.getByLabel('Account holder').fill('Sofía Ruiz');
-  await page.getByLabel('Bank', { exact: true }).fill('Banco Unión');
-  await page.getByLabel('Account type').selectOption('savings');
-  await page.getByLabel('Account number').fill('1000023456781');
-  await page.getByLabel('Document type').selectOption('CI');
-  await page.getByLabel('Document number').fill('6543210');
+  await page.getByLabel('Wallet', { exact: true }).selectOption('yape');
+  await page.getByLabel('Mobile number').fill('987 654 321');
+  await page.getByLabel("Holder's ID").fill('45821736');
   await page.getByRole('button', { name: 'Open order' }).click();
   await page.getByRole('button', { name: 'Sign', exact: true }).click({ timeout: 15_000 });
   await expect(page.getByText('Waiting for a merchant to accept the order.')).toBeVisible({
@@ -276,13 +280,13 @@ test('withdraw: the payout account, one signature, the merchant pays, release (E
   expect(errors).toEqual([]);
 });
 
-test('pay a charge from the balance, or in pesos through the checkout (English)', async ({
+test('pay a charge from the balance, or in soles through the checkout (English)', async ({
   page,
 }) => {
   const errors = trackErrors(page);
   await appSignIn(page, 'en', 'user', { path: '/app/charge/ch_pedido1042' });
   await expect(page.getByText('Tienda Lerma')).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByRole('link', { name: 'Pay in ARS by transfer' })).toHaveAttribute(
+  await expect(page.getByRole('link', { name: 'Pay in PEN by transfer' })).toHaveAttribute(
     'href',
     '/pay/ch_pedido1042',
   );
@@ -328,14 +332,13 @@ test('chat: the merchant sends the transfer receipt; the person writes and gets 
   await appSignIn(page, 'en');
   await page.getByRole('link', { name: 'Withdraw' }).click();
   await page.locator('#trade-amount').fill('25');
-  await expect(page.getByText('1 USDC = 11.85 BOB')).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText('1 USDC = 3.7 PEN')).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Continue' }).click();
+  // Yape or Plin, the first way to get soles: the holder, the wallet and the mobile number.
   await page.getByLabel('Account holder').fill('Sofía Ruiz');
-  await page.getByLabel('Bank', { exact: true }).fill('Banco Unión');
-  await page.getByLabel('Account type').selectOption('savings');
-  await page.getByLabel('Account number').fill('1000023456781');
-  await page.getByLabel('Document type').selectOption('CI');
-  await page.getByLabel('Document number').fill('6543210');
+  await page.getByLabel('Wallet', { exact: true }).selectOption('yape');
+  await page.getByLabel('Mobile number').fill('987 654 321');
+  await page.getByLabel("Holder's ID").fill('45821736');
   await page.getByRole('button', { name: 'Open order' }).click();
   await page.getByRole('button', { name: 'Sign', exact: true }).click({ timeout: 15_000 });
 
@@ -364,7 +367,7 @@ test('chat: the merchant sends the transfer receipt; the person writes and gets 
   expect(errors).toEqual([]);
 });
 
-test("a Yape QR from Peru (static, the account an opaque token): typed amount in soles, paid through a merchant (English)", async ({
+test('a Yape QR from Peru (static, the account an opaque token): typed amount in soles, paid through a merchant (English)', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -405,7 +408,9 @@ test('send to a bank account abroad: a CCI typed in "To" opens a sale to that ac
   });
   await expect(page.getByTestId('trade-dollars')).toHaveCount(0);
   await page.getByLabel('They receive', { exact: true }).fill('74');
-  await expect(page.getByLabel('You send', { exact: true })).toHaveValue('20.00', { timeout: 15_000 });
+  await expect(page.getByLabel('You send', { exact: true })).toHaveValue('20.00', {
+    timeout: 15_000,
+  });
   await page.getByRole('button', { name: 'Continue' }).click();
   await expect(page.getByText(/^74\.00\sPEN$/).first()).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Which account it goes to' })).toBeVisible();
@@ -416,7 +421,9 @@ test('send to a bank account abroad: a CCI typed in "To" opens a sale to that ac
   await page.getByLabel('Account holder').fill('Rosa Quispe');
   await page.getByRole('button', { name: 'Open order' }).click();
   await page.getByRole('button', { name: 'Sign', exact: true }).click({ timeout: 15_000 });
-  await expect(page.getByRole('button', { name: /Transfer receipt/ })).toBeVisible({ timeout: 40_000 });
+  await expect(page.getByRole('button', { name: /Transfer receipt/ })).toBeVisible({
+    timeout: 40_000,
+  });
   expect(errors).toEqual([]);
 });
 
@@ -427,10 +434,14 @@ test("send to someone's CVU in Argentina: their name and account only, no ID ask
   const errors = trackErrors(page);
   await appSignIn(page, 'es');
   await page.goto('/app/send');
-  await page.getByLabel('@usuario, dirección de Stellar o cuenta bancaria').fill('0000003100012345678907');
+  await page
+    .getByLabel('@usuario, dirección de Stellar o cuenta bancaria')
+    .fill('0000003100012345678907');
   await page.getByRole('button', { name: /Enviar al CVU ••••8907/ }).click();
   await page.getByLabel('Recibe', { exact: true }).fill('14520');
-  await expect(page.getByText(/1 USDC = 1452 ARS|1 USDC = 1\.452 ARS/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/1 USDC = 1452 ARS|1 USDC = 1\.452 ARS/)).toBeVisible({
+    timeout: 15_000,
+  });
   await expect(page.getByTestId('trade-dollars')).toHaveText('≈ US$ 10,00');
   await page.getByRole('button', { name: 'Continuar' }).click();
   // One field for the account: a CBU, a CVU or an alias.

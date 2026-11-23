@@ -1,7 +1,13 @@
 /* The mock API's payments-app routes (docs/STELLAR.md 5.2 and 5.6): SEP-10 sign-in and wallet
    proofs, profile and handles, balances and the sponsored activation, transfers, activity, paying
    a charge from the balance, QR payments, and submitting signed envelopes to the mock network. */
-import { Account, Keypair, Operation, TransactionBuilder, type Transaction } from '@stellar/stellar-sdk/base';
+import {
+  Account,
+  Keypair,
+  Operation,
+  TransactionBuilder,
+  type Transaction,
+} from '@stellar/stellar-sdk/base';
 import { normalizeHandle, normalizeRecipient, parseEmv } from '@pier/payment-qr';
 import type { ApiRequest } from '@/lib/api/client';
 import { BRAND } from '@/lib/brand';
@@ -79,7 +85,8 @@ export function sep10Verify(xdr: string, org?: string): string | null {
   } catch {
     return null;
   }
-  if (tx.source !== SEP10_SIGNER.publicKey() || !signedBy(tx, SEP10_SIGNER.publicKey())) return null;
+  if (tx.source !== SEP10_SIGNER.publicKey() || !signedBy(tx, SEP10_SIGNER.publicKey()))
+    return null;
   const first = tx.operations[0];
   if (!first || first.type !== 'manageData' || !first.value || !first.source) return null;
   const nonce = new TextDecoder().decode(first.value);
@@ -110,7 +117,8 @@ export function qrQuote(body: Wire) {
   // The person pays the token amount that buys `fiat` at the merchant's price, rounded up.
   const tokenUnits = BigInt(Math.ceil((fiat / price) * 1e7));
   const usd = Number(tokenUnits) / 1e7;
-  if (!(usd >= 1 && usd <= 2000)) return fail(422, 'no_match', 'No merchant takes this amount right now.');
+  if (!(usd >= 1 && usd <= 2000))
+    return fail(422, 'no_match', 'No merchant takes this amount right now.');
   const fee = (tokenUnits * BigInt(RULES.protocolFeeBps)) / 10000n;
   const q = {
     id: rid('qt', 12),
@@ -271,8 +279,10 @@ export const appRoutes: [ApiRequest['method'], string, Handler][] = [
       if (!h) return fail(422, 'invalid_handle', 'A handle has 3 to 20 of a-z, 0-9 and _.');
       if (RESERVED.includes(h)) return fail(422, 'handle_reserved', 'This handle is reserved.');
       const owner = db().handles[h];
-      if (owner && owner !== s.address) return fail(409, 'handle_taken', 'Someone has this handle.');
-      for (const [k, v] of Object.entries(db().handles)) if (v === s.address) delete db().handles[k];
+      if (owner && owner !== s.address)
+        return fail(409, 'handle_taken', 'Someone has this handle.');
+      for (const [k, v] of Object.entries(db().handles))
+        if (v === s.address) delete db().handles[k];
       db().handles[h] = s.address;
       save();
       return ok(profile(s.address));
@@ -285,7 +295,9 @@ export const appRoutes: [ApiRequest['method'], string, Handler][] = [
       if (!session()) return unauth();
       const h = normalizeHandle(params.handle);
       const address = h ? db().handles[h] : null;
-      return address ? ok({ handle: h, address }) : fail(404, 'not_found', 'Nobody has this handle.');
+      return address
+        ? ok({ handle: h, address })
+        : fail(404, 'not_found', 'Nobody has this handle.');
     },
   ],
   [
@@ -328,7 +340,8 @@ export const appRoutes: [ApiRequest['method'], string, Handler][] = [
       if (to === s.address || base === s.address)
         return fail(422, 'self_transfer', 'That is your own wallet.');
       const amount = String(body.amount ?? '');
-      if (!/^\d+$/.test(amount) || amount === '0') return fail(422, 'invalid_amount', 'Bad amount.');
+      if (!/^\d+$/.test(amount) || amount === '0')
+        return fail(422, 'invalid_amount', 'Bad amount.');
       const note = body.note ? String(body.note) : null;
       if (note && new TextEncoder().encode(note).length > 28)
         return fail(422, 'invalid_note', 'A note holds at most 28 bytes.');
@@ -384,7 +397,11 @@ export const appRoutes: [ApiRequest['method'], string, Handler][] = [
           .transfers.filter(
             (t) => (t.from === s.address || t.to === s.address) && t.status !== 'PENDING',
           )
-          .map((t) => ({ type: 'transfer', at: t.createdAt, transfer: transferView(t, s.address) })),
+          .map((t) => ({
+            type: 'transfer',
+            at: t.createdAt,
+            transfer: transferView(t, s.address),
+          })),
         ...myAppOrders(s.address).map((o) => ({
           type: 'order',
           at: o.createdAt,
@@ -394,7 +411,10 @@ export const appRoutes: [ApiRequest['method'], string, Handler][] = [
       const limit = Math.min(50, Number(req.query?.limit ?? 20) || 20);
       const start = Number(req.query?.cursor ?? 0) || 0;
       const page = items.slice(start, start + limit);
-      return ok({ items: page, nextCursor: start + limit < items.length ? String(start + limit) : null });
+      return ok({
+        items: page,
+        nextCursor: start + limit < items.length ? String(start + limit) : null,
+      });
     },
   ],
   [
@@ -458,4 +478,3 @@ export const appRoutes: [ApiRequest['method'], string, Handler][] = [
     },
   ],
 ];
-
