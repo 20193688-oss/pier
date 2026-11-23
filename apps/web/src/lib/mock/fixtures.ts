@@ -251,6 +251,11 @@ export const MERCHANT_ACCOUNTS: Record<
       documentNumber: '9001234567',
     },
   },
+  pe_wallet: {
+    holderName: 'Cambios Norte SAC',
+    document: null,
+    details: { wallet: 'yape', phone: '987654321' },
+  },
   pe_bank_transfer: {
     holderName: 'Cambios Norte SAC',
     document: null,

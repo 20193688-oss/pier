@@ -60,8 +60,8 @@ test('offers and API keys: publish an offer; a new key is shown once (Spanish)',
   await page.goto('/dashboard/offers');
   await page.getByRole('button', { name: 'Nueva oferta' }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.getByLabel('Moneda')).toHaveValue('BOB');
-  await dialog.getByLabel(/Precio de 1/).fill('12.1');
+  await expect(dialog.getByLabel('Moneda')).toHaveValue('PEN');
+  await dialog.getByLabel(/Precio de 1/).fill('3.8');
   await dialog.getByLabel(/Mínimo por orden/).fill('50');
   await dialog.getByLabel(/Máximo por orden/).fill('7000');
   await dialog.getByRole('button', { name: 'Nueva oferta' }).click();
@@ -159,11 +159,11 @@ test("a QR payment: the merchant sees the shop's QR to pay and marks it paid (En
   const errors = trackErrors(page);
   await signIn(page, 'en');
   await page.goto('/dashboard/orders');
-  await page.getByText('Kiosco La Esquina').first().click();
-  await expect(page.getByRole('img', { name: /Kiosco La Esquina/ })).toBeVisible({
+  await page.getByText('BODEGA LUCHO').first().click();
+  await expect(page.getByRole('img', { name: /BODEGA LUCHO/ })).toBeVisible({
     timeout: 15_000,
   });
-  await expect(page.getByText(/^00020101021143/).first()).toBeVisible();
+  await expect(page.getByText(/^00020101021139/).first()).toBeVisible();
   await expectNoHorizontalScroll(page);
   expect(errors).toEqual([]);
 });
@@ -175,10 +175,19 @@ test('a new wallet: create an organization and register the wallet with a SEP-10
   await dashboardSignIn(page, 'es', 'fresh');
   await page.getByLabel('Nombre', { exact: true }).fill('Cambios Salta');
   await page.getByRole('button', { name: /Crear/ }).first().click();
-  await expect(page.getByRole('heading', { level: 1 })).toContainText('Resumen', { timeout: 15_000 });
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Resumen', {
+    timeout: 15_000,
+  });
   await page.goto('/dashboard/liquidity');
-  await page.getByRole('button', { name: /Registrar/ }).first().click();
-  await page.getByRole('dialog').getByRole('button', { name: /Registrar|Firmar/ }).last().click();
+  await page
+    .getByRole('button', { name: /Registrar/ })
+    .first()
+    .click();
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: /Registrar|Firmar/ })
+    .last()
+    .click();
   await expect(page.getByText('Billetera registrada')).toBeVisible({ timeout: 20_000 });
   expect(errors).toEqual([]);
 });
