@@ -1,9 +1,9 @@
 /* The payments app (/app/*): international payments between people (send, receive, scan and pay
    in other countries' money). Spanish is the source; en/app.ts mirrors it key for key. */
 const app = {
-  metaTitle: '{brand}: pagos internacionales entre personas',
+  metaTitle: '{brand}: tus soles, en dólares digitales',
   metaDescription:
-    'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR.',
+    'Compra y vende dólares digitales con Yape, Plin o CCI, envía a cualquier @usuario y paga con QR, en Perú y en otros países.',
   tabs: {
     label: 'Secciones de la app',
     home: 'Inicio',
@@ -17,8 +17,8 @@ const app = {
   usd: 'US$ {amount}',
   approx: '≈ {amount}',
   welcome: {
-    title: 'Paga como local en cualquier país',
-    lede: 'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR.',
+    title: 'Tus soles, en dólares digitales',
+    lede: 'Compra y vende dólares digitales con Yape, Plin o CCI, envía a cualquier @usuario y paga con QR, en Perú y en otros países.',
   },
   handle: {
     title: 'Elige tu @usuario',
@@ -102,7 +102,7 @@ const app = {
     toLabel: '@usuario, dirección de Stellar o cuenta bancaria',
     toPlaceholder: '@usuario, G…, CCI, CVU o alias',
     toBank: 'A una cuenta bancaria',
-    toBankBody: 'En otro país y en su moneda: CCI, CVU o alias, PIX, CLABE o una cuenta de Bolivia.',
+    toBankBody: 'En Perú con su CCI, o en otro país y en su moneda: CVU o alias, PIX, CLABE o una cuenta de Bolivia.',
     bankDetected: 'Enviar al {kind} {account}',
     bankDetectedSub: 'Recibe en {currency} en su cuenta',
     bankKinds: { cbu: 'CBU', cvu: 'CVU', alias: 'alias', cci: 'CCI', clabe: 'CLABE' },
@@ -163,15 +163,15 @@ const app = {
   },
   add: {
     title: 'Agregar dinero',
-    lede: 'Compra USDC con una transferencia desde tu banco. Un comerciante verificado te los envía.',
+    lede: 'Compra USDC pagando con Yape, Plin o una transferencia. Un comerciante verificado te los envía.',
   },
   sendBank: {
     title: 'Enviar a una cuenta bancaria',
     lede: 'Envías USDC y la persona recibe el dinero en su cuenta, en su moneda. Un comerciante del mercado hace la transferencia y te deja el comprobante en el chat de la orden.',
   },
   withdraw: {
-    title: 'Retirar a tu banco',
-    lede: 'Vende USDC y recibe el dinero en tu cuenta bancaria. Los USDC quedan bloqueados hasta que confirmes que llegó el dinero.',
+    title: 'Retirar a tu cuenta',
+    lede: 'Vende USDC y recibe el dinero en tu Yape, Plin o cuenta bancaria. Los USDC quedan bloqueados hasta que confirmes que llegó el dinero.',
   },
   order: {
     title: 'Tu orden',
@@ -262,7 +262,7 @@ const app = {
     outside: 'una wallet externa',
     kinds: {
       BUY: 'Agregaste dinero',
-      SELL: 'Retiraste a tu banco',
+      SELL: 'Retiraste a tu cuenta',
       QR_PAY: 'Pago con QR',
       CHARGE: 'Pago de un cobro',
       PAYOUT: 'Pago',

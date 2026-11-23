@@ -18,6 +18,7 @@ export type RailId =
   | 'br_pix'
   | 'mx_spei'
   | 'co_bank_transfer'
+  | 'pe_wallet'
   | 'pe_bank_transfer'
   | 'cl_bank_transfer'
   | 'ar_qr'
@@ -46,6 +47,8 @@ export type FieldKind =
   | 'ciNit'
   | 'accountNumber'
   | 'cci'
+  | 'peWallet'
+  | 'pePhone'
   | 'dniRuc'
   | 'rut'
   | 'nitCc'
@@ -90,6 +93,8 @@ export const CO_ACCOUNT_TYPES = ['savings', 'checking'] as const;
 export const CL_ACCOUNT_TYPES = ['checking', 'vista', 'savings'] as const;
 export const CO_DOCUMENT_TYPES = ['CC', 'CE', 'NIT', 'PP'] as const;
 export const PE_DOCUMENT_TYPES = ['DNI', 'CE', 'RUC', 'PP'] as const;
+/** Peru's mobile wallets, paid to the holder's phone number. */
+export const PE_WALLETS = ['yape', 'plin'] as const;
 
 export const RAILS: Record<RailId, Rail> = {
   bo_bank_transfer: {
@@ -147,6 +152,15 @@ export const RAILS: Record<RailId, Rail> = {
     documentKey: 'documentNumber',
     idFields: ['documentType', 'documentNumber'],
     idRequired: true,
+  },
+  pe_wallet: {
+    id: 'pe_wallet',
+    currency: 'PEN',
+    country: 'pe',
+    fields: [
+      { key: 'wallet', kind: 'peWallet', options: PE_WALLETS },
+      { key: 'phone', kind: 'pePhone' },
+    ],
   },
   pe_bank_transfer: {
     id: 'pe_bank_transfer',
@@ -220,8 +234,8 @@ export function railsFor(currency: string): Rail[] {
   return RAIL_IDS.map((id) => RAILS[id]).filter((r) => r.currency === currency);
 }
 
-/** The market's main currency, Bolivia's boliviano: preselected wherever a currency is. */
-export const HOME_CURRENCY = 'BOB';
+/** The market's main currency, Peru's sol: preselected wherever a currency is. */
+export const HOME_CURRENCY = 'PEN';
 
 /** The currency to preselect among `currencies`: the main one when listed, else the first. */
 export function defaultCurrency(currencies: readonly { code: string }[]): string {
@@ -361,6 +375,16 @@ export function checkCurp(value: string): FieldError | null {
     : 'format';
 }
 
+/** A Peruvian mobile number for Yape or Plin: 9 digits starting with 9 (a +51 prefix is dropped). */
+export function checkPePhone(value: string): FieldError | null {
+  return /^9\d{8}$/.test(pePhone(value)) ? null : 'format';
+}
+
+/** A Peruvian mobile number as the server keeps it: digits only, without +51. */
+export function pePhone(value: string): string {
+  return (value ?? '').replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
+}
+
 /** A Peruvian CCI: 20 digits. */
 export function checkCci(value: string): FieldError | null {
   return /^\d{20}$/.test(digitsOf(value)) ? null : 'format';
@@ -450,7 +474,10 @@ export function checkField(
     case 'documentTypeBo':
     case 'documentTypeCo':
     case 'documentTypePe':
+    case 'peWallet':
       return options && !options.includes(v) ? 'format' : null;
+    case 'pePhone':
+      return checkPePhone(v);
     case 'pixKey':
       return checkPixKey(context.keyType ?? context.pixKeyType ?? '', v);
     case 'documentNumber':
@@ -588,6 +615,7 @@ export function normalizeDetails(
     if (!v) continue;
     if (field.kind === 'alias') v = v.toLowerCase();
     if (field.kind === 'documentNumberBo') v = boDocument(v);
+    if (field.kind === 'pePhone') v = pePhone(v);
     if (['cbu', 'clabe', 'cci', 'accountNumber'].includes(field.kind)) v = v.replace(/[\s.-]/g, '');
     out[field.key] = v;
   }

@@ -119,6 +119,7 @@ export const CURRENCIES = [
   {
     code: 'PEN',
     rails: [
+      { id: 'pe_wallet', fields: [field('wallet'), field('phone')] },
       {
         id: 'pe_bank_transfer',
         fields: [field('cci'), field('documentType'), field('documentNumber')],
@@ -249,6 +250,11 @@ export const MERCHANT_ACCOUNTS: Record<
       documentType: 'NIT',
       documentNumber: '9001234567',
     },
+  },
+  pe_wallet: {
+    holderName: 'Cambios Norte SAC',
+    document: null,
+    details: { wallet: 'yape', phone: '987654321' },
   },
   pe_bank_transfer: {
     holderName: 'Cambios Norte SAC',

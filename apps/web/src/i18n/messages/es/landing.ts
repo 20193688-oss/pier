@@ -1,15 +1,15 @@
 /* The public home page. */
 const landing = {
-  metaTitle: '{brand}: pagos internacionales entre personas',
+  metaTitle: '{brand}: de soles a dólares digitales con Yape, Plin o CCI',
   metaDescription:
-    'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR. Cada pago lo completa un comerciante local y el dinero queda en un contrato hasta que se confirma.',
+    'Compra y vende dólares digitales (USDC en Stellar) pagando con Yape, Plin o CCI. Cada pago lo completa un comerciante local y el dinero queda en un contrato hasta que se confirma.',
   hero: {
-    title: 'Pagos internacionales entre personas',
-    body: 'Envía dinero a alguien en otro país, paga con QR donde estés o cambia a tu moneda con una transferencia bancaria. Cada pago lo completa un comerciante local, y el dinero queda en un contrato hasta que se confirma.',
+    title: 'De soles a dólares digitales, con Yape',
+    body: 'En Perú todavía no hay una rampa de Stellar para soles: pasar de soles a dólares digitales depende de exchanges extranjeros. Aquí pagas con Yape, Plin o CCI, un comerciante verificado te envía USDC y el dinero queda en un contrato hasta que se confirma. También envías y pagas con QR en otros países.',
     open: 'Crear cuenta',
     merchant: 'Soy comerciante',
     rails:
-      'Transferencia bancaria en Bolivia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia, Perú y Chile.',
+      'Yape, Plin y CCI en Perú, transferencia bancaria en Bolivia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia y Chile.',
   },
   slip: {
     caption: 'Así se ve una orden: el monto exacto, la cuenta y el tiempo que te queda.',
@@ -52,11 +52,11 @@ const landing = {
       },
       {
         title: 'Paga con QR',
-        body: 'Escanea el QR de un comercio en Argentina o un PIX en Brasil: un comerciante del mercado lo paga por ti en pesos o reales.',
+        body: 'Escanea el QR de un comercio en Perú (Yape, Plin), en Argentina o un PIX en Brasil: un comerciante del mercado lo paga por ti en soles, pesos o reales.',
       },
       {
         title: 'Carga y retira',
-        body: 'Compra USDC con una transferencia desde tu banco y véndelos cuando necesites moneda local.',
+        body: 'Compra USDC con Yape, Plin o una transferencia desde tu banco, y véndelos cuando necesites soles.',
       },
       {
         title: 'Paga cobros',

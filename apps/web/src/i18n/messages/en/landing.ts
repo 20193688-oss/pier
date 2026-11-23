@@ -2,16 +2,16 @@
 import type es from '@/i18n/messages/es/landing';
 
 const landing: typeof es = {
-  metaTitle: '{brand}: international payments between people',
+  metaTitle: '{brand}: from soles to digital dollars with Yape, Plin or CCI',
   metaDescription:
-    'Send money to people in other countries and pay in each place’s currency, by bank transfer or QR. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
+    'Buy and sell digital dollars (USDC on Stellar) paying with Yape, Plin or CCI. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
   hero: {
-    title: 'International payments between people',
-    body: 'Send money to someone in another country, pay by QR wherever you are or switch to your currency with a bank transfer. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
+    title: 'From soles to digital dollars, with Yape',
+    body: 'Peru has no Stellar ramp for soles yet: going from soles to digital dollars depends on foreign exchanges. Here you pay with Yape, Plin or CCI, a verified merchant sends you USDC, and the money stays in a contract until it is confirmed. You can also send and pay by QR in other countries.',
     open: 'Create account',
     merchant: 'I am a merchant',
     rails:
-      'Bank transfer in Bolivia, CVU or alias in Argentina, PIX in Brazil, SPEI in Mexico, and banks in Colombia, Peru and Chile.',
+      'Yape, Plin and CCI in Peru, bank transfer in Bolivia, CVU or alias in Argentina, PIX in Brazil, SPEI in Mexico, and banks in Colombia and Chile.',
   },
   slip: {
     caption:
@@ -55,11 +55,11 @@ const landing: typeof es = {
       },
       {
         title: 'Pay by QR',
-        body: 'Scan a shop’s QR in Argentina or a PIX in Brazil: a market merchant pays it for you in pesos or reais.',
+        body: 'Scan a shop’s QR in Peru (Yape, Plin), in Argentina or a PIX in Brazil: a market merchant pays it for you in soles, pesos or reais.',
       },
       {
         title: 'Add money and withdraw',
-        body: 'Buy USDC with a transfer from your bank and sell it when you need local money.',
+        body: 'Buy USDC with Yape, Plin or a transfer from your bank, and sell it when you need local money.',
       },
       {
         title: 'Pay charges',

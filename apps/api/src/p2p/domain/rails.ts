@@ -285,6 +285,13 @@ const PE_FIELDS = [
   field('documentNumber', "The holder's document number"),
 ] as const;
 
+/** Peru's mobile wallets, paid to the holder's phone number. */
+const PE_WALLETS = ['yape', 'plin'] as const;
+const PE_WALLET_FIELDS = [
+  field('wallet', 'The mobile wallet', true, PE_WALLETS),
+  field('phone', "The holder's mobile number, 9 digits starting with 9"),
+] as const;
+
 const CL_ACCOUNT_TYPES = ['checking', 'vista', 'savings'] as const;
 const CL_FIELDS = [
   field('bank', 'Bank name'),
@@ -321,6 +328,7 @@ export const P2P_RAIL_IDS = [
   'br_pix',
   'mx_spei',
   'co_bank_transfer',
+  'pe_wallet',
   'pe_bank_transfer',
   'cl_bank_transfer',
   'ar_qr',
@@ -471,6 +479,25 @@ export const P2P_RAILS: Record<P2pRailId, P2pRail> = {
       return result(values, errors);
     },
     summary: (d) => `${d.bank} ${mask(d.accountNumber ?? '')}`,
+  },
+  pe_wallet: {
+    currency: 'PEN',
+    name: 'Yape or Plin',
+    fields: PE_WALLET_FIELDS,
+    // Yape and Plin pay a phone number: the wallet already identified its holder.
+    holderId: [],
+    beneficiaryIdRequired: false,
+    check(details) {
+      const { values, errors } = pick(details, PE_WALLET_FIELDS);
+      if (values.phone)
+        values.phone = values.phone.replace(/\D/g, '').replace(/^51(?=9\d{8}$)/, '');
+      requireFields(values, ['wallet', 'phone'], errors);
+      if (values.phone && !/^9\d{8}$/.test(values.phone)) {
+        errors.push('details.phone must be 9 digits starting with 9');
+      }
+      return result(values, errors);
+    },
+    summary: (d) => `${d.wallet === 'plin' ? 'Plin' : 'Yape'} ${mask(d.phone ?? '')}`,
   },
   pe_bank_transfer: {
     currency: 'PEN',

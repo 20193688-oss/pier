@@ -1903,7 +1903,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail?: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
+            rail?: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_wallet" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
             /**
              * @description A trade: BUY receives tokens and pays local money; SELL sends tokens and receives local money. Required unless `kind` is `QR_PAY`.
              * @example BUY
@@ -2436,7 +2436,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
+            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_wallet" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
         };
         /** @description A merchant’s standing price. Its bot refreshes `price` (a PATCH) before `priceTtlSeconds` runs out, or the offer stops matching. */
         CreateOfferDto: {
@@ -2487,7 +2487,7 @@ export interface components {
              *       "ar_bank_transfer"
              *     ]
              */
-            rails: ("bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr")[];
+            rails: ("bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_wallet" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr")[];
             /**
              * @description SELL_TOKEN: you sell tokens from your balance in the contract (authorise the matcher for it). BUY_TOKEN: you buy tokens, accepting each order with a bond from your balance.
              * @example SELL_TOKEN
@@ -2591,7 +2591,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
+            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_wallet" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
         };
         /** @description Payouts from your balance in the contract: each item is matched with a merchant and opened by the matcher on your balance. */
         CreatePayoutDto: {
@@ -2641,7 +2641,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
+            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_wallet" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
             /**
              * @description BUY: the person receives tokens and pays local money. SELL: the person sends tokens and receives local money.
              * @example BUY
@@ -3794,7 +3794,7 @@ export interface components {
              * @example ar_bank_transfer
              * @enum {string}
              */
-            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
+            rail: "bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_wallet" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr";
         };
         /** @description What a QR payment’s scanned QR reads, for the person who scanned it (never the payload itself). */
         QrSummaryView: {
@@ -4186,7 +4186,7 @@ export interface components {
              *       "ar_bank_transfer"
              *     ]
              */
-            rails?: ("bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr")[];
+            rails?: ("bo_bank_transfer" | "ar_bank_transfer" | "br_pix" | "mx_spei" | "co_bank_transfer" | "pe_wallet" | "pe_bank_transfer" | "cl_bank_transfer" | "ar_qr" | "br_pix_qr" | "pe_qr")[];
         };
         UpdateOrganization: {
             /** @example Pampa Cambio */
