@@ -57,6 +57,15 @@ type QuoteState = {
   accepted: AcceptedQuote | null;
 };
 
+/** The received amount's size: an exact USDC amount can carry up to seven decimals, so a long
+    figure steps down to fit beside the token button on a phone instead of being cut off. */
+function outSize(figure: string): string {
+  const n = figure.length;
+  if (n <= 7) return 'text-[clamp(1.7rem,8vw,2.3rem)]';
+  if (n <= 10) return 'text-[clamp(1.35rem,6.2vw,1.9rem)]';
+  return 'text-[clamp(1.1rem,5vw,1.6rem)]';
+}
+
 export function TradeForm({
   market,
   initialSide,
@@ -499,6 +508,9 @@ export function TradeForm({
       ? units(lang, fresh.netAmount, symbol)
       : money(lang, fresh.fiatAmount, currency)
     : '';
+  // The number alone: the token button beside it already names the unit. Formatting may join
+  // them with a no-break space, so any whitespace splits.
+  const outFigure = outText.split(/\s/)[0];
   const rateText = fresh
     ? inverse
       ? fmt(a.rateInverse, {
@@ -697,12 +709,12 @@ export function TradeForm({
                 <output
                   aria-labelledby="trade-get-l"
                   aria-live="polite"
-                  className={`figure w-full min-w-0 truncate text-[clamp(1.7rem,8vw,2.3rem)] ${outText ? '' : 'text-ink-3/60'}`}
+                  className={`figure w-full min-w-0 truncate ${outSize(outFigure)} ${outText ? '' : 'text-ink-3/60'}`}
                 >
                   {quote.status === 'loading' && !outText ? (
                     <Skeleton className="h-9 w-2/3" />
                   ) : outText ? (
-                    outText.split(' ')[0]
+                    outFigure
                   ) : (
                     '0'
                   )}
