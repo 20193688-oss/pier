@@ -271,11 +271,25 @@ offered to liquidity merchants.
     a side navigation with the logo and a centred column of up to 820px, with 32px gutters.
     Screens enter forward from the right, back from the left, and tab switches fade. There is
     no tap highlight, and every control shows its own press.
+- **Peru first** (2026-11-22, branch `feat/peru-front`, for the Stellar Codember Perú buildathon):
+  - PEN is the default currency everywhere (`HOME_CURRENCY` / `defaultCurrency` in
+    `apps/web/src/lib/p2p/rails.ts`; the app's pick moved to `pier.app.currency.v3`, so an older
+    pick is dropped once). ARS, BOB and the other currencies stay listed.
+  - **Yape and Plin** are a rail, `pe_wallet` (API `p2p/domain/rails.ts`, web `lib/p2p/rails.ts`):
+    `wallet` (`yape` | `plin`) and `phone` (9 digits starting with 9; a +51 prefix is dropped),
+    no holder ID; summary `Yape ••••4321`. It is listed before `pe_bank_transfer` (CCI). The dev
+    stack's bot merchants do not offer it yet.
+  - Copy leads with Peru (Yape, Plin, CCI): add money, withdraw ("to your account"), send to a
+    bank account, the landing ("From soles to digital dollars, with Yape") and the app welcome.
+  - Mock mode's demo data (the app user's history and the merchant dashboard: methods, offers,
+    orders, charges, payouts, the QR payment on a Yape QR) is in soles; the e2e flows follow.
+  - Fixes: right after a sign-in Home no longer shows "could not load your balance" (balances are
+    keyed to the wallet they were read for); add money's received figure shows the number only
+    and steps down in size instead of being cut off.
 - More of the owner's asks (2026-11-20, later; the hackathon is in Bolivia):
-  - **Bolivia first.** BOB is the default currency everywhere (`HOME_CURRENCY` /
-    `defaultCurrency` in `src/lib/p2p/rails.ts`; the app's pick is stored under
-    `pier.app.currency.v2`). The rail is `bo_bank_transfer` (CI/NIT as the payer's document).
-    The testnet market lists USDC and XLM only (no TUSD).
+  - **Bolivia first** (superseded on 2026-11-22 by "Peru first", below). BOB was the default
+    currency; the rail is `bo_bank_transfer` (CI/NIT as the payer's document). The testnet market
+    lists USDC and XLM only (no TUSD).
   - **Flags.** Each currency shows its country's round flag (`CurrencyMark` in
     `components/p2p/parts.tsx`, from `country-flag-icons`). Home's local-value line and the
     profile open a flag picker (`useCurrencyPicker`).
