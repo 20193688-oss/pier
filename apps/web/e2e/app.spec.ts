@@ -16,7 +16,7 @@ test('sign in, claim a handle, and the home screen (Spanish)', async ({ page }) 
   await page.getByRole('button', { name: 'Guardar @usuario' }).click();
   await expect(page.getByText('Hola, @sofia_r')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByTestId('balance')).toHaveText('US$ 248,35');
-  await expect(page.getByText(/≈ .*ARS/)).toBeVisible({ timeout: 15_000 });
+  await expect(page.getByText(/≈ .*PEN/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('navigation', { name: 'Secciones de la app' }).first()).toBeVisible();
   await expect(page.getByText('Recibiste de @lucia')).toBeVisible();
   await expectNoHorizontalScroll(page);
