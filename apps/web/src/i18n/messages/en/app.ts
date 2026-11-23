@@ -1,8 +1,8 @@
 /* The payments app (/app/*), in English: mirrors es/app.ts key for key. */
 const app = {
-  metaTitle: '{brand}: international payments between people',
+  metaTitle: '{brand}: your soles, in digital dollars',
   metaDescription:
-    'Send money to people in other countries and pay in each place’s currency, by bank transfer or QR.',
+    'Buy and sell digital dollars with Yape, Plin or CCI, send to any @handle and pay by QR, in Peru and other countries.',
   tabs: {
     label: 'App sections',
     home: 'Home',
@@ -16,8 +16,8 @@ const app = {
   usd: '${amount}',
   approx: '≈ {amount}',
   welcome: {
-    title: 'Pay like a local in any country',
-    lede: 'Send money to people in other countries and pay in each place’s currency, by bank transfer or QR.',
+    title: 'Your soles, in digital dollars',
+    lede: 'Buy and sell digital dollars with Yape, Plin or CCI, send to any @handle and pay by QR, in Peru and other countries.',
   },
   handle: {
     title: 'Pick your @handle',

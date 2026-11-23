@@ -2,12 +2,12 @@
 import type es from '@/i18n/messages/es/landing';
 
 const landing: typeof es = {
-  metaTitle: '{brand}: international payments between people',
+  metaTitle: '{brand}: from soles to digital dollars with Yape, Plin or CCI',
   metaDescription:
-    'Send money to people in other countries and pay in each place’s currency, by bank transfer or QR. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
+    'Buy and sell digital dollars (USDC on Stellar) paying with Yape, Plin or CCI. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
   hero: {
-    title: 'International payments between people',
-    body: 'Send money to someone in another country, pay by QR wherever you are or switch to your currency with a bank transfer. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
+    title: 'From soles to digital dollars, with Yape',
+    body: 'Peru has no Stellar ramp for soles yet: going from soles to digital dollars depends on foreign exchanges. Here you pay with Yape, Plin or CCI, a verified merchant sends you USDC, and the money stays in a contract until it is confirmed. You can also send and pay by QR in other countries.',
     open: 'Create account',
     merchant: 'I am a merchant',
     rails:

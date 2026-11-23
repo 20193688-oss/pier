@@ -314,7 +314,7 @@ test('profile: address, language, and sign out (English)', async ({ page }) => {
   await page.getByRole('button', { name: 'Sign out' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Sign out' }).click();
   await expect(
-    page.getByRole('heading', { name: 'Pay like a local in any country' }),
+    page.getByRole('heading', { name: 'Your soles, in digital dollars' }),
   ).toBeVisible();
   expect(errors).toEqual([]);
 });
