@@ -137,7 +137,8 @@ const p2p = {
     title: 'Chat con el comerciante',
     titleMerchant: 'Chat con el cliente',
     subtitle: 'Solo lo ven ustedes dos y, si hay un reclamo, quien lo resuelve.',
-    empty: 'Escríbele al comerciante si necesitas algo. El comprobante de la transferencia también llega acá.',
+    empty:
+      'Escríbele al comerciante si necesitas algo. El comprobante de la transferencia también llega acá.',
     emptyMerchant: 'Escríbele a tu cliente. Cuando le transfieras, adjunta el comprobante acá.',
     unavailable: 'El chat de esta orden no está disponible.',
     placeholder: 'Escribe un mensaje',

@@ -72,7 +72,7 @@ test('send to a handle with a note: review the resolved address, sign, done (Spa
   await expect(never).toHaveCount(1);
   await expect(never.getByText('Cancelada', { exact: true })).toBeVisible();
   await expect(never.locator('.pill')).toHaveCount(0);
-  await expect(never.getByText('Retiraste a tu banco')).toHaveCSS('text-decoration-line', 'line-through');
+  await expect(never.getByText('Retiraste a tu cuenta')).toHaveCSS('text-decoration-line', 'line-through');
   await expect(page.getByText('Fallida')).toHaveCount(0);
   expect(errors).toEqual([]);
 });

@@ -11,7 +11,7 @@ const landing: typeof es = {
     open: 'Create account',
     merchant: 'I am a merchant',
     rails:
-      'Bank transfer in Bolivia, CVU or alias in Argentina, PIX in Brazil, SPEI in Mexico, and banks in Colombia, Peru and Chile.',
+      'Yape, Plin and CCI in Peru, bank transfer in Bolivia, CVU or alias in Argentina, PIX in Brazil, SPEI in Mexico, and banks in Colombia and Chile.',
   },
   slip: {
     caption:
@@ -55,11 +55,11 @@ const landing: typeof es = {
       },
       {
         title: 'Pay by QR',
-        body: 'Scan a shop’s QR in Argentina or a PIX in Brazil: a market merchant pays it for you in pesos or reais.',
+        body: 'Scan a shop’s QR in Peru (Yape, Plin), in Argentina or a PIX in Brazil: a market merchant pays it for you in soles, pesos or reais.',
       },
       {
         title: 'Add money and withdraw',
-        body: 'Buy USDC with a transfer from your bank and sell it when you need local money.',
+        body: 'Buy USDC with Yape, Plin or a transfer from your bank, and sell it when you need local money.',
       },
       {
         title: 'Pay charges',

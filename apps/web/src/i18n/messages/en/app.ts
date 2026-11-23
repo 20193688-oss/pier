@@ -100,7 +100,8 @@ const app = {
     toLabel: '@handle, Stellar address or bank account',
     toPlaceholder: '@handle, G…, CCI, CVU or alias',
     toBank: 'To a bank account',
-    toBankBody: 'In another country, in its currency: CCI, CVU or alias, PIX, CLABE or a Bolivian account.',
+    toBankBody:
+      'In Peru with their CCI, or in another country in its currency: CVU or alias, PIX, CLABE or a Bolivian account.',
     bankDetected: 'Send to the {kind} {account}',
     bankDetectedSub: 'They receive {currency} in their account',
     bankKinds: { cbu: 'CBU', cvu: 'CVU', alias: 'alias', cci: 'CCI', clabe: 'CLABE' },
@@ -161,15 +162,15 @@ const app = {
   },
   add: {
     title: 'Add money',
-    lede: 'Buy USDC with a transfer from your bank. A verified merchant sends them to you.',
+    lede: 'Buy USDC paying with Yape, Plin or a bank transfer. A verified merchant sends them to you.',
   },
   sendBank: {
     title: 'Send to a bank account',
     lede: 'You send USDC and the person gets the money in their account, in their currency. A market merchant makes the transfer and leaves you the receipt in the order’s chat.',
   },
   withdraw: {
-    title: 'Withdraw to your bank',
-    lede: 'Sell USDC and get local money in your account. The USDC stay locked until you confirm the money arrived.',
+    title: 'Withdraw to your account',
+    lede: 'Sell USDC and get local money in your Yape, Plin or bank account. The USDC stay locked until you confirm the money arrived.',
   },
   order: {
     title: 'Your order',
@@ -261,7 +262,7 @@ const app = {
     outside: 'an outside wallet',
     kinds: {
       BUY: 'Added money',
-      SELL: 'Withdrew to your bank',
+      SELL: 'Withdrew to your account',
       QR_PAY: 'QR payment',
       CHARGE: 'Charge payment',
       PAYOUT: 'Payment',
