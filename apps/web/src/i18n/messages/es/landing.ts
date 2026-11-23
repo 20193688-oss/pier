@@ -9,7 +9,7 @@ const landing = {
     open: 'Crear cuenta',
     merchant: 'Soy comerciante',
     rails:
-      'Transferencia bancaria en Bolivia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia, Perú y Chile.',
+      'Yape, Plin y CCI en Perú, transferencia bancaria en Bolivia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia y Chile.',
   },
   slip: {
     caption: 'Así se ve una orden: el monto exacto, la cuenta y el tiempo que te queda.',
@@ -52,11 +52,11 @@ const landing = {
       },
       {
         title: 'Paga con QR',
-        body: 'Escanea el QR de un comercio en Argentina o un PIX en Brasil: un comerciante del mercado lo paga por ti en pesos o reales.',
+        body: 'Escanea el QR de un comercio en Perú (Yape, Plin), en Argentina o un PIX en Brasil: un comerciante del mercado lo paga por ti en soles, pesos o reales.',
       },
       {
         title: 'Carga y retira',
-        body: 'Compra USDC con una transferencia desde tu banco y véndelos cuando necesites moneda local.',
+        body: 'Compra USDC con Yape, Plin o una transferencia desde tu banco, y véndelos cuando necesites soles.',
       },
       {
         title: 'Paga cobros',

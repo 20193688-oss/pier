@@ -113,7 +113,12 @@ const p2p: typeof es = {
     accountTypeBo: { savings: 'Savings', checking: 'Checking' },
     accountTypeCo: { savings: 'Savings', checking: 'Checking' },
     accountTypeCl: { checking: 'Checking', vista: 'Demand account', savings: 'Savings' },
-    documentTypeBo: { CI: 'Identity card (CI)', NIT: 'NIT', CE: 'Foreigner ID card', PP: 'Passport' },
+    documentTypeBo: {
+      CI: 'Identity card (CI)',
+      NIT: 'NIT',
+      CE: 'Foreigner ID card',
+      PP: 'Passport',
+    },
     documentTypeCo: { CC: 'Citizenship card', CE: 'Foreigner ID card', NIT: 'NIT', PP: 'Passport' },
     documentTypePe: { DNI: 'DNI', CE: 'Foreigner ID card', RUC: 'RUC', PP: 'Passport' },
   },
@@ -144,7 +149,8 @@ const p2p: typeof es = {
     openFailed: 'Could not open the receipt.',
     unread: 'New message',
     open: 'Chat',
-    afterPaid: 'You marked the order paid. Attach the transfer receipt: your customer sees it in their chat.',
+    afterPaid:
+      'You marked the order paid. Attach the transfer receipt: your customer sees it in their chat.',
   },
   errors: {
     required: 'Required',
