@@ -1,11 +1,11 @@
 /* The public home page. */
 const landing = {
-  metaTitle: '{brand}: pagos internacionales entre personas',
+  metaTitle: '{brand}: de soles a dólares digitales con Yape, Plin o CCI',
   metaDescription:
-    'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR. Cada pago lo completa un comerciante local y el dinero queda en un contrato hasta que se confirma.',
+    'Compra y vende dólares digitales (USDC en Stellar) pagando con Yape, Plin o CCI. Cada pago lo completa un comerciante local y el dinero queda en un contrato hasta que se confirma.',
   hero: {
-    title: 'Pagos internacionales entre personas',
-    body: 'Envía dinero a alguien en otro país, paga con QR donde estés o cambia a tu moneda con una transferencia bancaria. Cada pago lo completa un comerciante local, y el dinero queda en un contrato hasta que se confirma.',
+    title: 'De soles a dólares digitales, con Yape',
+    body: 'En Perú todavía no hay una rampa de Stellar para soles: pasar de soles a dólares digitales depende de exchanges extranjeros. Aquí pagas con Yape, Plin o CCI, un comerciante verificado te envía USDC y el dinero queda en un contrato hasta que se confirma. También envías y pagas con QR en otros países.',
     open: 'Crear cuenta',
     merchant: 'Soy comerciante',
     rails:

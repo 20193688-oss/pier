@@ -1,9 +1,9 @@
 /* The payments app (/app/*): international payments between people (send, receive, scan and pay
    in other countries' money). Spanish is the source; en/app.ts mirrors it key for key. */
 const app = {
-  metaTitle: '{brand}: pagos internacionales entre personas',
+  metaTitle: '{brand}: tus soles, en dólares digitales',
   metaDescription:
-    'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR.',
+    'Compra y vende dólares digitales con Yape, Plin o CCI, envía a cualquier @usuario y paga con QR, en Perú y en otros países.',
   tabs: {
     label: 'Secciones de la app',
     home: 'Inicio',
@@ -17,8 +17,8 @@ const app = {
   usd: 'US$ {amount}',
   approx: '≈ {amount}',
   welcome: {
-    title: 'Paga como local en cualquier país',
-    lede: 'Envía dinero a personas de otros países y paga en la moneda de cada lugar, por transferencia bancaria o con QR.',
+    title: 'Tus soles, en dólares digitales',
+    lede: 'Compra y vende dólares digitales con Yape, Plin o CCI, envía a cualquier @usuario y paga con QR, en Perú y en otros países.',
   },
   handle: {
     title: 'Elige tu @usuario',
