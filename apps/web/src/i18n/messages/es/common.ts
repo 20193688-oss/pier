@@ -7,7 +7,7 @@ const common = {
   nav: {
     label: 'Principal',
     app: 'App de pagos',
-    merchants: 'Comerciantes',
+    merchants: 'Cambistas',
     business: 'Empresas',
     docs: 'Documentación',
     dashboard: 'Panel',

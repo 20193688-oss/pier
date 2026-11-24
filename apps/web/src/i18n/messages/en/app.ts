@@ -161,7 +161,7 @@ const app = {
   },
   add: {
     title: 'Add money',
-    lede: 'Buy USDC paying with Yape, Plin or a bank transfer. A verified merchant sends them to you.',
+    lede: 'Buy USDC paying with Yape, Plin or a bank transfer. A merchant with a track record sends them to you.',
   },
   sendBank: {
     title: 'Send to a bank account',
@@ -190,7 +190,7 @@ const app = {
     rate: '1 USDC = {price} {currency}',
     merchant: 'Paid by',
     howTitle: 'How it works',
-    how: 'A verified merchant pays the QR from its bank. Your USDC stay locked and are released only when you confirm the shop got paid.',
+    how: 'A merchant with a track record pays the QR from its bank. Your USDC stay locked and are released only when you confirm the shop got paid.',
     quoting: 'Finding the best price…',
     noQuote: 'Nobody takes this payment right now. Try again in a few minutes.',
     untrusted: 'The quote does not match the QR. Nothing was done.',

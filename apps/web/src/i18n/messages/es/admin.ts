@@ -4,7 +4,7 @@
 const admin = {
   webhooksTitle: 'Webhooks',
   charges: {
-    lede: 'Un cobro es un enlace y un código QR para que alguien te pague en moneda local con una transferencia. Tú recibes USDC en tu billetera cuando el comerciante confirma el pago.',
+    lede: 'Un cobro es un enlace y un código QR para que alguien te pague en moneda local con una transferencia. Tú recibes USDC en tu billetera cuando el cambista confirma el pago.',
     empty: 'Todavía no hay cobros.',
     emptyBody: 'Crea uno y comparte su enlace con quien tiene que pagarte.',
     createTitle: 'Nuevo cobro',
@@ -30,7 +30,7 @@ const admin = {
     cancelled: 'Cobro cancelado',
   },
   payouts: {
-    lede: 'Paga a muchas personas en moneda local desde un archivo. Un comerciante compra los USDC de tu saldo, transfiere a cada beneficiario y tú liberas cada pago cuando lo marca como pagado.',
+    lede: 'Paga a muchas personas en moneda local desde un archivo. Un cambista compra los USDC de tu saldo, transfiere a cada beneficiario y tú liberas cada pago cuando lo marca como pagado.',
     empty: 'Todavía no hay pagos a terceros.',
     emptyBody: 'Sube un archivo CSV con los beneficiarios: cada fila se revisa antes de enviarse.',
     createTitle: 'Nuevos pagos a terceros',
