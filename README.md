@@ -99,6 +99,49 @@ La venta (retiro a Yape, Plin o CCI) es el camino inverso: los USDC de la person
 hasta que confirma que recibió los soles. Cada orden tiene un chat con el cambista para
 comprobantes.
 
+## Pier frente a otras opciones
+
+|                                         | Pier                                                                                                                        | Binance P2P                                                                    | Casas de cambio digitales                 | Anchor regulado en Stellar                      |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------------------------------------- | ----------------------------------------------- |
+| Quién guarda el dinero durante la orden | Un contrato en Soroban; nadie puede moverlo fuera de sus reglas                                                             | Binance                                                                        | La casa de cambio                         | La empresa del anchor                           |
+| Cómo se elige la contraparte            | El mercado asigna el mejor precio y, a igual precio, la mejor reputación                                                    | La persona elige un anuncio de una lista                                       | La empresa es la contraparte              | La empresa es la contraparte                    |
+| Medios de pago en soles                 | Yape, Plin y CCI                                                                                                            | Yape, Plin y bancos                                                            | Transferencia bancaria                    | Transferencia bancaria                          |
+| Qué entrega                             | USDC en una wallet de Stellar                                                                                               | Cripto dentro de Binance                                                       | Dólares en una cuenta bancaria            | USDC en Stellar, a través de wallets integradas |
+| Costo para la persona                   | Comisión de protocolo (configurable hasta 3%; 0% en el lanzamiento) más el precio del cambista, mostrado antes de confirmar | Sin comisión visible al tomar un anuncio; el costo va en el precio del anuncio | Diferencia entre precio de compra y venta | Según cada anchor                               |
+| Para empresas                           | API, cobros con link o QR, pagos masivos y webhooks                                                                         | —                                                                              | —                                         | API para wallets y fintechs                     |
+
+Las referencias de mercado son públicas y cambian con frecuencia; se toman como aproximadas.
+
+## Lanzamiento y crecimiento
+
+Pier es un mercado de dos lados: necesita personas que quieran cambiar y cambistas con liquidez.
+
+- **Campaña de lanzamiento sin comisión.** Una oferta pública para los primeros usuarios y cambistas:
+  durante el lanzamiento no se cobra comisión de protocolo. El contrato permite fijarla en 0% sin
+  cambiar código, y la comisión se activa después, cuando haya volumen.
+- **Qué gana el cambista.** El diferencial entre su precio de compra y de venta, sin pagar por
+  publicar ofertas, con órdenes asignadas automáticamente y un historial público que mejora su
+  posición en el mercado.
+- **Demanda desde empresas.** Los cobros, pagos masivos e integraciones por API traen órdenes a los
+  cambistas desde el primer día, y son la vía de ingresos a mediano plazo (comisión de integrador).
+
+## Limitaciones y hoja de ruta
+
+Pier funciona hoy en Stellar testnet, sin dinero real. Antes de operar en la red principal:
+
+- **Identidad de los cambistas.** Hoy Pier verifica que la wallet sea del cambista (SEP-10), no su
+  identidad. Se sumará verificación de identidad con el estándar SEP-12 de Stellar.
+- **Cumplimiento regulatorio.** El intercambio entre activos virtuales y soles está sujeto a las
+  normas de prevención de lavado de activos para proveedores de servicios de activos virtuales (PSAV)
+  ante la UIF-Perú (Resolución SBS N.° 02648-2024).
+- **Aliados regulados.** Evaluar una alianza con un anchor o PSAV registrado en el Perú, como cambista
+  dentro de Pier o como rampa alternativa.
+- **Disputas.** El contrato ya permite que un árbitro resuelva disputas; falta la pantalla para
+  gestionarlas.
+- **Confirmación de pagos.** La confirmación de los pagos por Yape, Plin o CCI es manual: la hace
+  quien recibe los soles, con comprobante en el chat de la orden.
+- **Despliegue público** de la app y la API, y prueba completa del inicio de sesión con Pollar.
+
 ## Cómo ejecutarlo
 
 Requisitos: Node.js 24.9 o superior y npm.
