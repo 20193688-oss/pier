@@ -464,7 +464,7 @@ constructor arguments and allows the tokens. Mainnet stays behind `--i-understan
   only).
 - Lists XLM (the owner allows its SAC on a market deployed before it).
 - Sets up three automated test merchants (Andes Cambio, Pampa Pagos, Río Express: their own
-  organizations, keys, payment methods in every listed currency with Bolivia's first, offers in
+  organizations, keys, payment methods in every listed currency with Peru's Yape or Plin first, offers in
   USDC and XLM, liquidity and the matcher), runs the SDK's simulated merchant for each, and
   reprices all four merchants' offers every minute from live mainnet references (CriptoYa with an
   FX fallback; the XLM/USDC book on the public Horizon), each with its own spread. A resumed stack

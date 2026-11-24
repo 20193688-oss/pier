@@ -62,7 +62,8 @@ export interface BotMerchantProfile {
   displayName: string;
   /** Its spread around the reference, basis points each way. */
   spreadBps: number;
-  /** One bank-transfer (or PIX, SPEI) account per currency it trades, Bolivia first. */
+  /** The accounts it collects on and pays from: Peru's Yape or Plin first, then one bank-transfer
+      (or PIX, SPEI) account per currency it trades. */
   methods: readonly BotPaymentMethod[];
   /** QR rails it pays shop QRs on (it buys tokens there). */
   qrRails: readonly BotQrRail[];
@@ -75,6 +76,12 @@ export const BOT_MERCHANTS: readonly BotMerchantProfile[] = [
     displayName: 'Andes Cambio',
     spreadBps: 60,
     methods: [
+      {
+        currency: 'PEN',
+        rail: 'pe_wallet',
+        holderName: 'Andes Cambio SAC',
+        details: { wallet: 'yape', phone: '900000001' },
+      },
       {
         currency: 'BOB',
         rail: 'bo_bank_transfer',
@@ -135,6 +142,12 @@ export const BOT_MERCHANTS: readonly BotMerchantProfile[] = [
     spreadBps: 90,
     methods: [
       {
+        currency: 'PEN',
+        rail: 'pe_wallet',
+        holderName: 'Pampa Pagos SAC',
+        details: { wallet: 'plin', phone: '900000002' },
+      },
+      {
         currency: 'BOB',
         rail: 'bo_bank_transfer',
         holderName: 'Pampa Pagos SRL',
@@ -183,6 +196,12 @@ export const BOT_MERCHANTS: readonly BotMerchantProfile[] = [
     displayName: 'Río Express',
     spreadBps: 120,
     methods: [
+      {
+        currency: 'PEN',
+        rail: 'pe_wallet',
+        holderName: 'Río Express SAC',
+        details: { wallet: 'yape', phone: '900000003' },
+      },
       {
         currency: 'BOB',
         rail: 'bo_bank_transfer',
