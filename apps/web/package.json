@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Pier web app: the public buy/sell app, the hosted charge page, the merchant dashboard and the docs",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "dev": "vite",

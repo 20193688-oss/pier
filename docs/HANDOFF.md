@@ -91,7 +91,7 @@ npm run dev:mock -w @pier/web        # the whole web with no backend (demo walle
   `ar_qr`/`br_pix_qr` QR offers in the dollar and XLM, liquidity, the matcher authorised, a
   charge of 150 BOB, the user activated by the sponsor and given dollars). It prints the URLs,
   keys and the dev secret keys (testnet only).
-- **Tokens (since 2026-11-20, for the Bolivia hackathon): the testnet market lists only Circle's
+- **Tokens (since 2026-11-20): the testnet market lists only Circle's
   USDC and XLM.** `P2P_TESTNET_TOKENS` is `[{"native":true}]` (USDC comes from the network table;
   XLM through its SAC, `issuer: null`, no trustline; the stack's owner key allows it on a market
   deployed before). The stack's USDC is real testnet USDC bought with test lumens on the testnet
@@ -101,7 +101,7 @@ npm run dev:mock -w @pier/web        # the whole web with no backend (demo walle
   1 000 USDC. TUSD (minted by the stack's issuer) is listed only on the fully local quickstart
   network, which has no Circle USDC; it stays allowed on the contract of a testnet market
   deployed before, unlisted, and the TUSD already deposited there was not withdrawn.
-- **Currencies: the boliviano (BOB) is the main one** and the market lists it first (`BOB`,
+- **Currencies: the API lists the boliviano (BOB) first** (the web's default is PEN since 2026-11-22) (`BOB`,
   2 decimals, country `BO`, then ARS, BRL, MXN, COP, PEN, CLP). Its one rail is
   `bo_bank_transfer` ("Bank transfer"): `bank` (bank name), `accountType` (`savings` |
   `checking`), `accountNumber` (spaces, dots and hyphens dropped, then 6 to 20 digits),
@@ -286,7 +286,7 @@ offered to liquidity merchants.
   - Fixes: right after a sign-in Home no longer shows "could not load your balance" (balances are
     keyed to the wallet they were read for); add money's received figure shows the number only
     and steps down in size instead of being cut off.
-- More of the owner's asks (2026-11-20, later; the hackathon is in Bolivia):
+- More of the owner's asks (2026-11-20, later):
   - **Bolivia first** (superseded on 2026-11-22 by "Peru first", below). BOB was the default
     currency; the rail is `bo_bank_transfer` (CI/NIT as the payer's document). The testnet market
     lists USDC and XLM only (no TUSD).
