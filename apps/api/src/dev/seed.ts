@@ -45,8 +45,22 @@ const U = 10_000_000n;
 /** The seeded merchant's display name (a manual merchant: `npm run dev:simulate` plays it). */
 export const SEEDED_MERCHANT_NAME = 'Pampa Cambio';
 
-/** The seeded merchant's payment methods, Bolivia first. */
+/** The seeded merchant's payment methods, Peru first (Yape, then CCI). */
 export const SEEDED_MERCHANT_METHODS: readonly MerchantMethod[] = [
+  {
+    currency: 'PEN',
+    rail: 'pe_wallet',
+    holderName: 'Pampa Cambio SAC',
+    details: { wallet: 'yape', phone: '900000004' },
+    label: 'Yape',
+  },
+  {
+    currency: 'PEN',
+    rail: 'pe_bank_transfer',
+    holderName: 'Pampa Cambio SAC',
+    details: { cci: '00219300987654321098', documentType: 'RUC', documentNumber: '20601234567' },
+    label: 'Main PEN account (CCI)',
+  },
   {
     currency: 'BOB',
     rail: 'bo_bank_transfer',
@@ -80,6 +94,38 @@ type SeededOffer = Omit<MerchantOffer, 'token' | 'priceTtlSeconds'>;
 
 /** Its offers per dollar, at fixed test prices (the dev stack's price loop reprices them). */
 const SEEDED_DOLLAR_OFFERS: readonly SeededOffer[] = [
+  {
+    side: 'SELL_TOKEN',
+    currency: 'PEN',
+    rails: ['pe_wallet'],
+    price: '3.8',
+    minFiat: '10',
+    maxFiat: '5000',
+  },
+  {
+    side: 'BUY_TOKEN',
+    currency: 'PEN',
+    rails: ['pe_wallet'],
+    price: '3.7',
+    minFiat: '10',
+    maxFiat: '5000',
+  },
+  {
+    side: 'SELL_TOKEN',
+    currency: 'PEN',
+    rails: ['pe_bank_transfer'],
+    price: '3.8',
+    minFiat: '10',
+    maxFiat: '20000',
+  },
+  {
+    side: 'BUY_TOKEN',
+    currency: 'PEN',
+    rails: ['pe_bank_transfer'],
+    price: '3.7',
+    minFiat: '10',
+    maxFiat: '20000',
+  },
   {
     side: 'SELL_TOKEN',
     currency: 'BOB',
@@ -278,8 +324,8 @@ async function createCharge(
     {
       network: ctx.chain.network,
       token: ctx.dollar.symbol,
-      currency: 'BOB',
-      fiatAmount: '150',
+      currency: 'PEN',
+      fiatAmount: '68',
       recipient: business.accountId,
       payeeName: 'Dev Business',
       description: 'A test charge',
@@ -320,7 +366,7 @@ export async function seedDevMarket(input: {
   const ctx = await context(input);
   const { api, accounts, dollar, log } = ctx;
 
-  // --- the merchant: sells and buys tokens against BOB, ARS and BRL, and pays QRs -----
+  // --- the merchant: sells and buys tokens against PEN, BOB, ARS and BRL, and pays QRs -
   const merchantKey = keypair(accounts.merchant);
   const merchantSession = await signIn(api, merchantKey);
   const merchant = await organizationWithKey(api, merchantSession, 'Dev Merchant');
@@ -336,7 +382,7 @@ export async function seedDevMarket(input: {
   });
   await authoriseMatcher(session, accounts.matcher.publicKey, SEEDED_MATCHER_MAX_PER_ORDER);
   log(
-    `merchant seeded: offers (BOB, ARS, BRL, QR) in ${dollar.symbol} and XLM, liquidity, matcher authorised`,
+    `merchant seeded: offers (PEN, BOB, ARS, BRL, QR) in ${dollar.symbol} and XLM, liquidity, matcher authorised`,
   );
 
   // --- the business: integrates buy/sell and collects with charges -----------

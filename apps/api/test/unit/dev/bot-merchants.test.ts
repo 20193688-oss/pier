@@ -49,17 +49,15 @@ describe('the bot merchants', () => {
       expect(merchant.qrRails, merchant.slug).toContain('pe_qr');
   });
 
-  it('all trade bolivianos first, by Bolivian bank transfer with a company NIT', () => {
-    const banks = new Set<string>();
+  it('all trade soles first, by Yape or Plin, and both wallets are covered', () => {
+    const wallets = new Set<string>();
     for (const merchant of BOT_MERCHANTS) {
       const [first] = merchant.methods;
-      expect(first, merchant.slug).toMatchObject({ currency: 'BOB', rail: 'bo_bank_transfer' });
-      expect(first.details.documentType).toBe('NIT');
-      expect(first.details.documentNumber).toMatch(/^\d{9,10}$/);
-      expect(first.holderName).toMatch(/SRL$/);
-      banks.add(first.details.bank);
+      expect(first, merchant.slug).toMatchObject({ currency: 'PEN', rail: 'pe_wallet' });
+      expect(first.details.phone).toMatch(/^9\d{8}$/);
+      wallets.add(first.details.wallet);
     }
-    expect(banks.size).toBe(BOT_MERCHANTS.length);
+    expect([...wallets].sort()).toEqual(['plin', 'yape']);
   });
 
   it('hold payment details every rail accepts (check digits included)', () => {
@@ -96,10 +94,10 @@ describe('botOffers', () => {
       side: 'BUY_TOKEN',
       currency: 'PEN',
     });
-    // Bolivia first: the first offers are the boliviano ones.
+    // Peru first: the first offers are in soles by Yape or Plin.
     expect(
       offers.slice(0, 2).map((o) => `${o.side} ${o.token} ${o.currency} ${o.rails[0]}`),
-    ).toEqual(['SELL_TOKEN USDC BOB bo_bank_transfer', 'BUY_TOKEN USDC BOB bo_bank_transfer']);
+    ).toEqual(['SELL_TOKEN USDC PEN pe_wallet', 'BUY_TOKEN USDC PEN pe_wallet']);
   });
 
   it('prices around the reference with the merchant’s spread', () => {

@@ -290,9 +290,9 @@ a QR payment and a charge paid from the balance.
 embedded), Stellar (`stellar container start local` when a Docker daemon answers, else testnet with
 friendbot; Docker is never started), creates the dev accounts (owner, arbiter, treasury, matcher,
 sponsor, SEP-10 signer, merchant, business, user, TUSD issuer), deploys the market, seeds it
-through the API (organizations, keys, SEP-10-proven accounts, payment methods with Bolivia first,
+through the API (organizations, keys, SEP-10-proven accounts, payment methods with Peru first (Yape or Plin, then CCI),
 offers including `ar_qr` and `br_pix_qr` QR offers, liquidity, the matcher, a charge in
-bolivianos, the user's sponsored activation), starts the API and the web, and prints the URLs, keys
+soles, the user's sponsored activation), starts the API and the web, and prints the URLs, keys
 and the dev secrets (test networks only). State persists in `.dev-stack/`; a restart syncs an
 existing seed and the merchants idempotently (`src/dev/merchant-sync.ts`: missing payment methods
 and offers added, offers in a token no longer listed deactivated, dollar liquidity topped up).

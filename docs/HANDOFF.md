@@ -87,9 +87,9 @@ npm run dev:mock -w @pier/web        # the whole web with no backend (demo walle
   (`--testnet` forces it). Docker Desktop is never started.
 - It creates and keeps in `.dev-stack/` the owner, arbiter, treasury, matcher, sponsor, SEP-10
   signer, merchant, business, user and a `TUSD` issuer; deploys the market; seeds through the API
-  (organizations, `pk_test_` keys, SEP-10 wallet proofs, payment methods, BOB/ARS/BRL offers and
+  (organizations, `pk_test_` keys, SEP-10 wallet proofs, payment methods, PEN (Yape, CCI)/BOB/ARS/BRL offers and
   `ar_qr`/`br_pix_qr` QR offers in the dollar and XLM, liquidity, the matcher authorised, a
-  charge of 150 BOB, the user activated by the sponsor and given dollars). It prints the URLs,
+  charge of 68 PEN, the user activated by the sponsor and given dollars). It prints the URLs,
   keys and the dev secret keys (testnet only).
 - **Tokens (since 2026-11-20): the testnet market lists only Circle's
   USDC and XLM.** `P2P_TESTNET_TOKENS` is `[{"native":true}]` (USDC comes from the network table;
@@ -110,13 +110,14 @@ npm run dev:mock -w @pier/web        # the whole web with no backend (demo walle
   `12345671A`), all required; summary `<bank> ••••1234`. No Bolivian QR rail yet.
 - The stack runs **three automated test merchants**: Andes Cambio, Pampa Pagos and Río Express
   (keys and set-up in `.dev-stack/merchants.json`, created on the first run and reused after).
-  Each has its own organization, `pk_test_` key, payment methods (a Bolivian bank transfer first
-  — Banco Unión, Banco Mercantil Santa Cruz, Banco BISA, company NITs — then ARS, BRL, MXN, COP,
+  Each has its own organization, `pk_test_` key, payment methods (Yape or Plin first — `pe_wallet`:
+  Andes Cambio and Río Express on Yape, Pampa Pagos on Plin — then a Bolivian bank transfer —
+  Banco Unión, Banco Mercantil Santa Cruz, Banco BISA, company NITs — and ARS, BRL, MXN, COP,
   PEN, CLP between them, plus `ar_qr` / `br_pix_qr` and, all three, `pe_qr`: Peru's
   interoperable QR of Yape, Plin and the banks, whose static QRs carry the account as an opaque
   token and no amount, so the person types it), offers in USDC and XLM (dollar orders up to
-  2 000 USD), liquidity and the matcher. The seeded merchant (Pampa Cambio) collects in BOB
-  (Banco Nacional de Bolivia), ARS and BRL. **Every start syncs the seed and the merchants,
+  2 000 USD), liquidity and the matcher. The seeded merchant (Pampa Cambio) collects in PEN
+  (Yape, then CCI), BOB (Banco Nacional de Bolivia), ARS and BRL. **Every start syncs the seed and the merchants,
   idempotently, without a reset** (`apps/api/src/dev/merchant-sync.ts`): missing payment methods
   and offers are added, active offers in a token no longer listed (TUSD) are deactivated through
   the API (never deleted), offer bounds that drifted are resized, dollar liquidity below 90 % of
@@ -278,7 +279,7 @@ offered to liquidity merchants.
   - **Yape and Plin** are a rail, `pe_wallet` (API `p2p/domain/rails.ts`, web `lib/p2p/rails.ts`):
     `wallet` (`yape` | `plin`) and `phone` (9 digits starting with 9; a +51 prefix is dropped),
     no holder ID; summary `Yape ••••4321`. It is listed before `pe_bank_transfer` (CCI). The dev
-    stack's bot merchants do not offer it yet.
+    stack's bot merchants and the seeded merchant offer it since 2026-11-24.
   - Copy leads with Peru (Yape, Plin, CCI): add money, withdraw ("to your account"), send to a
     bank account, the landing ("From soles to digital dollars, with Yape") and the app welcome.
   - Mock mode's demo data (the app user's history and the merchant dashboard: methods, offers,

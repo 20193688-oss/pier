@@ -10,8 +10,10 @@ import { isP2pRailId, P2P_RAILS, validateRailDetails } from '@/p2p/domain/rails'
 const U = 10_000_000n;
 
 describe('the seeded merchant', () => {
-  it('collects in bolivianos first, then pesos and reais, with details every rail accepts', () => {
+  it('collects in soles first (Yape, then CCI), then bolivianos, pesos and reais', () => {
     expect(SEEDED_MERCHANT_METHODS.map((m) => `${m.currency} ${m.rail}`)).toEqual([
+      'PEN pe_wallet',
+      'PEN pe_bank_transfer',
       'BOB bo_bank_transfer',
       'ARS ar_bank_transfer',
       'BRL br_pix',
@@ -25,16 +27,16 @@ describe('the seeded merchant', () => {
     }
   });
 
-  it('publishes its offers in the dollar and XLM only, bolivianos first', () => {
+  it('publishes its offers in the dollar and XLM only, soles by Yape first', () => {
     const offers = seededOffers(['USDC', 'XLM']);
     expect(new Set(offers.map((o) => o.token))).toEqual(new Set(['USDC', 'XLM']));
-    expect(offers.filter((o) => o.token === 'USDC')).toHaveLength(8);
+    expect(offers.filter((o) => o.token === 'USDC')).toHaveLength(12);
     expect(offers[0]).toMatchObject({
       side: 'SELL_TOKEN',
       token: 'USDC',
-      currency: 'BOB',
-      rails: ['bo_bank_transfer'],
-      price: '12.1',
+      currency: 'PEN',
+      rails: ['pe_wallet'],
+      price: '3.8',
     });
     for (const o of offers) {
       for (const rail of o.rails) {
