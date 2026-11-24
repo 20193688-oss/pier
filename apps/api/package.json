@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "The Pier public API: accounts, offers, matching, orders, charges, payouts, webhooks, the indexer and the matcher",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "exports": {
     "./dev": "./dist/dev/index.js"

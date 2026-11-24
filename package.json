@@ -2,7 +2,7 @@
   "name": "pier",
   "private": true,
   "description": "Pier: a peer-to-peer market for stablecoins against local money, with a public API",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=24.9.0"
