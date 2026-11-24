@@ -7,7 +7,7 @@ const landing: typeof es = {
     'Buy and sell digital dollars (USDC on Stellar) paying with Yape, Plin or CCI. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
   hero: {
     title: 'From soles to digital dollars, with Yape',
-    body: 'Peru has no Stellar ramp for soles yet: going from soles to digital dollars depends on foreign exchanges. Here you pay with Yape, Plin or CCI, a verified merchant sends you USDC, and the money stays in a contract until it is confirmed. You can also send and pay by QR in other countries.',
+    body: 'Peru has no Stellar ramp for soles yet: going from soles to digital dollars depends on foreign exchanges. Here you pay with Yape, Plin or CCI, a merchant with a track record sends you USDC, and the money stays in a contract until it is confirmed. You can also send and pay by QR in other countries.',
     open: 'Create account',
     merchant: 'I am a merchant',
     rails:

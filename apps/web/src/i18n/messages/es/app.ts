@@ -163,7 +163,7 @@ const app = {
   },
   add: {
     title: 'Agregar dinero',
-    lede: 'Compra USDC pagando con Yape, Plin o una transferencia. Un cambista verificado te los envía.',
+    lede: 'Compra USDC pagando con Yape, Plin o una transferencia. Un cambista con historial te los envía.',
   },
   sendBank: {
     title: 'Enviar a una cuenta bancaria',
@@ -192,7 +192,7 @@ const app = {
     rate: '1 USDC = {price} {currency}',
     merchant: 'Lo paga',
     howTitle: 'Cómo funciona',
-    how: 'Un cambista verificado paga el QR desde su banco. Tus USDC quedan bloqueados y se liberan solo cuando confirmas que el comercio cobró.',
+    how: 'Un cambista con historial paga el QR desde su banco. Tus USDC quedan bloqueados y se liberan solo cuando confirmas que el comercio cobró.',
     quoting: 'Buscando el mejor precio…',
     noQuote: 'Nadie toma este pago ahora. Prueba en unos minutos.',
     untrusted: 'La cotización no coincide con el QR. No se hizo nada.',

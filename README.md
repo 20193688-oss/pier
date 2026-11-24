@@ -21,7 +21,7 @@ USDC.
 ## La solución
 
 Pier es un mercado P2P donde la persona solo escribe un monto y el mercado elige a un cambista
-verificado. No hay libro de anuncios ni regateo.
+con historial. No hay libro de anuncios ni regateo.
 
 - **Compra y vende USDC pagando con Yape, Plin o CCI.** La cotización muestra el precio, la
   comisión y el monto final antes de confirmar.

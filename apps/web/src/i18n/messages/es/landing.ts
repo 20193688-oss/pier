@@ -5,7 +5,7 @@ const landing = {
     'Compra y vende dólares digitales (USDC en Stellar) pagando con Yape, Plin o CCI. Cada pago lo completa un cambista local y el dinero queda en un contrato hasta que se confirma.',
   hero: {
     title: 'De soles a dólares digitales, con Yape',
-    body: 'En Perú todavía no hay una rampa de Stellar para soles: pasar de soles a dólares digitales depende de exchanges extranjeros. Aquí pagas con Yape, Plin o CCI, un cambista verificado te envía USDC y el dinero queda en un contrato hasta que se confirma. También envías y pagas con QR en otros países.',
+    body: 'En Perú todavía no hay una rampa de Stellar para soles: pasar de soles a dólares digitales depende de exchanges extranjeros. Aquí pagas con Yape, Plin o CCI, un cambista con historial te envía USDC y el dinero queda en un contrato hasta que se confirma. También envías y pagas con QR en otros países.',
     open: 'Crear cuenta',
     merchant: 'Soy cambista',
     rails:
