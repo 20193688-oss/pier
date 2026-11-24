@@ -5,7 +5,7 @@ const dash = {
   metaTitle: 'Panel | {brand}',
   signIn: {
     title: 'Inicia sesión en el panel',
-    body: 'Para comerciantes y empresas: liquidez, ofertas, órdenes, cobros, pagos a terceros y la API.',
+    body: 'Para cambistas y empresas: liquidez, ofertas, órdenes, cobros, pagos a terceros y la API.',
     back: 'Volver al sitio',
   },
   orgs: {
@@ -107,7 +107,7 @@ const dash = {
     lede: 'Las billeteras de tu organización: su saldo en el contrato del mercado, el límite con el que {brand} puede abrir órdenes sobre él y los bots que autorizaste. Cada movimiento lo firmas tú, en tu wallet.',
     empty: 'Todavía no registraste ninguna billetera.',
     emptyBody:
-      'Registra una para depositar liquidez, publicar ofertas como comerciante o recibir cobros.',
+      'Registra una para depositar liquidez, publicar ofertas como cambista o recibir cobros.',
     account: 'Cuenta de la wallet',
     network: 'Red',
     token: 'Token',
@@ -120,8 +120,8 @@ const dash = {
     revokeStep: 'Quitarle todos los permisos al bot {address}',
     pause: 'Pausar órdenes',
     resume: 'Recibir órdenes',
-    paused: 'El comerciante no recibe órdenes',
-    resumed: 'El comerciante recibe órdenes',
+    paused: 'El cambista no recibe órdenes',
+    resumed: 'El cambista recibe órdenes',
     sent: 'Listo. El saldo se actualiza en unos segundos.',
     registered: 'Billetera registrada',
     alreadyRegistered: 'Esa billetera ya está registrada.',

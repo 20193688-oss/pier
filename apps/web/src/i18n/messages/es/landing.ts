@@ -2,12 +2,12 @@
 const landing = {
   metaTitle: '{brand}: de soles a dólares digitales con Yape, Plin o CCI',
   metaDescription:
-    'Compra y vende dólares digitales (USDC en Stellar) pagando con Yape, Plin o CCI. Cada pago lo completa un comerciante local y el dinero queda en un contrato hasta que se confirma.',
+    'Compra y vende dólares digitales (USDC en Stellar) pagando con Yape, Plin o CCI. Cada pago lo completa un cambista local y el dinero queda en un contrato hasta que se confirma.',
   hero: {
     title: 'De soles a dólares digitales, con Yape',
-    body: 'En Perú todavía no hay una rampa de Stellar para soles: pasar de soles a dólares digitales depende de exchanges extranjeros. Aquí pagas con Yape, Plin o CCI, un comerciante verificado te envía USDC y el dinero queda en un contrato hasta que se confirma. También envías y pagas con QR en otros países.',
+    body: 'En Perú todavía no hay una rampa de Stellar para soles: pasar de soles a dólares digitales depende de exchanges extranjeros. Aquí pagas con Yape, Plin o CCI, un cambista verificado te envía USDC y el dinero queda en un contrato hasta que se confirma. También envías y pagas con QR en otros países.',
     open: 'Crear cuenta',
-    merchant: 'Soy comerciante',
+    merchant: 'Soy cambista',
     rails:
       'Yape, Plin y CCI en Perú, transferencia bancaria en Bolivia, CVU o alias en Argentina, PIX en Brasil, SPEI en México, y bancos de Colombia y Chile.',
   },
@@ -20,27 +20,27 @@ const landing = {
     account: 'Cuenta',
     receive: 'Recibes',
     left: 'Tiempo para pagar',
-    locked: 'Bloqueado en el contrato hasta que el comerciante confirma',
+    locked: 'Bloqueado en el contrato hasta que el cambista confirma',
     button: 'Ya transferí',
   },
   how: {
     title: 'Cómo funciona una compra',
-    lede: 'Sin libro de anuncios ni regateo: escribes un monto y el mercado elige al comerciante.',
+    lede: 'Sin libro de anuncios ni regateo: escribes un monto y el mercado elige al cambista.',
     steps: [
       {
         title: 'Escribe el monto',
-        body: 'En tu moneda. El mercado elige un comerciante con precio y historial, y te muestra cuánto recibes, con la comisión incluida.',
+        body: 'En tu moneda. El mercado elige un cambista con precio y historial, y te muestra cuánto recibes, con la comisión incluida.',
       },
       {
         title: 'Transfiere el monto exacto',
-        body: 'Desde una cuenta a tu nombre, a la cuenta del comerciante que te mostramos, antes de que termine el tiempo. Después tocas «Ya transferí».',
+        body: 'Desde una cuenta a tu nombre, a la cuenta del cambista que te mostramos, antes de que termine el tiempo. Después tocas «Ya transferí».',
       },
       {
         title: 'Recibe los USDC',
-        body: 'El comerciante ve tu transferencia y libera la orden. El contrato envía los USDC a tu wallet de Stellar, sin comisión de red para ti.',
+        body: 'El cambista ve tu transferencia y libera la orden. El contrato envía los USDC a tu wallet de Stellar, sin comisión de red para ti.',
       },
     ],
-    sell: 'Vender es lo mismo al revés: bloqueas tus USDC en la orden, el comerciante te transfiere a tu cuenta y tú liberas los USDC cuando ves el dinero.',
+    sell: 'Vender es lo mismo al revés: bloqueas tus USDC en la orden, el cambista te transfiere a tu cuenta y tú liberas los USDC cuando ves el dinero.',
   },
   app: {
     title: 'La app',
@@ -52,7 +52,7 @@ const landing = {
       },
       {
         title: 'Paga con QR',
-        body: 'Escanea el QR de un comercio en Perú (Yape, Plin), en Argentina o un PIX en Brasil: un comerciante del mercado lo paga por ti en soles, pesos o reales.',
+        body: 'Escanea el QR de un comercio en Perú (Yape, Plin), en Argentina o un PIX en Brasil: un cambista del mercado lo paga por ti en soles, pesos o reales.',
       },
       {
         title: 'Carga y retira',
@@ -81,13 +81,13 @@ const landing = {
         body: 'Si algo sale mal, un revisor decide. Solo puede repartir la orden entre su comprador y su vendedor, nunca enviarla a un tercero.',
       },
       {
-        title: 'Comerciantes con historial',
-        body: 'Cada precio muestra cuántas órdenes completó el comerciante y qué tan rápido libera.',
+        title: 'Cambistas con historial',
+        body: 'Cada precio muestra cuántas órdenes completó el cambista y qué tan rápido libera.',
       },
     ],
   },
   merchants: {
-    title: 'Para comerciantes',
+    title: 'Para cambistas',
     body: 'Pon tu liquidez a trabajar sin entregarla. Tus USDC quedan en el contrato del mercado a tu nombre y puedes retirarlos cuando quieras.',
     points: [
       'Autorizas al mercado a abrir órdenes sobre tu saldo, con un límite por orden que eliges tú.',
@@ -133,8 +133,8 @@ const landing = {
         a: 'En Stellar. Las comisiones de red las paga {brand}: no necesitas tener XLM.',
       },
       {
-        q: '¿Qué pasa si transfiero y el comerciante no libera?',
-        a: 'Reportas un problema desde la orden. Los USDC siguen bloqueados y un revisor decide con los comprobantes, entre tú y el comerciante.',
+        q: '¿Qué pasa si transfiero y el cambista no libera?',
+        a: 'Reportas un problema desde la orden. Los USDC siguen bloqueados y un revisor decide con los comprobantes, entre tú y el cambista.',
       },
       {
         q: '¿Qué pasa si no llego a transferir a tiempo?',
@@ -142,11 +142,11 @@ const landing = {
       },
       {
         q: '¿Cuánto cuesta?',
-        a: 'El precio de cada comerciante y la comisión del mercado se muestran antes de abrir la orden. Recibes exactamente lo que dice la cotización.',
+        a: 'El precio de cada cambista y la comisión del mercado se muestran antes de abrir la orden. Recibes exactamente lo que dice la cotización.',
       },
       {
         q: '¿Por qué tiene que ser una cuenta a mi nombre?',
-        a: 'El comerciante comprueba que la transferencia venga de la persona que abrió la orden. Así se evitan pagos con cuentas de terceros.',
+        a: 'El cambista comprueba que la transferencia venga de la persona que abrió la orden. Así se evitan pagos con cuentas de terceros.',
       },
     ],
   },

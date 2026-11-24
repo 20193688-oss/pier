@@ -20,21 +20,21 @@ USDC.
 
 ## La solución
 
-Pier es un mercado P2P donde la persona solo escribe un monto y el mercado elige a un comerciante
+Pier es un mercado P2P donde la persona solo escribe un monto y el mercado elige a un cambista
 verificado. No hay libro de anuncios ni regateo.
 
 - **Compra y vende USDC pagando con Yape, Plin o CCI.** La cotización muestra el precio, la
   comisión y el monto final antes de confirmar.
-- **Sin custodia.** Los USDC del comerciante quedan bloqueados en un contrato de Soroban hasta que
+- **Sin custodia.** Los USDC del cambista quedan bloqueados en un contrato de Soroban hasta que
   quien recibe los soles confirma que llegaron. Si se vence el plazo, se devuelven solos; si hay
   desacuerdo, decide un árbitro que solo puede repartir entre comprador y vendedor.
 - **Sin comisiones de red para el usuario.** La API paga las comisiones de Stellar (fee-bump) y
   patrocina la activación de cuentas.
 - **Fácil de empezar.** Se entra con correo o Google y la wallet de Stellar se crea sola (Pollar).
 - **Envíos y pagos.** Enviar y recibir USDC por @usuario, enlace o QR; pagar el QR de una tienda
-  (Yape, Plin) a través de un comerciante del mercado.
+  (Yape, Plin) a través de un cambista del mercado.
 - **Para negocios.** Cobros en soles con link o QR que se reciben en USDC, pagos masivos, bots de
-  comerciante y webhooks, todo por API.
+  cambista y webhooks, todo por API.
 
 ### Por qué Stellar
 
@@ -55,8 +55,8 @@ verificado. No hay libro de anuncios ni regateo.
 | ------------------------- | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | Contrato `P2PMarket`      | `CAM26PWR372POJ43R3OGU5JZM2YLOEOGMKDW7P7YTPAMFAH4VQ2F57A5` | [stellar.expert](https://stellar.expert/explorer/testnet/contract/CAM26PWR372POJ43R3OGU5JZM2YLOEOGMKDW7P7YTPAMFAH4VQ2F57A5) |
 | Sponsor (paga comisiones) | `GBRF3NAEZXRSDYHWPX2ERKRFYFGGYA5SIWP7R5HFYY4VKQHLJZJHO27A` | [stellar.expert](https://stellar.expert/explorer/testnet/account/GBRF3NAEZXRSDYHWPX2ERKRFYFGGYA5SIWP7R5HFYY4VKQHLJZJHO27A)  |
-| Comerciante de prueba 1   | `GB5GXDFHZEUMSID7OZ6OVDROLQZKZ2Q7RQKUTKAGO52XMS5ITO3SE6UX` | [stellar.expert](https://stellar.expert/explorer/testnet/account/GB5GXDFHZEUMSID7OZ6OVDROLQZKZ2Q7RQKUTKAGO52XMS5ITO3SE6UX)  |
-| Comerciante de prueba 2   | `GC3VG5NT3W4Y3BU6OEGWO3T7A6SG42YJLXBX3PNX4Z2D2CPR6OBNOPE3` | [stellar.expert](https://stellar.expert/explorer/testnet/account/GC3VG5NT3W4Y3BU6OEGWO3T7A6SG42YJLXBX3PNX4Z2D2CPR6OBNOPE3)  |
+| Cambista de prueba 1      | `GB5GXDFHZEUMSID7OZ6OVDROLQZKZ2Q7RQKUTKAGO52XMS5ITO3SE6UX` | [stellar.expert](https://stellar.expert/explorer/testnet/account/GB5GXDFHZEUMSID7OZ6OVDROLQZKZ2Q7RQKUTKAGO52XMS5ITO3SE6UX)  |
+| Cambista de prueba 2      | `GC3VG5NT3W4Y3BU6OEGWO3T7A6SG42YJLXBX3PNX4Z2D2CPR6OBNOPE3` | [stellar.expert](https://stellar.expert/explorer/testnet/account/GC3VG5NT3W4Y3BU6OEGWO3T7A6SG42YJLXBX3PNX4Z2D2CPR6OBNOPE3)  |
 
 Activos del mercado en testnet: USDC de Circle y XLM.
 
@@ -65,7 +65,7 @@ Activos del mercado en testnet: USDC de Circle y XLM.
 ```mermaid
 flowchart TB
   persona[Persona] --> web
-  comerciante[Comerciante] --> web
+  cambista[Cambista] --> web
   empresa[Empresa] --> sdk
   web["Web (React + Vite)<br/>app PWA, panel, docs"] --> api
   web --> pollar["Pollar<br/>login y wallets"]
@@ -82,21 +82,21 @@ flowchart TB
 | --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
 | `apps/web`            | App de pagos instalable (`/app`), panel para comercios (`/dashboard`), página de cobro (`/pay/:id`), documentación (`/docs`) y portada. Español e inglés.                                                      | React 19, Vite 8, Tailwind 4, React Router, `@stellar/stellar-sdk`, Pollar, PWA |
 | `apps/api`            | API pública: cuentas, ofertas, cotizaciones, órdenes, cobros, pagos masivos, webhooks y rutas de la app. Procesos automáticos: matcher, indexer de la red, vencimientos y envío de transacciones patrocinadas. | NestJS 12, Prisma 7, PostgreSQL, Soroban RPC                                    |
-| `packages/contracts`  | Contrato `P2PMarket`: liquidez de comerciantes, bloqueo por orden, liberación, cancelación, disputas y comisiones. No es actualizable: el dueño nunca puede mover fondos.                                      | Rust, `soroban-sdk`                                                             |
-| `packages/sdk`        | Cliente TypeScript de la API, verificación de webhooks y un bot de comerciante de referencia.                                                                                                                  | TypeScript                                                                      |
+| `packages/contracts`  | Contrato `P2PMarket`: liquidez de cambistas, bloqueo por orden, liberación, cancelación, disputas y comisiones. No es actualizable: el dueño nunca puede mover fondos.                                         | Rust, `soroban-sdk`                                                             |
+| `packages/sdk`        | Cliente TypeScript de la API, verificación de webhooks y un bot de cambista de referencia.                                                                                                                     | TypeScript                                                                      |
 | `packages/payment-qr` | Lee lo que la app escanea o pega: direcciones Stellar, SEP-7, enlaces de pago y QR de comercios (Perú, Argentina, PIX).                                                                                        | TypeScript                                                                      |
 
 ### Cómo funciona una compra
 
 1. La persona escribe cuánto quiere pagar en soles y elige Yape, Plin o CCI.
-2. La API cotiza y elige un comerciante por precio, límites e historial.
-3. El contrato bloquea los USDC del comerciante para esa orden, con un plazo de pago.
+2. La API cotiza y elige un cambista por precio, límites e historial.
+3. El contrato bloquea los USDC del cambista para esa orden, con un plazo de pago.
 4. La persona paga el monto exacto desde una cuenta a su nombre y toca «Ya transferí».
-5. El comerciante revisa que el pago llegó y libera: el contrato envía los USDC a la wallet de la
+5. El cambista revisa que el pago llegó y libera: el contrato envía los USDC a la wallet de la
    persona.
 
 La venta (retiro a Yape, Plin o CCI) es el camino inverso: los USDC de la persona quedan bloqueados
-hasta que confirma que recibió los soles. Cada orden tiene un chat con el comerciante para
+hasta que confirma que recibió los soles. Cada orden tiene un chat con el cambista para
 comprobantes.
 
 ## Cómo ejecutarlo
@@ -108,7 +108,7 @@ npm install
 npm run dev:mock -w @pier/web     # la web completa sin backend, con datos de ejemplo
 ```
 
-El mercado completo en Stellar testnet (base de datos, contrato, API, bots de comerciante y web):
+El mercado completo en Stellar testnet (base de datos, contrato, API, bots de cambista y web):
 
 ```sh
 npm run dev:stack -- --testnet    # levanta todo; imprime URLs y claves de prueba
