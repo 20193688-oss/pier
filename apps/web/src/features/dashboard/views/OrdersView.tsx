@@ -325,7 +325,7 @@ export function OrdersView() {
                     return (
                       <li key={order.id} className="sheet p-4">
                         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
-                          <div className="flex min-w-0 flex-1 items-center gap-3">
+                          <div className="flex min-w-0 flex-1 basis-[15rem] items-center gap-3">
                             <TokenMark symbol={order.token} network={network?.name} size={34} />
                             <div className="min-w-0">
                               <p className="num font-semibold">

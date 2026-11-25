@@ -185,14 +185,30 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
   );
 }
 
-/** Movements under a heading per day ("Hoy", "Ayer", "18 de noviembre"), each day its own list. */
-export function ActivityList({ items, level = 3 }: { items: ActivityItem[]; level?: 2 | 3 }) {
+/** Whether a movement brought money in (a transfer received, a purchase). */
+export const isIncoming = (item: ActivityItem) =>
+  item.type === 'transfer' ? item.transfer.direction === 'in' : item.order.kind === 'BUY';
+
+/** Movements under a heading per day ("Hoy", "Ayer", "18 de noviembre"), each day its own list;
+    with `cards`, each day is its own card. */
+export function ActivityList({
+  items,
+  level = 3,
+  cards = false,
+}: {
+  items: ActivityItem[];
+  level?: 2 | 3;
+  cards?: boolean;
+}) {
   const { lang } = useI18n();
   const Heading = level === 2 ? 'h2' : 'h3';
   return (
-    <div className="flex flex-col">
+    <div className={`flex flex-col ${cards ? 'gap-4' : ''}`}>
       {groupByDay(items, itemDate, lang).map((g) => (
-        <section key={`${g.label}-${itemKey(g.items[0])}`}>
+        <section
+          key={`${g.label}-${itemKey(g.items[0])}`}
+          className={cards ? 'sheet px-5 pt-1 pb-2 md:px-6' : undefined}
+        >
           {g.label && (
             <Heading className="mt-3 mb-0.5 text-[0.8125rem] font-medium tracking-normal text-ink-3">
               {g.label}

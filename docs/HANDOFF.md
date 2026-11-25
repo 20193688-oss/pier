@@ -404,6 +404,46 @@ offered to liquidity merchants.
     cents; the welcome holds the symbol in a `.glass-lens`.
   - No dot without a reason: status pills are words on a tint, and an unread chat says «Mensaje
     nuevo» with a chat icon (the app's activity rows, the dashboard's chat button).
+- **Structure (2026-11-25, the owner: "debe verse como una app totalmente distinta y nueva respecto
+  a midpoint")**. The layouts and the organization of elements differ from Midpoint's on purpose:
+  - Payments app frame (`features/app/shell.tsx`):
+    - Phone: the tab screens have a top bar (avatar → profile, the screen's name, your QR →
+      receive). The home brings its own top bar with the balance chip. A docked bar at the foot
+      holds Home ($), the scanner (the raised centre) and Activity.
+    - Tablet and up: a top navigation (logo, Home / Activity / Receive, a "Move money" dropdown,
+      the scanner, the avatar). There is no side navigation.
+  - `Screen` layout:
+    - Phone: a sticky top bar with back and a centred title.
+    - Tablet and up: a page header with "‹ Back" above a large title.
+    - Flows pass `steps`: a progress bar ("Step 2 of 3") on a phone and a step rail from a tablet
+      up. This covers send (To, Amount, Review, Done), add money / withdraw (`TradeForm`
+      `onStep`) and QR payments.
+  - Home, **keypad first** (the owner chose it so the money header stops looking like
+    Midpoint's):
+    - The balance is a small chip at the top. It opens "Your balances": one row per coin
+      (tapping one makes it the app's coin), plus hide and refresh.
+    - The screen is the amount you type, in the app's coin with "≈ local" under it (tapping that
+      changes the currency), a keypad (the physical keyboard types too) and four destinations.
+      Request and Send are the big pills; Add and Withdraw sit under them.
+    - Each destination opens with the amount filled in: `/app/send?amount=`,
+      `/app/receive?tab=ask&amount=`, `/app/withdraw?amount=`, and `/app/add?currency=&amount=`
+      with the local money at the current price.
+    - From a tablet up, the keypad is a card and the latest movements sit beside it. On a phone
+      the movements live in Activity.
+  - Activity: All / Money in / Money out filters, a card per day.
+  - Receive, two tabs:
+    - "Show QR": a contact card (your initial, @handle, short address), your QR on white, copy
+      and share, your link and address.
+    - "Ask for an amount": the unit chip, the amount typed on the shared keypad
+      (`features/app/keypad.tsx`, also the home's) with what it is worth under it, a note, and
+      beside it the live request (its QR, its link, copy/share, the SEP-7 switch).
+  - Profile: an identity header, then grouped settings (Wallet, Preferences, The app), sign out.
+  - Welcome: the words, three feature rows and the two ways in; the brand panel on the right
+    from a tablet up.
+  - Merchant dashboard: a top header (organization, test/live, account, language, theme), group
+    tabs and section tabs instead of the sidebar.
+  - Hosted charge page: a two-column checkout (a summary with the payer's steps beside the
+    current step); on a phone, a compact summary first.
 - The public site (landing, docs; `SiteLayout`) is **clean**, not glass (2026-11-25, after a fintech
   product-flow reference the owner chose): `.site-clean` swaps the tokens to solid white surfaces
   on a pale page (Abismo surfaces on dark), hairline rules between sections, guide lines on the

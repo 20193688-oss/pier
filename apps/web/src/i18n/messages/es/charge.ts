@@ -43,8 +43,7 @@ const charge = {
   status: {
     preparing: 'Preparando tu pago…',
     paid: 'Transferencia informada',
-    paidBody:
-      'El cambista revisa tu transferencia. Esta página se actualiza cuando la confirma.',
+    paidBody: 'El cambista revisa tu transferencia. Esta página se actualiza cuando la confirma.',
     completed: 'Pagado',
     completedBody: 'El cambista confirmó tu transferencia. Ya puedes cerrar esta página.',
     expired: 'Vencido',
@@ -58,6 +57,15 @@ const charge = {
     requestPaid: 'Esta solicitud ya está pagada.',
     requestExpired: 'Esta solicitud de pago venció.',
     requestCancelled: 'Esta solicitud de pago se canceló.',
+  },
+  // The payer's progress beside the current step (on phones, "Paso 2 de 3" in the summary).
+  steps: {
+    label: 'Pasos del pago',
+    details: 'Tus datos',
+    transfer: 'Transferencia',
+    confirmation: 'Confirmación',
+    progress: 'Paso {step} de {total}',
+    done: 'Listo',
   },
   startAgain: 'Empezar de nuevo',
   poweredBy:

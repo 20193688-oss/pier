@@ -46,8 +46,8 @@ const dash = {
     keys: 'Claves de API',
     webhooks: 'Webhooks',
     team: 'Equipo',
-    menu: 'Abrir las secciones',
-    close: 'Cerrar las secciones',
+    menu: 'Abrir el menú',
+    close: 'Cerrar el menú',
     site: 'Ir al sitio',
   },
   state: {

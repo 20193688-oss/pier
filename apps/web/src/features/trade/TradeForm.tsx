@@ -78,6 +78,7 @@ export function TradeForm({
   recipient = 'self',
   onConnect,
   onOpened,
+  onStep,
 }: {
   market: P2pMarket;
   initialSide: P2pSide;
@@ -97,6 +98,8 @@ export function TradeForm({
   recipient?: 'self' | 'other';
   onConnect: () => void;
   onOpened: (o: P2pOrder, accepted: AcceptedQuote) => void;
+  /* Told which step is on screen (the amount and price, then the details), for a step rail. */
+  onStep?: (step: 'form' | 'details') => void;
 }) {
   const { t, lang } = useI18n();
   const a = t.trade;
@@ -130,6 +133,7 @@ export function TradeForm({
     accepted: null,
   });
   const [step, setStep] = useState<'form' | 'details'>('form');
+  useEffect(() => onStep?.(step), [step, onStep]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   // The payer and the payout account come back as this device last sent them (src/lib/app/remember).

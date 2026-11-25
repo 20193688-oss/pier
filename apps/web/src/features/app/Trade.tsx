@@ -5,6 +5,7 @@
    the payer and the person's own payout account come back as last sent. Sending to an account can
    start from what was typed on the Send screen (`?rail=` and the account's fields). The order then
    opens on its own screen, where the merchant's transfer receipt arrives in the chat. */
+import { useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { useI18n } from '@/i18n';
 import { Notice, Skeleton } from '@/components/ui/controls';
@@ -24,11 +25,17 @@ export default function Trade({ side, toOther = false }: { side: P2pSide; toOthe
   const [params] = useSearchParams();
   const { market, token, currency } = useAppData();
   const amount = params.get('amount');
+  const [step, setStep] = useState<'form' | 'details'>('form');
   const details = toOther
     ? Object.fromEntries([...params.entries()].filter(([k]) => !NOT_DETAILS.has(k)))
     : undefined;
   return (
-    <Screen back title={words.title} aside={<WalletSummary />}>
+    <Screen
+      back
+      title={words.title}
+      aside={<WalletSummary />}
+      steps={{ labels: t.app.tradeSteps, current: step === 'form' ? 0 : 1 }}
+    >
       <p className="mb-4 text-ink-2">{words.lede}</p>
       {market === undefined ? (
         <Skeleton className="h-64" />
@@ -47,6 +54,7 @@ export default function Trade({ side, toOther = false }: { side: P2pSide; toOthe
           initialDetails={details}
           recipient={toOther ? 'other' : 'self'}
           onConnect={() => navigate('/app')}
+          onStep={setStep}
           onOpened={(o, accepted) => {
             saveSteps(o.id, o.transactions);
             if (o.kind === 'SELL') saveQuoteTerms(o.id, accepted);

@@ -15,7 +15,7 @@
      moments that carry the product (the balance, the wallet card, the welcome, the landing's
      hero). On the dark theme the page already is that ground, so a bleed aura is clear and an
      aura card turns into glass tinted blue.
-   - Orbs: round glass buttons with a centred glyph and the label under them (the home's actions).
+   - Keypad first: the app's home is the amount you type on a keypad; the balance is a small chip.
    - Marker: a celeste highlighter for the one thing a person must not get wrong (the exact amount
      to transfer). Never decoration; no dot without a reason either.
    - Type: Sora (the brand's face), SemiBold for titles, Regular for text. Tabular figures where
@@ -403,87 +403,6 @@
         linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
       -webkit-backdrop-filter: blur(24px) saturate(160%);
       backdrop-filter: blur(24px) saturate(160%);
-    }
-  }
-  /* A bleed aura that becomes a card from a tablet up (the home's balance). */
-  @media (min-width: 768px) {
-    .aura.aura-md-card {
-      background: var(--night);
-      border: 1px solid rgb(255 255 255 / 0.14);
-      box-shadow:
-        inset 0 1px 0 rgb(255 255 255 / 0.22),
-        0 24px 48px -24px rgb(8 20 70 / 0.6);
-    }
-    :root[data-theme='dark'] .aura.aura-md-card {
-      background:
-        radial-gradient(90% 70% at 15% 0%, rgb(140 170 255 / 0.22), transparent 70%),
-        linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
-      -webkit-backdrop-filter: blur(24px) saturate(160%);
-      backdrop-filter: blur(24px) saturate(160%);
-    }
-  }
-  @media (min-width: 768px) and (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) .aura.aura-md-card {
-      background:
-        radial-gradient(90% 70% at 15% 0%, rgb(140 170 255 / 0.22), transparent 70%),
-        linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
-      -webkit-backdrop-filter: blur(24px) saturate(160%);
-      backdrop-filter: blur(24px) saturate(160%);
-    }
-  }
-
-  /* An orb: a round glass button, its glyph in the middle and its label under it (the home's
-     send, receive, add, withdraw). The rim catches the light top left and bottom right. */
-  .orb-action {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.6rem;
-    min-width: 0;
-    color: var(--ink-2);
-    text-decoration: none;
-    font-size: 0.9375rem;
-    font-weight: 500;
-  }
-  .orb {
-    display: grid;
-    place-items: center;
-    flex: none;
-    width: 64px;
-    height: 64px;
-    border-radius: 999px;
-    color: var(--ink);
-    background:
-      radial-gradient(110% 110% at 30% 12%, rgb(255 255 255 / 0.16), transparent 62%),
-      linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.04));
-    border: 1px solid rgb(255 255 255 / 0.22);
-    box-shadow:
-      inset 1px 1px 1px rgb(255 255 255 / 0.28),
-      inset -1px -1px 1px rgb(255 255 255 / 0.12),
-      0 14px 28px -16px rgb(2 6 24 / 0.7);
-    -webkit-backdrop-filter: blur(16px) saturate(170%);
-    backdrop-filter: blur(16px) saturate(170%);
-    transition:
-      transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
-      background-color 200ms ease,
-      box-shadow 220ms ease;
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .orb-action:hover .orb {
-      transform: translateY(-2px);
-      background-color: rgb(255 255 255 / 0.08);
-    }
-    .orb-action:hover {
-      color: var(--ink);
-    }
-  }
-  .orb-action:active .orb {
-    transform: scale(0.94);
-  }
-  @media (min-width: 768px) {
-    .orb {
-      width: 72px;
-      height: 72px;
     }
   }
   /* A lens: a large liquid-glass disc holding the mark (the welcome). Light catches its rim top
@@ -1315,31 +1234,11 @@
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
   }
-  /* A glass sheet that rises over the aura above it. */
-  .rise {
-    position: relative;
-    z-index: 1;
-    margin-top: -22px;
-    border-radius: 26px 26px 0 0;
-    background: var(--glass);
-    border-top: 1px solid var(--glass-rim);
-    box-shadow: inset 0 1px 0 var(--glass-hi);
-    -webkit-backdrop-filter: blur(28px) saturate(160%);
-    backdrop-filter: blur(28px) saturate(160%);
-  }
-  /* The home's rising sheet is a sheet on a phone only; from a tablet up its parts are cards. */
+  /* The home's keypad is the screen on a phone and a glass card from a tablet up. */
   @media (min-width: 768px) {
-    .rise.rise-phone {
-      border: 0;
-      border-radius: 0;
-      background: none;
-      box-shadow: none;
-      -webkit-backdrop-filter: none;
-      backdrop-filter: none;
-    }
-    .home-recent {
+    .keypad-card {
       padding: 1.5rem;
-      border-radius: 24px;
+      border-radius: 28px;
       background: var(--glass);
       border: 1px solid var(--glass-rim);
       box-shadow: var(--shadow-sheet);

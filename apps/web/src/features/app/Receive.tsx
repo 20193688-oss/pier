@@ -1,16 +1,21 @@
-/* Receive: my QR, on a wallet card. By default a payment link (this app's /app/send?to=@handle...), which any phone
+/* Receive, in two tabs.
+   - "Show QR": you, as a contact card: your initial, your @handle and short address, your QR on
+     white (a payment link with no amount), copy and share, and your link and address to copy.
+   - "Ask for an amount": the unit (a token of the network, or any currency the market pays out
+     in), the amount typed on the keypad with what it is worth or what reaches the wallet under
+     it, and a note; beside it (under it on a phone) the request it makes: its QR, its link,
+     copy and share, and the SEP-7 switch.
+   A request is a payment link by default (this app's /app/send?to=@handle...), which any phone
    camera opens; with the SEP-7 switch, a standard `web+stellar:pay` request for other Stellar
-   wallets. An optional amount and note go in both. The amount is asked in any unit the picker
-   lists: a token of the network (USDC, XLM: the request is in that token), or any currency the
-   market pays out in (it becomes the wallet's token at the market's price, and what reaches the
-   wallet is said under it). Copy and share (Web Share API). */
+   wallets. An amount in a currency becomes the wallet's token at the market's price. The home's
+   keypad opens this screen on the second tab with its amount (`?tab=ask&amount=12.5`). */
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { buildPaymentLink, buildSep7Pay } from '@pier/payment-qr';
 import { fmt, useI18n } from '@/i18n';
 import { Field, Notice, Switch } from '@/components/ui/controls';
 import { CopyButton, CopyRow, Qr } from '@/components/ui/misc';
 import { Icon } from '@/components/ui/Icon';
-import { LogoGlyph } from '@/components/ui/Logo';
 import { CurrencyMark, PickerSheet, TokenMark } from '@/components/p2p/parts';
 import { currencyName, shortAddress } from '@/lib/format';
 import { isQrRail } from '@/lib/p2p/qr-pay';
@@ -21,6 +26,7 @@ import { isDollarToken, tokensForLocal } from '@/lib/app/money';
 import { useAppData, usePrice } from '@/features/app/data';
 import { Screen } from '@/features/app/shell';
 import { ActivationCard, useLocal, useUsd } from '@/features/app/parts';
+import { Keypad, shownAmount, typedValue, useKeypad } from '@/features/app/keypad';
 
 export default function Receive() {
   const { t, lang } = useI18n();
@@ -29,7 +35,7 @@ export default function Receive() {
   const { market, profile, network, token: appToken, needsActivation } = useAppData();
   const fmtUsd = useUsd();
   const localOf = useLocal();
-  const [amount, setAmount] = useState('');
+  const [params] = useSearchParams();
   // The unit the amount is typed in: `token:USDC`, `token:XLM` or `fiat:BOB`; the wallet's token
   // to start with.
   const [unit, setUnit] = useState<string | null>(null);
@@ -44,8 +50,18 @@ export default function Receive() {
   const price = usePrice(fiat);
   const [note, setNote] = useState('');
   const [sep7, setSep7] = useState(false);
+  const [tab, setTab] = useState<'qr' | 'ask'>(() =>
+    params.get('tab') === 'ask' || params.get('amount') ? 'ask' : 'qr',
+  );
   const address = session?.address ?? '';
   const decimals = fiat ? fiatDecimals(fiat) : token && isDollarToken(token.symbol) ? 2 : 7;
+  // The keypad on the home opens this screen with an amount (`?tab=ask&amount=12.5`).
+  const fromHome = params.get('amount') ?? '';
+  const keypad = useKeypad({
+    initial: /^\d+(\.\d{1,7})?$/.test(fromHome) ? fromHome : '',
+    maxDecimals: decimals,
+  });
+  const amount = typedValue(keypad.typed);
   const typed = amount ? parseDecimal(amount, decimals) : null;
   const amountOk = !amount || typed !== null;
   const noteOk = new TextEncoder().encode(note).length <= 28;
@@ -70,7 +86,7 @@ export default function Receive() {
     setPicking(false);
     if (key === unitKey) return;
     setUnit(key);
-    setAmount('');
+    keypad.setTyped('');
   };
   const unitMark = fiat ? (
     <CurrencyMark code={fiat} size={24} />
@@ -78,10 +94,8 @@ export default function Receive() {
     <TokenMark symbol={unitCode} network={network?.name} size={24} />
   );
 
-  const value = useMemo(() => {
-    if (!address || !token || !network || !amountOk || !noteOk || waiting) return null;
-    const a = asked;
-    const n = note.trim() || null;
+  const build = (a: string | null, n: string | null) => {
+    if (!address || !token || !network) return null;
     try {
       return sep7
         ? buildSep7Pay({
@@ -102,93 +116,194 @@ export default function Receive() {
     } catch {
       return null;
     }
-  }, [address, token, network, asked, waiting, note, sep7, profile, amountOk, noteOk]);
+  };
+  const value = useMemo(
+    () => (!amountOk || !noteOk || waiting ? null : build(asked, note.trim() || null)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [address, token, network, asked, waiting, note, sep7, profile, amountOk, noteOk],
+  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const plain = useMemo(() => build(null, null), [address, token, network, sep7, profile]);
+
+  const shareButtons = (link: string | null) =>
+    link && (
+      <div
+        className={`grid w-full gap-2 ${typeof navigator.share === 'function' ? 'grid-cols-2' : 'grid-cols-1'}`}
+      >
+        <CopyButton value={link} label={r.copyLink} className="btn-lg w-full" />
+        {typeof navigator.share === 'function' && (
+          <button
+            type="button"
+            className="btn btn-ink btn-lg"
+            onClick={() =>
+              void navigator
+                .share({ text: fmt(r.shareText, { brand: t.common.brand, link }) })
+                .catch(() => {})
+            }
+          >
+            <Icon name="share" size={20} />
+            {r.share}
+          </button>
+        )}
+      </div>
+    );
+  const sep7Row = (
+    <div className="sheet flex items-center justify-between gap-4 px-5 py-4">
+      <span className="flex flex-col">
+        <b className="font-semibold">{r.sep7}</b>
+        <span className="text-[0.875rem] text-ink-3">{r.sep7Hint}</span>
+      </span>
+      <Switch label={r.sep7} checked={sep7} onChange={setSep7} />
+    </div>
+  );
+  const qrOnWhite = (link: string | null, size: number) => (
+    <div className="rounded-[30px] bg-white p-3 shadow-[var(--shadow-float)]">
+      {link ? (
+        <Qr value={link} label={r.qrLabel} size={size} />
+      ) : (
+        <div className="skeleton" style={{ width: size, height: size }} />
+      )}
+    </div>
+  );
+  const figure = fiat
+    ? `${shownAmount(lang, keypad.typed || '0')} ${fiat}`
+    : token && isDollarToken(token.symbol)
+      ? t.app.usd.replace('{amount}', shownAmount(lang, keypad.typed || '0'))
+      : `${shownAmount(lang, keypad.typed || '0')} ${unitCode}`;
 
   return (
     <Screen title={r.title} width="page">
-      {/* Wide screens (1280px up): the QR card on the left, what goes in it and the links on the right. */}
-      <div className="grid gap-6 pb-6 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)] xl:items-start xl:gap-10">
-        <p className="text-ink-2 xl:col-start-2 xl:row-start-1">
-          {fmt(r.body, { brand: t.common.brand })}
-        </p>
+      <div className="flex flex-col gap-5 pb-6">
         {needsActivation && (
-          <div className="flex flex-col gap-4 xl:col-start-2">
+          <div className="flex flex-col gap-4">
             <Notice tone="warn">{r.inactive}</Notice>
             <ActivationCard />
           </div>
         )}
-        <div className="flex flex-col gap-4 xl:col-start-1 xl:row-span-6 xl:row-start-1">
-          {/* The QR on a wallet card: the night aura, the handle at its foot. */}
-          <div className="tone-dark aura-card flex flex-col items-center gap-4 overflow-hidden rounded-[26px] px-5 pt-4 pb-5 text-ink">
-            <div className="flex w-full items-center justify-between text-ink-2">
-              <span className="num text-[0.875rem] font-medium">{shortAddress(address)}</span>
-              <LogoGlyph size={24} className="text-ink" />
-            </div>
-            {value ? (
-              <Qr value={value} label={r.qrLabel} size={224} />
-            ) : (
-              <div className="skeleton size-[224px]" />
-            )}
-            {profile?.handle ? (
-              <b className="text-[1.375rem] font-semibold tracking-[-0.02em]">@{profile.handle}</b>
-            ) : (
-              <span className="text-[0.9375rem] text-ink-2">{network?.name}</span>
-            )}
-          </div>
-          {value && (
-            <div className="flex w-full gap-2">
-              <CopyButton value={value} label={r.copyLink} className="btn-lg flex-1" />
-              {typeof navigator.share === 'function' && (
-                <button
-                  type="button"
-                  className="btn btn-ink btn-lg flex-1"
-                  onClick={() =>
-                    void navigator
-                      .share({ text: fmt(r.shareText, { brand: t.common.brand, link: value }) })
-                      .catch(() => {})
-                  }
-                >
-                  <Icon name="share" size={20} />
-                  {r.share}
-                </button>
-              )}
-            </div>
-          )}
-          {!profile?.handle && <p className="text-[0.875rem] text-ink-3">{r.noHandle}</p>}
-        </div>
-        <div className="flex flex-col gap-3 xl:col-start-2">
-          {/* Any unit: a token of the network or a currency, from one picker. */}
+        <div className="seg md:max-w-md" role="tablist" aria-label={r.title}>
           <button
             type="button"
-            className="glass flex items-center gap-2 self-start rounded-full py-1.5 pr-3 pl-1.5 transition-colors hover:bg-well"
-            onClick={() => setPicking(true)}
-            aria-haspopup="dialog"
-            aria-label={fmt(r.changeUnit, { unit: unitCode })}
-            data-testid="receive-unit"
+            role="tab"
+            id="receive-tab-qr"
+            aria-selected={tab === 'qr'}
+            aria-controls="receive-panel"
+            onClick={() => setTab('qr')}
           >
-            {unitMark}
-            <b className="font-bold">{unitCode}</b>
-            <Icon name="chevron" size={16} />
+            {r.tabQr}
           </button>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field
-              label={fmt(r.amountIn, { unit: unitCode })}
-              inputMode="decimal"
-              placeholder={decimals === 0 ? '0' : '0.00'}
-              value={amount}
-              onChange={(e) => setAmount(e.target.value.trim().replace(',', '.'))}
-              hint={hint}
-              error={amountOk ? null : t.app.send.badAmount}
-            />
-            <Field
-              label={r.note}
-              value={note}
-              maxLength={28}
-              onChange={(e) => setNote(e.target.value)}
-              error={noteOk ? null : t.app.send.noteTooLong}
-            />
-          </div>
+          <button
+            type="button"
+            role="tab"
+            id="receive-tab-ask"
+            aria-selected={tab === 'ask'}
+            aria-controls="receive-panel"
+            onClick={() => setTab('ask')}
+          >
+            {r.tabAsk}
+          </button>
         </div>
+
+        {tab === 'qr' ? (
+          <div
+            id="receive-panel"
+            role="tabpanel"
+            aria-labelledby="receive-tab-qr"
+            className="flex flex-col items-center gap-5 pt-2 text-center md:mx-auto md:w-full md:max-w-md"
+          >
+            <div className="flex flex-col items-center gap-2">
+              <span
+                className="glass-strong grid size-[68px] place-items-center rounded-full text-[1.75rem] font-semibold text-ink uppercase"
+                aria-hidden="true"
+              >
+                {profile?.handle ? profile.handle.slice(0, 1) : <Icon name="user" size={28} />}
+              </span>
+              <p className="text-[1.625rem] leading-tight font-semibold tracking-[-0.02em]">
+                {profile?.handle ? `@${profile.handle}` : network?.name}
+              </p>
+              <p className="num text-[0.9375rem] text-ink-3">{shortAddress(address)}</p>
+            </div>
+            {qrOnWhite(plain, 236)}
+            <p className="max-w-xs text-[0.9375rem] text-ink-2">
+              {fmt(r.body, { brand: t.common.brand })}
+            </p>
+            {shareButtons(plain)}
+            {!profile?.handle && <p className="text-[0.875rem] text-ink-3">{r.noHandle}</p>}
+            <div className="sheet w-full divide-y divide-line px-5 text-left">
+              {plain && !sep7 && <CopyRow label={r.link} value={plain} />}
+              <CopyRow label={r.address} value={address} />
+            </div>
+            <div className="w-full text-left">{sep7Row}</div>
+          </div>
+        ) : (
+          <div
+            id="receive-panel"
+            role="tabpanel"
+            aria-labelledby="receive-tab-ask"
+            className="grid gap-5 md:grid-cols-[minmax(0,440px)_minmax(0,340px)] md:items-start md:gap-10"
+          >
+            <section className="sheet flex flex-col items-center gap-1 p-5 text-center md:p-6">
+              {/* Any unit: a token of the network or a currency, from one picker. */}
+              <button
+                type="button"
+                className="glass flex items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 transition-colors hover:bg-well"
+                onClick={() => setPicking(true)}
+                aria-haspopup="dialog"
+                aria-label={fmt(r.changeUnit, { unit: unitCode })}
+                data-testid="receive-unit"
+              >
+                {unitMark}
+                <b className="font-bold">{unitCode}</b>
+                <Icon name="chevron" size={16} />
+              </button>
+              <h2 className="sr-only">{fmt(r.amountIn, { unit: unitCode })}</h2>
+              <p
+                className={`figure mt-4 text-[clamp(2.4rem,12vw,3.5rem)] ${keypad.typed ? 'text-ink' : 'text-ink-3'}`}
+                aria-live="polite"
+              >
+                {figure}
+              </p>
+              <p
+                className={`num mt-1 min-h-[1.5rem] text-[0.9375rem] ${amountOk ? 'text-ink-2' : 'text-bad'}`}
+              >
+                {amountOk ? (hint ?? '') : t.app.send.badAmount}
+              </p>
+              <Keypad
+                onPress={keypad.press}
+                decimals={decimals > 0}
+                className="mt-2 w-full max-w-sm"
+              />
+              <div className="mt-4 w-full text-left">
+                <Field
+                  label={r.note}
+                  value={note}
+                  maxLength={28}
+                  onChange={(e) => setNote(e.target.value)}
+                  error={noteOk ? null : t.app.send.noteTooLong}
+                />
+              </div>
+            </section>
+            <aside className="flex flex-col items-center gap-4 md:sticky md:top-24">
+              <p className="caps self-start text-ink-3">{r.preview}</p>
+              {qrOnWhite(value, 200)}
+              {wanted && asked && (
+                <p className="figure text-[1.5rem]">
+                  {askedText}
+                  {fiat && (
+                    <span className="block text-[0.9375rem] font-normal text-ink-3">{figure}</span>
+                  )}
+                </p>
+              )}
+              {shareButtons(value)}
+              {value && !sep7 && (
+                <div className="sheet w-full px-5 text-left">
+                  <CopyRow label={r.link} value={value} />
+                </div>
+              )}
+              <div className="w-full">{sep7Row}</div>
+            </aside>
+          </div>
+        )}
+
         {picking && (
           <PickerSheet
             title={r.unit}
@@ -214,17 +329,6 @@ export default function Receive() {
             ]}
           />
         )}
-        <div className="sheet flex items-center justify-between gap-4 px-5 py-4 xl:col-start-2">
-          <span className="flex flex-col">
-            <b className="font-semibold">{r.sep7}</b>
-            <span className="text-[0.875rem] text-ink-3">{r.sep7Hint}</span>
-          </span>
-          <Switch label={r.sep7} checked={sep7} onChange={setSep7} />
-        </div>
-        <div className="sheet divide-y divide-line px-5 xl:col-start-2">
-          {value && !sep7 && <CopyRow label={r.link} value={value} />}
-          <CopyRow label={r.address} value={address} />
-        </div>
       </div>
     </Screen>
   );
