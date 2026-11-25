@@ -236,11 +236,11 @@ export function SiteFooter() {
   );
 }
 
-/** The public pages' layout. */
+/** The public pages' layout: the clean look (`.site-clean`), not the app's glass. */
 export function SiteLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   return (
-    <div className="flex min-h-dvh flex-col">
+    <div className="site-clean site-guides flex min-h-dvh flex-col">
       <a
         href="#main"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-[10px] focus:bg-ink focus:px-4 focus:py-2 focus:text-on-ink"

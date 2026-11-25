@@ -5,6 +5,7 @@ const landing: typeof es = {
   metaTitle: '{brand}: from soles to digital dollars with Yape, Plin or CCI',
   metaDescription:
     'Buy and sell digital dollars (USDC on Stellar) paying with Yape, Plin or CCI. A local merchant completes each payment, and the money stays in a contract until it is confirmed.',
+  eyebrow: 'USDC on Stellar, no network fees',
   hero: {
     title: 'From soles to digital dollars, with Yape',
     body: 'Peru has no Stellar ramp for soles yet: going from soles to digital dollars depends on foreign exchanges. Here you pay with Yape, Plin or CCI, a merchant with a track record sends you USDC, and the money stays in a contract until it is confirmed. You can also send and pay by QR in other countries.',
@@ -26,9 +27,20 @@ const landing: typeof es = {
     locked: 'Locked in the contract until the merchant confirms',
     button: 'I transferred',
   },
+  frame: {
+    url: '{brand} · Add money',
+    wallet: 'My wallet',
+    steps: ['Amount', 'Payment', 'Done'],
+    context: 'Purchase by bank transfer to {merchant}',
+    price: 'Price',
+    priceValue: '{price} per USDC',
+    back: 'Back',
+  },
   how: {
     title: 'How a purchase works',
     lede: 'No ads board, no haggling: you type an amount and the market picks the merchant.',
+    stepLabel: 'Step {n}',
+    ui: { pay: 'You pay', with: 'Pay with', method: 'Yape', received: 'You received' },
     steps: [
       {
         title: 'Type the amount',
@@ -67,6 +79,7 @@ const landing: typeof es = {
       },
     ],
     cta: 'Open the app',
+    pick: { title: 'What would you like to do?', url: '{brand} · Home' },
   },
   trust: {
     title: 'How each payment is protected',
@@ -115,6 +128,7 @@ const landing: typeof es = {
       { title: 'Public API', body: 'Test and live keys with scopes, and HMAC-signed webhooks.' },
     ],
     codeLabel: 'Create a charge with the API',
+    response: 'Response',
     cta: 'Read the docs',
   },
   faq: {

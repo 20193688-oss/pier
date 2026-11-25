@@ -981,6 +981,240 @@
   }
 }
 
+/* The public site (landing, docs): clean. After a fintech product reference the owner chose:
+   solid white surfaces on a pale page, hairline rules, the product's own screens in browser
+   frames, guide lines along the content's edges, regular-weight titles, Cobalto pills with a soft
+   grey secondary. The payments app keeps its glass; `.site-clean` (the public layout) swaps the
+   tokens back to flat surfaces. */
+.site-clean {
+  --page: #f8faff;
+  --paper: #f8faff;
+  --sheet: #ffffff;
+  --sheet-solid: #ffffff;
+  --well: #f1f4fa;
+  --ink: #070b1f;
+  --ink-2: #3b4462;
+  --ink-3: #626b85;
+  --line: #e3e8f2;
+  --line-2: #cdd5e4;
+  --primary: #2f54ff;
+  --on-primary: #ffffff;
+  --soft: #edf1fb;
+  --soft-ink: #2341d6;
+  --glass: #ffffff;
+  --glass-strong: #edf1fb;
+  --glass-rim: #e3e8f2;
+  --glass-hi: transparent;
+  --shadow-sheet: 0 1px 2px rgb(7 11 31 / 0.04), 0 12px 32px -20px rgb(18 48 158 / 0.2);
+  --shadow-float: 0 1px 2px rgb(7 11 31 / 0.05), 0 28px 60px -28px rgb(18 48 158 / 0.32);
+  --bar: rgb(255 255 255 / 0.82);
+  --frame-bar: #f6f8fc;
+  --code: #f6f8fc;
+  color-scheme: light;
+  color: var(--ink);
+  background: var(--page);
+}
+:root[data-theme='dark'] .site-clean {
+  --page: #070b1f;
+  --paper: #070b1f;
+  --sheet: #0c1330;
+  --sheet-solid: #0c1330;
+  --well: #121a3c;
+  --ink: #ffffff;
+  --ink-2: #c3cce6;
+  --ink-3: #97a3c6;
+  --line: rgb(255 255 255 / 0.09);
+  --line-2: rgb(255 255 255 / 0.18);
+  --primary: #2f54ff;
+  --on-primary: #ffffff;
+  --soft: rgb(255 255 255 / 0.07);
+  --soft-ink: #a9bbff;
+  --glass: #0c1330;
+  --glass-strong: #16204a;
+  --glass-rim: rgb(255 255 255 / 0.09);
+  --shadow-sheet: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 36px -22px rgb(0 0 0 / 0.7);
+  --shadow-float: 0 30px 70px -30px rgb(0 0 0 / 0.8);
+  --bar: rgb(7 11 31 / 0.8);
+  --frame-bar: #0f1738;
+  --code: #0a112b;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .site-clean {
+    --page: #070b1f;
+    --paper: #070b1f;
+    --sheet: #0c1330;
+    --sheet-solid: #0c1330;
+    --well: #121a3c;
+    --ink: #ffffff;
+    --ink-2: #c3cce6;
+    --ink-3: #97a3c6;
+    --line: rgb(255 255 255 / 0.09);
+    --line-2: rgb(255 255 255 / 0.18);
+    --primary: #2f54ff;
+    --on-primary: #ffffff;
+    --soft: rgb(255 255 255 / 0.07);
+    --soft-ink: #a9bbff;
+    --glass: #0c1330;
+    --glass-strong: #16204a;
+    --glass-rim: rgb(255 255 255 / 0.09);
+    --shadow-sheet: 0 1px 2px rgb(0 0 0 / 0.3), 0 16px 36px -22px rgb(0 0 0 / 0.7);
+    --shadow-float: 0 30px 70px -30px rgb(0 0 0 / 0.8);
+    --bar: rgb(7 11 31 / 0.8);
+    --frame-bar: #0f1738;
+    --code: #0a112b;
+    color-scheme: dark;
+  }
+}
+
+/* Guide lines along the content's edges (the frames sit on them), as on a drawing board, once the
+   content has its full width. */
+@media (min-width: 1160px) {
+  .site-clean.site-guides {
+    background:
+      linear-gradient(var(--line), var(--line)) no-repeat calc(50% - 34rem) 0 / 1px 100%,
+      linear-gradient(var(--line), var(--line)) no-repeat calc(50% + 34rem) 0 / 1px 100%,
+      var(--page);
+  }
+}
+
+@layer components {
+  /* Flat, not frosted: no blur behind anything on the public site. */
+  .site-clean .sheet,
+  .site-clean .glass,
+  .site-clean .glass-strong,
+  .site-clean .bg-sheet,
+  .site-clean .btn-line,
+  .site-clean .seg {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .site-clean .glass-strong {
+    box-shadow: none;
+  }
+  .site-clean h1,
+  .site-clean h2,
+  .site-clean h3 {
+    font-weight: 500;
+    letter-spacing: -0.03em;
+  }
+  .site-clean .display {
+    font-weight: 500;
+    letter-spacing: -0.04em;
+    line-height: 1.02;
+  }
+  /* A section's top rule, across the page. */
+  .rule-top {
+    border-top: 1px solid var(--line);
+  }
+  /* The soft secondary: a grey pill with cobalt words. */
+  .btn-soft {
+    background: var(--soft);
+    color: var(--soft-ink);
+  }
+  .btn-soft:hover:not(:disabled) {
+    background: color-mix(in oklab, var(--soft) 80%, var(--primary));
+  }
+  /* A small label over a title. */
+  .eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.75rem 0.3rem 0.35rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--sheet);
+    color: var(--ink-2);
+    font-size: 0.875rem;
+  }
+
+  /* A browser window holding one of the product's screens. */
+  .frame {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--sheet);
+    box-shadow: var(--shadow-float);
+  }
+  .frame-bar {
+    display: grid;
+    grid-template-columns: 60px 1fr 60px;
+    align-items: center;
+    height: 40px;
+    padding: 0 14px;
+    background: var(--frame-bar);
+    border-bottom: 1px solid var(--line);
+  }
+  .frame-dots {
+    display: flex;
+    gap: 6px;
+  }
+  .frame-dots > span {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--line-2);
+  }
+  .frame-url {
+    justify-self: center;
+    width: min(100%, 22rem);
+    padding: 0.2rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--sheet);
+    color: var(--ink-3);
+    font-size: 0.75rem;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* A fragment of a screen in a card (the steps): a soft panel with the screen's part on it. */
+  .fragment {
+    display: grid;
+    place-items: center;
+    height: 232px;
+    padding: 1.5rem;
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(80% 90% at 50% 0%, rgb(94 216 255 / 0.14), transparent 70%), var(--well);
+  }
+  /* The steps of a flow, as a rail: the current one marked on the line. */
+  .step-rail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  .step-rail > span {
+    padding: 0.3rem 0 0.3rem 0.85rem;
+    border-left: 2px solid var(--line);
+    color: var(--ink-3);
+    font-size: 0.875rem;
+  }
+  .step-rail > span[aria-current='step'] {
+    border-left-color: var(--primary);
+    color: var(--ink);
+    font-weight: 500;
+  }
+  /* A field as the product draws it, for a screen shown on the page. */
+  .mock-field {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-height: 40px;
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--sheet);
+    font-size: 0.875rem;
+  }
+  /* Code as the docs show it, light on the light page. */
+  .code-panel {
+    background: var(--code);
+    color: var(--ink);
+  }
+}
+
 /* The payments app (/app/*): a phone-width column, centred on a desktop against the page, with the
    phone's safe areas (notch, home indicator) kept clear and a floating dock for the tabs. */
 @layer components {

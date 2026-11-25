@@ -3,6 +3,7 @@ const landing = {
   metaTitle: '{brand}: de soles a dólares digitales con Yape, Plin o CCI',
   metaDescription:
     'Compra y vende dólares digitales (USDC en Stellar) pagando con Yape, Plin o CCI. Cada pago lo completa un cambista local y el dinero queda en un contrato hasta que se confirma.',
+  eyebrow: 'USDC en Stellar, sin comisión de red',
   hero: {
     title: 'De soles a dólares digitales, con Yape',
     body: 'En Perú todavía no hay una rampa de Stellar para soles: pasar de soles a dólares digitales depende de exchanges extranjeros. Aquí pagas con Yape, Plin o CCI, un cambista con historial te envía USDC y el dinero queda en un contrato hasta que se confirma. También envías y pagas con QR en otros países.',
@@ -23,9 +24,20 @@ const landing = {
     locked: 'Bloqueado en el contrato hasta que el cambista confirma',
     button: 'Ya transferí',
   },
+  frame: {
+    url: '{brand} · Agregar dinero',
+    wallet: 'Mi billetera',
+    steps: ['Monto', 'Pago', 'Listo'],
+    context: 'Compra por transferencia a {merchant}',
+    price: 'Precio',
+    priceValue: '{price} por USDC',
+    back: 'Atrás',
+  },
   how: {
     title: 'Cómo funciona una compra',
     lede: 'Sin libro de anuncios ni regateo: escribes un monto y el mercado elige al cambista.',
+    stepLabel: 'Paso {n}',
+    ui: { pay: 'Pagas', with: 'Pagas con', method: 'Yape', received: 'Recibiste' },
     steps: [
       {
         title: 'Escribe el monto',
@@ -64,6 +76,7 @@ const landing = {
       },
     ],
     cta: 'Abrir la app',
+    pick: { title: '¿Qué quieres hacer?', url: '{brand} · Inicio' },
   },
   trust: {
     title: 'Cómo se protege cada pago',
@@ -115,6 +128,7 @@ const landing = {
       },
     ],
     codeLabel: 'Crear un cobro con la API',
+    response: 'Respuesta',
     cta: 'Leer la documentación',
   },
   faq: {

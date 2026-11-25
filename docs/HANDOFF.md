@@ -404,6 +404,13 @@ offered to liquidity merchants.
     cents; the welcome holds the symbol in a `.glass-lens`.
   - No dot without a reason: status pills are words on a tint, and an unread chat says «Mensaje
     nuevo» with a chat icon (the app's activity rows, the dashboard's chat button).
+- The public site (landing, docs; `SiteLayout`) is **clean**, not glass (2026-11-25, after a fintech
+  product-flow reference the owner chose): `.site-clean` swaps the tokens to solid white surfaces
+  on a pale page (Abismo surfaces on dark), hairline rules between sections, guide lines on the
+  content's edges (`.site-guides`, from 1160px), regular-weight titles, Cobalto pills with a soft
+  grey secondary (`.btn-soft`). The landing shows the product's own screens in browser frames
+  (`.frame`: the pay screen with its step rail, the steps' fragments, the app's «¿Qué quieres
+  hacer?» picker, the API request and response).
 - The logo is the brand kit's (Pier_Marca v2, `02_Logo/SVG_editable`): the symbol is a «P»
   shaped like a pier, split in two halves; the wordmark sets it before «ier» and the dot of the i.
   The geometry is copied into `apps/web/src/components/ui/logo-paths.ts` (no generator); `Logo`
