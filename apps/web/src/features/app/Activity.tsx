@@ -1,5 +1,5 @@
-/* Activity: every movement of the wallet, newest first and by day (transfers in and out,
-   purchases, sales, QR payments), a page at a time. */
+/* Activity: every movement of the wallet, newest first, a card per day (transfers in and out,
+   purchases, sales, QR payments), a page at a time; a filter shows all, money in or money out. */
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/i18n';
 import { Icon } from '@/components/ui/Icon';
@@ -8,7 +8,7 @@ import { app } from '@/lib/api/app';
 import { decimalsFrom } from '@/lib/p2p/normalize';
 import { useAppData } from '@/features/app/data';
 import { Screen } from '@/features/app/shell';
-import { ActivityList } from '@/features/app/parts';
+import { ActivityList, isIncoming } from '@/features/app/parts';
 import type { ActivityItem } from '@/lib/app/types';
 
 export default function Activity() {
@@ -18,6 +18,7 @@ export default function Activity() {
   const [items, setItems] = useState<ActivityItem[] | null | undefined>(undefined);
   const [cursor, setCursor] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'in' | 'out'>('all');
 
   const load = useCallback(
     async (from: string | null) => {
@@ -39,8 +40,17 @@ export default function Activity() {
     void load(null);
   }, [load]);
 
+  const shown =
+    items && filter !== 'all' ? items.filter((it) => (filter === 'in') === isIncoming(it)) : items;
   return (
-    <Screen title={a.title} width="page">
+    <Screen title={a.title}>
+      <div className="seg mb-5" role="group" aria-label={a.filter}>
+        {(['all', 'in', 'out'] as const).map((f) => (
+          <button key={f} type="button" aria-pressed={filter === f} onClick={() => setFilter(f)}>
+            {a.filters[f]}
+          </button>
+        ))}
+      </div>
       {items === undefined && (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-14" />
@@ -48,7 +58,11 @@ export default function Activity() {
           <Skeleton className="h-14" />
         </div>
       )}
-      {items === null && <Notice tone="error" stay>{a.loadError}</Notice>}
+      {items === null && (
+        <Notice tone="error" stay>
+          {a.loadError}
+        </Notice>
+      )}
       {items && items.length === 0 && (
         <div className="sheet flex flex-col items-center gap-3 px-6 py-12 text-center">
           <span className="icon-tile" aria-hidden="true">
@@ -57,11 +71,10 @@ export default function Activity() {
           <p className="max-w-sm text-ink-3">{a.empty}</p>
         </div>
       )}
-      {items && items.length > 0 && (
-        <div className="sheet px-5 pb-2 md:px-6 md:pb-4">
-          <ActivityList items={items} level={2} />
-        </div>
+      {shown && items && items.length > 0 && shown.length === 0 && (
+        <p className="py-6 text-center text-ink-3">{a.noneHere}</p>
       )}
+      {shown && shown.length > 0 && <ActivityList items={shown} level={2} cards />}
       {cursor && (
         <button
           type="button"

@@ -183,7 +183,7 @@ export function Switch({
       className={`relative h-7 w-12 shrink-0 rounded-full transition-colors ${checked ? 'bg-ink' : 'bg-line-2'}`}
     >
       <span
-        className={`absolute top-1 size-5 rounded-full bg-sheet transition-[left] ${checked ? 'left-6' : 'left-1'}`}
+        className={`absolute top-1 size-5 rounded-full shadow-[0_1px_3px_rgb(2_6_24/0.35)] transition-[left] ${checked ? 'left-6 bg-on-ink' : 'left-1 bg-white'}`}
       />
     </button>
   );

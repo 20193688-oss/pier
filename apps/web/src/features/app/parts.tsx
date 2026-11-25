@@ -163,17 +163,16 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
         <Icon name={icon} size={19} strokeWidth={2.1} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <b className="flex min-w-0 items-center gap-2 font-medium">
-          <span className={`truncate ${struck}`}>{title}</span>
+        <b className={`truncate font-medium ${struck}`}>{title}</b>
+        <span className="flex min-w-0 items-center gap-1.5 text-[0.8125rem] text-ink-3">
           {unread && (
-            <span
-              className="size-2 shrink-0 rounded-full bg-bad"
-              role="img"
-              aria-label={t.p2p.chat.unread}
-            />
+            <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-info">
+              <Icon name="chat" size={13} strokeWidth={2.2} />
+              {t.p2p.chat.unread}
+            </span>
           )}
-        </b>
-        <span className={`truncate text-[0.8125rem] text-ink-3 ${struck}`}>{sub}</span>
+          <span className={`truncate ${struck}`}>{sub}</span>
+        </span>
       </span>
       <span className="flex flex-col items-end gap-1">
         <b className={`num font-medium ${voided ? struck : incoming ? 'text-ok' : ''}`}>
@@ -186,14 +185,30 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
   );
 }
 
-/** Movements under a heading per day ("Hoy", "Ayer", "18 de noviembre"), each day its own list. */
-export function ActivityList({ items, level = 3 }: { items: ActivityItem[]; level?: 2 | 3 }) {
+/** Whether a movement brought money in (a transfer received, a purchase). */
+export const isIncoming = (item: ActivityItem) =>
+  item.type === 'transfer' ? item.transfer.direction === 'in' : item.order.kind === 'BUY';
+
+/** Movements under a heading per day ("Hoy", "Ayer", "18 de noviembre"), each day its own list;
+    with `cards`, each day is its own card. */
+export function ActivityList({
+  items,
+  level = 3,
+  cards = false,
+}: {
+  items: ActivityItem[];
+  level?: 2 | 3;
+  cards?: boolean;
+}) {
   const { lang } = useI18n();
   const Heading = level === 2 ? 'h2' : 'h3';
   return (
-    <div className="flex flex-col">
+    <div className={`flex flex-col ${cards ? 'gap-4' : ''}`}>
       {groupByDay(items, itemDate, lang).map((g) => (
-        <section key={`${g.label}-${itemKey(g.items[0])}`}>
+        <section
+          key={`${g.label}-${itemKey(g.items[0])}`}
+          className={cards ? 'sheet px-5 pt-1 pb-2 md:px-6' : undefined}
+        >
           {g.label && (
             <Heading className="mt-3 mb-0.5 text-[0.8125rem] font-medium tracking-normal text-ink-3">
               {g.label}
@@ -302,7 +317,7 @@ export function InstallBanner() {
   };
   return (
     <section
-      className="flex items-start gap-3 rounded-[18px] bg-well p-4"
+      className="glass flex items-start gap-3 rounded-[22px] p-4"
       aria-labelledby="install-h"
     >
       <span className="tile-icon mt-0.5 shrink-0" aria-hidden="true">
@@ -351,7 +366,7 @@ export function WalletSummary() {
       : null;
   return (
     <section
-      className="tone-dark aura-night grain overflow-hidden rounded-[24px] p-6 text-ink"
+      className="tone-dark aura-card overflow-hidden rounded-[26px] p-6 text-ink"
       aria-label={h.balance}
     >
       <p className="text-[0.875rem] font-medium text-ink-3">{h.balance}</p>

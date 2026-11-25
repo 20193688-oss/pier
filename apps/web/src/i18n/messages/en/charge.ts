@@ -59,6 +59,14 @@ const charge: typeof es = {
     requestExpired: 'This payment request expired.',
     requestCancelled: 'This payment request was cancelled.',
   },
+  steps: {
+    label: 'Payment steps',
+    details: 'Your details',
+    transfer: 'Transfer',
+    confirmation: 'Confirmation',
+    progress: 'Step {step} of {total}',
+    done: 'Done',
+  },
   startAgain: 'Start again',
   poweredBy:
     'Payment protected by {brand}: the money goes to the merchant, who releases the payment in a smart contract on the Stellar network.',

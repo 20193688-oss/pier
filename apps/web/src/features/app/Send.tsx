@@ -151,7 +151,7 @@ export default function Send() {
 
   if (step === 'done' && recipient)
     return (
-      <Screen>
+      <Screen steps={{ labels: s.steps, current: 3 }}>
         <div className="flex flex-1 flex-col items-center justify-center gap-4 pt-10 text-center">
           <span
             className="grid size-16 place-items-center rounded-full bg-ok-soft text-ok"
@@ -199,6 +199,7 @@ export default function Send() {
       <Screen
         back={undefined}
         title={s.review}
+        steps={{ labels: s.steps, current: 2 }}
         aside={<WalletSummary />}
         action={
           <button type="button" className="btn btn-quiet btn-sm" onClick={() => setStep('amount')}>
@@ -288,6 +289,7 @@ export default function Send() {
       <Screen
         back={undefined}
         title={s.amount}
+        steps={{ labels: s.steps, current: 1 }}
         aside={<WalletSummary />}
         action={
           <button type="button" className="btn btn-quiet btn-sm" onClick={() => setStep('to')}>
@@ -368,7 +370,12 @@ export default function Send() {
     );
 
   return (
-    <Screen back title={s.title} aside={<WalletSummary />}>
+    <Screen
+      back
+      title={s.title}
+      aside={<WalletSummary />}
+      steps={{ labels: s.steps, current: 0 }}
+    >
       <form
         className="flex flex-1 flex-col gap-4"
         onSubmit={(e: FormEvent) => {

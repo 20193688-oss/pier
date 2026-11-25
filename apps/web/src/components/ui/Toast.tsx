@@ -29,9 +29,9 @@ const ClearCtx = createContext<() => void>(() => {});
 const LIFE: Record<ToastTone, number> = { ok: 3200, info: 4800, error: 6500 };
 const ICON: Record<ToastTone, IconName> = { ok: 'check', info: 'info', error: 'alert' };
 const LOOK: Record<ToastTone, string> = {
-  ok: 'bg-ink text-on-ink',
-  info: 'bg-ink text-on-ink',
-  error: 'bg-bad text-white',
+  ok: 'border border-[var(--glass-rim)] bg-[var(--glass-dialog)] text-ink backdrop-blur-2xl backdrop-saturate-150',
+  info: 'border border-[var(--glass-rim)] bg-[var(--glass-dialog)] text-ink backdrop-blur-2xl backdrop-saturate-150',
+  error: 'bg-bad text-on-bad',
 };
 /** A message shown this recently is not shown again. */
 const REPEAT_MS = 4000;
@@ -88,7 +88,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         {toasts.map((t) => (
           <div
             key={t.id}
-            className={`toast pointer-events-auto flex max-w-[min(32rem,100%)] cursor-pointer items-start gap-2.5 rounded-[14px] px-4 py-3 text-[0.9375rem] shadow-[0_10px_30px_rgb(8_18_15/0.28)] ${LOOK[t.tone]}`}
+            className={`toast pointer-events-auto flex max-w-[min(32rem,100%)] cursor-pointer items-start gap-2.5 rounded-[18px] px-4 py-3 text-[0.9375rem] shadow-[inset_0_1px_0_var(--glass-hi),var(--shadow-float)] ${LOOK[t.tone]}`}
             onClick={() => drop(t.id)}
             // An error a screen already announces (its Notice) is not read twice.
             {...(t.silent

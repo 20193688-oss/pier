@@ -4,8 +4,8 @@
    `pier-signature` webhook header, the `Pier-Organization` request header, storage keys,
    the `@pier/*` packages) are not the display name and do not change with it. */
 export const BRAND = {
-  /* The name as people read it in a sentence. The wordmark (Logo.tsx) draws it from generated
-     outlines (logo-paths.ts, scripts/gen-logo.py): a new name means generating them again. */
+  /* The name as people read it in a sentence. The wordmark (Logo.tsx) draws the brand kit's
+     outlines (logo-paths.ts): a new name means a new logo from the brand kit. */
   name: 'Pier',
   /* The installed app's short name (home screen label). */
   shortName: 'Pier',

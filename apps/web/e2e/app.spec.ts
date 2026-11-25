@@ -18,7 +18,9 @@ test('sign in, claim a handle, and the home screen (Spanish)', async ({ page }) 
   await expect(page.getByTestId('balance')).toHaveText('US$ 248,35');
   await expect(page.getByText(/≈ .*PEN/)).toBeVisible({ timeout: 15_000 });
   await expect(page.getByRole('navigation', { name: 'Secciones de la app' }).first()).toBeVisible();
-  await expect(page.getByText('Recibiste de @lucia')).toBeVisible();
+  // The home is the keypad: the movements live in Activity.
+  await page.getByRole('link', { name: 'Actividad' }).first().click();
+  await expect(page.getByText('Recibiste de @lucia').first()).toBeVisible();
   await expectNoHorizontalScroll(page);
   expect(errors).toEqual([]);
 });
@@ -82,7 +84,13 @@ test('receive: a payment link with a handle, or a SEP-7 request (English)', asyn
   await appSignIn(page, 'en');
   await page.getByRole('link', { name: 'Receive' }).first().click();
   await expect(page.getByRole('img', { name: 'QR code to pay you' })).toBeVisible();
-  await page.getByLabel('Ask for an amount in USDC (optional)').fill('20');
+  // Asking for an amount is its own tab: the amount on the keypad, the request beside it.
+  await page.getByRole('tab', { name: 'Ask for an amount' }).click();
+  const keypad = page.getByRole('group', { name: 'Keypad' });
+  const type = async (digits: string) => {
+    for (const d of digits) await keypad.getByRole('button', { name: d, exact: true }).click();
+  };
+  await type('20');
   // The handle taken right after sign-in (suggested from user@demo.test) names the payee.
   const link = page.getByText(/\/app\/send\?to=%40user&amount=20&asset=USDC/);
   await expect(link).toBeVisible();
@@ -91,7 +99,7 @@ test('receive: a payment link with a handle, or a SEP-7 request (English)', asyn
   await page.getByTestId('receive-unit').click();
   await page.getByRole('dialog').getByRole('button', { name: /PEN/ }).click();
   await expect(page.getByTestId('receive-unit')).toHaveAccessibleName(/PEN/);
-  await page.getByLabel('Ask for an amount in PEN (optional)').fill('37');
+  await type('37');
   await expect(page.getByText('About $10.00 reaches your wallet.')).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText(/\/app\/send\?to=%40user&amount=10(\.00)?&asset=USDC/)).toBeVisible();
   // The picker lists the network's tokens and every currency (the mock network has USDC only).

@@ -127,7 +127,7 @@ export default function QrOrder() {
   const settleLeft = msLeft(order.deadlines.settleBy, now);
 
   return (
-    <Screen back="/app" title={q.title} width="page">
+    <Screen back="/app" title={q.title} steps={{ labels: t.app.qrSteps, current: 2 }}>
       <div className="grid gap-6 pb-6 xl:grid-cols-[minmax(0,1fr)_400px] xl:items-start xl:gap-8">
         <div className="mx-auto flex w-full max-w-[720px] flex-col gap-4 xl:mx-0">
           <section className="slip overflow-hidden">

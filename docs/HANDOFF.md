@@ -385,22 +385,79 @@ offered to liquidity merchants.
     is not a dependency yet (its install needs the owner's OK).
   - **Restarting the API** means restarting the whole stack (`npm run dev:stack -- --stop`, then
     the same start command): the launcher's watcher stops everything when the API process exits.
-- The look ("night and aura", 2026-11-20, after a Dribbble banking-app reference the owner chose)
-  is defined in `apps/web/src/styles/global.css`: near-black ink on a cool white page with white
-  sheets; one atmospheric gradient textured with halftone dots and grain (`.aura`,
-  `.aura-screen`, `.aura-night`, `.aura-card` + `.grain`) only for the welcome, the home balance,
-  the wallet cards (receive, me) and the landing's hero and closing; `.tone-light`,
-  `.tone-dark` and `.tone-glass` set the palette for part of a page whatever the theme; pill
-  buttons (`.btn-white`, `.btn-glass` on the aura);
-  action `.tile`s with tracked capitals (`.caps`); wide uppercase `.display` headlines on the aura;
-  an ice highlighter (`.marker`) for the exact amount.
-- The logo (2026-11-20, the owner's choices on the logo canvas for Midpoint, carried over to the
-  rename): PIER drawn from the hero's letters (Archivo at width 116, weight 720), every letter cut
-  on a slant with its lower part slid right. Flat, in the current colour, on
-  no tile (`Logo`); the cut P alone is `LogoGlyph`. Only the favicon and the app icons set the P on
-  an ink tile. The outlines are generated: `python apps/web/scripts/gen-logo.py` (fontTools,
-  brotli, skia-pathops) writes `apps/web/src/components/ui/logo-paths.ts` from the app's own
-  font file, then `npm run icons -w @pier/web` redraws `public/favicon.svg` and the PNGs.
+- The look ("glass", 2026-11-25, after a Dribbble glass wallet reference the owner chose, in the
+  colours of the brand kit Pier_Marca v2) is defined in `apps/web/src/styles/global.css`:
+  - Brand palette: Abismo `#070B1F` (text, dark grounds), Marea `#12309E` (glass base), Cobalto
+    `#2F54FF` (main colour; the primary button on light), Celeste `#5ED8FF` (accent, the
+    `.marker` highlighter), Hielo `#EEF6FF` (light grounds). Type: Sora (SemiBold titles, Regular
+    text), from `@fontsource-variable/sora`.
+  - One fixed ground behind every page (`body::before`): on dark, Abismo through Marea with
+    diffuse cobalt and celeste lights at the foot; on light, Hielo with the same lights, soft.
+  - Glass per the brand rule (white panel 4-16 %, 1px white rim 12-65 %, 24-40px blur): `.sheet`,
+    `.glass`, `.glass-strong` (the chosen segment, the active tab), `.btn-line`, `.btn-orb`,
+    `.seg`, `.field`, the dock, the dialogs and toasts; `.bg-sheet` frosts too.
+  - `.aura` (a bleed panel: the night ground on light, clear on dark) and `.aura-card` (the night
+    ground as a card on light, blue-tinted glass on dark) for the home balance, the wallet cards
+    (receive, me), the welcome and the landing's hero, merchants and closing; `.tone-dark` /
+    `.tone-light` set the palette for part of a page whatever the theme.
+  - The home's actions are round glass `.orb`s with the label under them; the balance dims its
+    cents; the welcome holds the symbol in a `.glass-lens`.
+  - No dot without a reason: status pills are words on a tint, and an unread chat says «Mensaje
+    nuevo» with a chat icon (the app's activity rows, the dashboard's chat button).
+- **Structure (2026-11-25, the owner: "debe verse como una app totalmente distinta y nueva respecto
+  a midpoint")**. The layouts and the organization of elements differ from Midpoint's on purpose:
+  - Payments app frame (`features/app/shell.tsx`):
+    - Phone: the tab screens have a top bar (avatar → profile, the screen's name, your QR →
+      receive). The home brings its own top bar with the balance chip. A docked bar at the foot
+      holds Home ($), the scanner (the raised centre) and Activity.
+    - Tablet and up: a top navigation (logo, Home / Activity / Receive, a "Move money" dropdown,
+      the scanner, the avatar). There is no side navigation.
+  - `Screen` layout:
+    - Phone: a sticky top bar with back and a centred title.
+    - Tablet and up: a page header with "‹ Back" above a large title.
+    - Flows pass `steps`: a progress bar ("Step 2 of 3") on a phone and a step rail from a tablet
+      up. This covers send (To, Amount, Review, Done), add money / withdraw (`TradeForm`
+      `onStep`) and QR payments.
+  - Home, **keypad first** (the owner chose it so the money header stops looking like
+    Midpoint's):
+    - The balance is a small chip at the top. It opens "Your balances": one row per coin
+      (tapping one makes it the app's coin), plus hide and refresh.
+    - The screen is the amount you type, in the app's coin with "≈ local" under it (tapping that
+      changes the currency), a keypad (the physical keyboard types too) and four destinations.
+      Request and Send are the big pills; Add and Withdraw sit under them.
+    - Each destination opens with the amount filled in: `/app/send?amount=`,
+      `/app/receive?tab=ask&amount=`, `/app/withdraw?amount=`, and `/app/add?currency=&amount=`
+      with the local money at the current price.
+    - From a tablet up, the keypad is a card and the latest movements sit beside it. On a phone
+      the movements live in Activity.
+  - Activity: All / Money in / Money out filters, a card per day.
+  - Receive, two tabs:
+    - "Show QR": a contact card (your initial, @handle, short address), your QR on white, copy
+      and share, your link and address.
+    - "Ask for an amount": the unit chip, the amount typed on the shared keypad
+      (`features/app/keypad.tsx`, also the home's) with what it is worth under it, a note, and
+      beside it the live request (its QR, its link, copy/share, the SEP-7 switch).
+  - Profile: an identity header, then grouped settings (Wallet, Preferences, The app), sign out.
+  - Welcome: the words, three feature rows and the two ways in; the brand panel on the right
+    from a tablet up.
+  - Merchant dashboard: a top header (organization, test/live, account, language, theme), group
+    tabs and section tabs instead of the sidebar.
+  - Hosted charge page: a two-column checkout (a summary with the payer's steps beside the
+    current step); on a phone, a compact summary first.
+- The public site (landing, docs; `SiteLayout`) is **clean**, not glass (2026-11-25, after a fintech
+  product-flow reference the owner chose): `.site-clean` swaps the tokens to solid white surfaces
+  on a pale page (Abismo surfaces on dark), hairline rules between sections, guide lines on the
+  content's edges (`.site-guides`, from 1160px), regular-weight titles, Cobalto pills with a soft
+  grey secondary (`.btn-soft`). The landing shows the product's own screens in browser frames
+  (`.frame`: the pay screen with its step rail, the steps' fragments, the app's «¿Qué quieres
+  hacer?» picker, the API request and response).
+- The logo is the brand kit's (Pier_Marca v2, `02_Logo/SVG_editable`): the symbol is a «P»
+  shaped like a pier, split in two halves; the wordmark sets it before «ier» and the dot of the i.
+  The geometry is copied into `apps/web/src/components/ui/logo-paths.ts` (no generator); `Logo`
+  and `LogoGlyph` draw it with the Aurora gradient (`--logo-1..3`: Aurora on light, Aurora glass
+  on blue) and the rest in the current colour. Brand rules: the wordmark at least 80px wide (its
+  default height is 32px), the symbol at least 24px, no shadow, glass or rotation on the logo.
+  `npm run icons -w @pier/web` redraws `public/favicon.svg` and the PNGs as the kit's app icon.
 
 ## 7. Security invariants (keep them)
 

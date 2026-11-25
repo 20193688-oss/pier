@@ -46,8 +46,8 @@ const dash: typeof es = {
     keys: 'API keys',
     webhooks: 'Webhooks',
     team: 'Team',
-    menu: 'Open the sections',
-    close: 'Close the sections',
+    menu: 'Open the menu',
+    close: 'Close the menu',
     site: 'Go to the site',
   },
   state: {

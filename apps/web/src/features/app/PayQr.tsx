@@ -157,9 +157,14 @@ export default function PayQr() {
   };
 
   return (
-    <Screen back title={q.title} aside={<WalletSummary />}>
+    <Screen
+      back
+      title={q.title}
+      aside={<WalletSummary />}
+      steps={{ labels: t.app.qrSteps, current: 1 }}
+    >
       <div className="flex flex-col gap-4 pb-4">
-        <div className="flex items-center gap-3 rounded-[18px] border border-line bg-sheet p-4">
+        <div className="sheet flex items-center gap-3 p-4">
           <span
             className="grid size-12 shrink-0 place-items-center rounded-full bg-well"
             aria-hidden="true"
