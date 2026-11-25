@@ -75,7 +75,7 @@ export function WalletButton({ compact = false }: { compact?: boolean }) {
 }
 
 const navClass = ({ isActive }: { isActive: boolean }) =>
-  `rounded-full px-3.5 py-2 font-semibold transition-colors duration-200 ${isActive ? 'text-ink bg-well' : 'text-ink-2 hover:text-ink'}`;
+  `rounded-full px-3.5 py-2 font-semibold transition-colors duration-200 ${isActive ? 'text-ink glass-strong' : 'border border-transparent text-ink-2 hover:text-ink'}`;
 
 export function SiteHeader() {
   const { t } = useI18n();
@@ -91,7 +91,7 @@ export function SiteHeader() {
     { to: '/dashboard', label: n.dashboard },
   ];
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-[color-mix(in_oklab,var(--paper)_88%,transparent)] backdrop-blur-md">
+    <header className="sticky top-0 z-30 border-b border-[var(--glass-rim)] bg-[var(--bar)] shadow-[inset_0_-1px_0_var(--line)] backdrop-blur-2xl backdrop-saturate-150">
       <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-6 sm:px-8">
         <Link to="/" aria-label={n.home} className="mr-2 rounded-[10px]">
           <Logo />

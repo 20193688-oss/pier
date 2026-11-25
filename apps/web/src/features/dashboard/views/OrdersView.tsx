@@ -403,17 +403,15 @@ export function OrdersView() {
                             return (
                               <button
                                 type="button"
-                                className="btn btn-line btn-sm relative"
+                                className={`btn btn-sm ${fresh ? 'btn-ink' : 'btn-line'}`}
                                 onClick={() => setChatFor({ order, scope: chatScope })}
                               >
                                 <Icon name="chat" size={16} />
                                 {t.p2p.chat.open}
                                 {fresh && (
-                                  <span
-                                    className="absolute -top-1 -right-1 size-3 rounded-full border-2 border-sheet bg-bad"
-                                    role="img"
-                                    aria-label={t.p2p.chat.unread}
-                                  />
+                                  <span className="rounded-full bg-on-primary/15 px-2 py-0.5 text-[0.75rem]">
+                                    {t.p2p.chat.unread}
+                                  </span>
                                 )}
                               </button>
                             );
@@ -744,7 +742,7 @@ function QrToPay({ qr }: { qr: P2pOrderQr }) {
   const standard = (q.standards as Record<string, string>)[qr.standard] ?? qr.standard;
   return (
     <section
-      className="mt-3 grid gap-4 rounded-[16px] border border-line bg-paper p-4 sm:grid-cols-[auto_minmax(0,1fr)]"
+      className="mt-3 grid gap-4 rounded-[16px] border border-line bg-well p-4 sm:grid-cols-[auto_minmax(0,1fr)]"
       aria-label={q.title}
     >
       <div className="justify-self-center rounded-[14px] bg-white p-2">

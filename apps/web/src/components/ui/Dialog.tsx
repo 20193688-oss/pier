@@ -39,7 +39,7 @@ export function Dialog({
       onClick={(e) => {
         if (e.target === ref.current) close.current();
       }}
-      className={`fixed m-0 mt-auto w-full max-w-none rounded-t-[22px] border border-line bg-sheet p-0 text-ink backdrop:bg-[rgb(8_18_15/0.55)] sm:m-auto sm:rounded-[22px] ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}
+      className={`fixed m-0 mt-auto w-full max-w-none rounded-t-[22px] border border-[var(--glass-rim)] bg-[var(--glass-dialog)] p-0 text-ink shadow-[inset_0_1px_0_var(--glass-hi),var(--shadow-float)] backdrop-blur-2xl backdrop-saturate-150 backdrop:bg-[rgb(4_8_28/0.45)] backdrop:backdrop-blur-[3px] sm:m-auto sm:rounded-[22px] ${wide ? 'sm:max-w-2xl' : 'sm:max-w-md'}`}
     >
       <div className="flex max-h-[88dvh] flex-col">
         <div className="flex items-start justify-between gap-4 px-5 pt-5 pb-3">

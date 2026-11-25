@@ -68,7 +68,7 @@ export default function HandleScreen() {
         <label htmlFor="handle" className="mt-8 text-[0.875rem] font-semibold text-ink-2">
           {h.label}
         </label>
-        <div className="mt-1.5 flex items-center rounded-[14px] border border-transparent bg-well px-4 focus-within:border-ink focus-within:bg-sheet">
+        <div className="mt-1.5 flex items-center rounded-[16px] border border-line bg-well px-4 focus-within:border-line-2 focus-within:bg-sheet focus-within:shadow-[0_0_0_3px_color-mix(in_oklab,var(--focus)_28%,transparent)]">
           <span className="text-[1.5rem] font-bold text-ink-3" aria-hidden="true">
             @
           </span>

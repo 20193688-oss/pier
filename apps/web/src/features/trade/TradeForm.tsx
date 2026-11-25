@@ -401,7 +401,7 @@ export function TradeForm({
   const currencyButton = (
     <button
       type="button"
-      className="flex shrink-0 items-center gap-2 rounded-full border border-line bg-sheet py-1.5 pr-3 pl-1.5 hover:border-ink"
+      className="glass flex shrink-0 items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 transition-colors hover:bg-well"
       onClick={() => setPicker('currency')}
       aria-haspopup="dialog"
       disabled={market.currencies.length < 2}
@@ -417,7 +417,7 @@ export function TradeForm({
   const tokenButton = (
     <button
       type="button"
-      className="flex shrink-0 items-center gap-2 rounded-full border border-line bg-sheet py-1.5 pr-3 pl-1.5 hover:border-ink"
+      className="glass flex shrink-0 items-center gap-2 rounded-full py-1.5 pr-3 pl-1.5 transition-colors hover:bg-well"
       onClick={() => setPicker('token')}
       aria-haspopup="dialog"
       aria-label={fmt(a.changeToken, { token: symbol, network: network?.name ?? '' })}

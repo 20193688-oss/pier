@@ -124,7 +124,7 @@ export function Figures({
   return (
     <dl aria-label={label} className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
       {items.map((f) => (
-        <div key={f.label} className="rounded-[18px] border border-line bg-sheet p-4">
+        <div key={f.label} className="sheet p-4">
           <dt className="text-[0.8125rem] font-semibold text-ink-3">{f.label}</dt>
           <dd className="figure mt-2 text-[clamp(1.05rem,4.4vw,1.45rem)] [overflow-wrap:anywhere]">
             {f.value}

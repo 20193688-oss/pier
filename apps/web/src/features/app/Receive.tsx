@@ -118,11 +118,11 @@ export default function Receive() {
           </div>
         )}
         <div className="flex flex-col gap-4 xl:col-start-1 xl:row-span-6 xl:row-start-1">
-          {/* The QR on a wallet card: the aura from ice to night, the handle at its foot. */}
-          <div className="tone-dark aura-card grain flex flex-col items-center gap-4 overflow-hidden rounded-[24px] px-5 pt-4 pb-5 text-ink shadow-[var(--shadow-float)]">
-            <div className="flex w-full items-center justify-between text-[#0a0b0e]">
+          {/* The QR on a wallet card: the night aura, the handle at its foot. */}
+          <div className="tone-dark aura-card flex flex-col items-center gap-4 overflow-hidden rounded-[26px] px-5 pt-4 pb-5 text-ink">
+            <div className="flex w-full items-center justify-between text-ink-2">
               <span className="num text-[0.875rem] font-medium">{shortAddress(address)}</span>
-              <LogoGlyph size={22} />
+              <LogoGlyph size={24} className="text-ink" />
             </div>
             {value ? (
               <Qr value={value} label={r.qrLabel} size={224} />
@@ -160,7 +160,7 @@ export default function Receive() {
           {/* Any unit: a token of the network or a currency, from one picker. */}
           <button
             type="button"
-            className="flex items-center gap-2 self-start rounded-full border border-line bg-sheet py-1.5 pr-3 pl-1.5 transition-colors hover:border-ink"
+            className="glass flex items-center gap-2 self-start rounded-full py-1.5 pr-3 pl-1.5 transition-colors hover:bg-well"
             onClick={() => setPicking(true)}
             aria-haspopup="dialog"
             aria-label={fmt(r.changeUnit, { unit: unitCode })}

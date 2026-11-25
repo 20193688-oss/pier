@@ -1,5 +1,5 @@
 /* The home page. The hero sits on the night aura and opens with the logo, large; its second half is the thing the product is
-   about: an order slip (a white sheet) with the exact amount to transfer marked like a receipt
+   about: an order slip (a glass card) with the exact amount to transfer marked like a receipt
    someone highlighted, the account to pay, and the clock. Then how a purchase works (a real sequence, so numbered), the payments app (/app),
    why nobody keeps the funds, merchants, businesses and the API, and the questions people ask
    first. The market runs on Stellar. */
@@ -25,7 +25,7 @@ function OrderSlip() {
   return (
     <figure className="relative mx-auto w-full max-w-[25rem]">
       <div
-        className="tone-light slip text-ink [--notch:transparent] shadow-[0_40px_80px_-30px_rgb(0_0_0/0.7)] sm:rotate-[-1.2deg]"
+        className="slip text-ink shadow-[inset_0_1px_0_var(--glass-hi),0_40px_80px_-30px_rgb(2_6_24/0.75)] sm:rotate-[-1.2deg]"
         aria-hidden="true"
       >
         <div className="flex items-center justify-between px-6 pt-5">
@@ -79,7 +79,7 @@ export default function LandingPage() {
   useDocumentMeta(l.metaTitle, l.metaDescription);
   return (
     <>
-      <section className="tone-dark aura-night grain text-ink">
+      <section className="tone-dark aura text-ink">
         <div className="mx-auto grid max-w-6xl items-center gap-12 px-6 sm:px-8 pt-12 pb-20 md:pt-16 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:pt-24 lg:pb-28">
           <div className="flex flex-col gap-6">
             <Logo
@@ -102,7 +102,7 @@ export default function LandingPage() {
         </div>
       </section>
 
-      <section aria-labelledby="how-h" className="border-b border-line bg-sheet">
+      <section aria-labelledby="how-h">
         <div className="mx-auto max-w-6xl px-6 sm:px-8 py-16 md:py-20">
           <h2 id="how-h" className="text-[1.9rem] sm:text-[2.3rem]">
             {l.how.title}
@@ -110,9 +110,9 @@ export default function LandingPage() {
           <p className="mt-3 max-w-[40rem] text-[1.0625rem] text-ink-2">{l.how.lede}</p>
           <ol className="mt-10 grid gap-8 md:grid-cols-3 md:gap-6">
             {l.how.steps.map((step, i) => (
-              <li key={step.title} className="relative flex flex-col gap-3">
+              <li key={step.title} className="sheet relative flex flex-col gap-3 p-6">
                 <span
-                  className="figure grid size-11 place-items-center rounded-full bg-ink text-[1.1rem] text-on-ink"
+                  className="figure glass-strong grid size-11 place-items-center rounded-full text-[1.1rem] text-ink"
                   aria-hidden="true"
                 >
                   {i + 1}
@@ -122,7 +122,7 @@ export default function LandingPage() {
               </li>
             ))}
           </ol>
-          <p className="mt-10 max-w-[44rem] rounded-[16px] bg-well px-5 py-4 text-ink-2">
+          <p className="glass mt-10 max-w-[44rem] rounded-[20px] px-5 py-4 text-ink-2">
             {l.how.sell}
           </p>
         </div>
@@ -144,10 +144,7 @@ export default function LandingPage() {
           <ul className="grid gap-4 sm:grid-cols-2" role="list">
             {l.app.points.map((p, i) => (
               <li key={p.title} className="sheet flex gap-3 p-4">
-                <span
-                  className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-well text-ink"
-                  aria-hidden="true"
-                >
+                <span className="icon-tile size-10" aria-hidden="true">
                   <Icon name={APP_ICONS[i] ?? 'send'} />
                 </span>
                 <div>
@@ -167,10 +164,7 @@ export default function LandingPage() {
         <ul className="mt-10 grid gap-x-10 gap-y-9 sm:grid-cols-2" role="list">
           {l.trust.items.map((it, i) => (
             <li key={it.title} className="flex gap-4">
-              <span
-                className="grid size-10 shrink-0 place-items-center rounded-[12px] bg-well text-ink"
-                aria-hidden="true"
-              >
+              <span className="icon-tile size-10" aria-hidden="true">
                 <Icon name={TRUST_ICONS[i] ?? 'lock'} />
               </span>
               <div>
@@ -185,9 +179,9 @@ export default function LandingPage() {
       <section
         id="merchants"
         aria-labelledby="merchants-h"
-        className="tone-dark scroll-mt-20 bg-paper text-ink"
+        className="mx-auto max-w-6xl scroll-mt-20 px-6 sm:px-8"
       >
-        <div className="mx-auto grid max-w-6xl gap-10 px-6 sm:px-8 py-16 md:grid-cols-2 md:py-20">
+        <div className="tone-dark aura-card grid gap-10 rounded-[28px] px-6 py-12 text-ink sm:px-10 md:grid-cols-2 md:py-14">
           <div className="flex flex-col gap-5">
             <h2 id="merchants-h" className="text-[1.9rem] sm:text-[2.3rem]">
               {l.merchants.title}
@@ -237,7 +231,7 @@ export default function LandingPage() {
               </Link>
             </div>
           </div>
-          <figure className="tone-dark min-w-0 self-start rounded-[22px] border border-line bg-paper p-5 text-ink sm:p-6">
+          <figure className="tone-dark min-w-0 self-start rounded-[22px] border border-[rgb(255_255_255/0.12)] bg-[rgb(8_12_34/0.82)] p-5 text-ink shadow-[inset_0_1px_0_rgb(255_255_255/0.1),var(--shadow-float)] backdrop-blur-xl sm:p-6">
             <figcaption className="caps mb-4 text-ink-3">{l.business.codeLabel}</figcaption>
             <pre className="overflow-x-auto text-[0.8125rem] leading-relaxed">
               <code>{`curl "$PIER_API_URL/v1/p2p/charges" \\
@@ -264,9 +258,9 @@ export default function LandingPage() {
           <h2 id="faq-h" className="text-[1.9rem] sm:text-[2.3rem]">
             {l.faq.title}
           </h2>
-          <div className="mt-8 flex flex-col">
+          <div className="sheet mt-8 flex flex-col px-5 sm:px-6">
             {l.faq.items.map((f) => (
-              <details key={f.q} className="group border-b border-line py-4">
+              <details key={f.q} className="group border-b border-line py-4 last:border-0">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-[1.0625rem] font-semibold">
                   {f.q}
                   <Icon
@@ -282,7 +276,7 @@ export default function LandingPage() {
       </section>
 
       <section className="mx-auto max-w-6xl px-6 sm:px-8">
-        <div className="tone-dark aura-night grain flex flex-col items-start gap-5 overflow-hidden rounded-[28px] px-6 py-12 text-ink sm:px-10 md:flex-row md:items-center md:justify-between">
+        <div className="tone-dark aura-card flex flex-col items-start gap-5 overflow-hidden rounded-[28px] px-6 py-12 text-ink sm:px-10 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="display text-[clamp(1.6rem,4vw,2.4rem)]">{l.closing.title}</h2>
             <p className="mt-3 text-ink-2">{l.closing.body}</p>

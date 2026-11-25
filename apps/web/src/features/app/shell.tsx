@@ -47,7 +47,7 @@ export function AppFrame({
     <div className="app-backdrop min-h-dvh">
       {nav && <SideNav />}
       <div
-        className={`app-column relative mx-auto flex min-h-dvh w-full max-w-[460px] flex-col bg-paper md:w-auto md:max-w-none ${nav ? 'md:ml-[260px]' : 'md:mx-0'}`}
+        className={`app-column relative mx-auto flex min-h-dvh w-full max-w-[460px] flex-col md:w-auto md:max-w-none ${nav ? 'md:ml-[268px]' : 'md:mx-0'}`}
       >
         <div className="app-top-inset" />
         {!pwa.online && (
@@ -105,7 +105,7 @@ function Tab({
       aria-label={label}
       title={label}
       className={({ isActive }) =>
-        `grid size-12 place-items-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-90 ${isActive ? 'tab-on bg-well text-ink' : 'text-ink-3 hover:text-ink'}`
+        `grid size-12 place-items-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-90 ${isActive ? 'tab-on glass-strong text-ink' : 'border border-transparent text-ink-3 hover:text-ink'}`
       }
     >
       {({ isActive }) => <Icon name={icon} size={22} strokeWidth={isActive ? 2.3 : 1.9} />}
@@ -129,7 +129,7 @@ export function TabBar() {
         to="/app/scan"
         aria-label={tb.scan}
         title={tb.scan}
-        className="grid size-[52px] place-items-center rounded-full bg-ink text-on-ink transition-transform duration-150 active:scale-90"
+        className="grid size-[52px] place-items-center rounded-full bg-primary text-on-primary shadow-[inset_0_1px_0_rgb(255_255_255/0.4),0_10px_22px_-10px_rgb(3_6_20/0.7)] transition-transform duration-150 active:scale-90"
       >
         <Icon name="scan" size={24} strokeWidth={2.2} />
       </NavLink>
@@ -156,7 +156,7 @@ function SideLink({
       to={to}
       end={end}
       className={({ isActive }) =>
-        `flex min-h-12 items-center gap-3 rounded-full px-4 font-semibold transition-[background-color,color,transform] duration-200 active:scale-[0.98] ${isActive ? 'tab-on bg-well text-ink' : 'text-ink-2 hover:bg-well hover:text-ink'}`
+        `flex min-h-12 items-center gap-3 rounded-full px-4 font-semibold transition-[background-color,color,transform] duration-200 active:scale-[0.98] ${isActive ? 'tab-on glass-strong text-ink' : 'border border-transparent text-ink-2 hover:bg-well hover:text-ink'}`
       }
     >
       <Icon name={icon} size={20} />
@@ -172,10 +172,10 @@ function SideNav() {
   return (
     <nav
       aria-label={tb.label}
-      className="fixed inset-y-0 left-0 z-20 hidden w-[260px] flex-col gap-1 border-r border-line bg-sheet px-4 py-6 md:flex"
+      className="glass fixed inset-y-3 left-3 z-20 hidden w-[244px] flex-col gap-1 rounded-[26px] px-4 py-6 md:flex"
     >
       <Link to="/app" className="mb-8 self-start rounded-[10px] px-3" aria-label={tb.home}>
-        <Logo size={22} />
+        <Logo size={32} />
       </Link>
       <SideLink to="/app" end icon="home" label={tb.home} />
       <SideLink to="/app/activity" icon="list" label={tb.activity} />
@@ -231,7 +231,7 @@ export function Screen({
           {back && (
             <button
               type="button"
-              className="btn btn-quiet btn-icon -ml-1.5 bg-sheet shadow-[var(--shadow-sheet)]"
+              className="btn btn-orb btn-icon -ml-1.5"
               onClick={goBack}
               aria-label={t.app.back}
             >
@@ -255,15 +255,15 @@ export function Screen({
   );
 }
 
-/** An action on the aura (the home screen's send, receive, add, withdraw): a pale tile with a
-    black icon tile and a tracked capital label. */
+/** An action on the aura (the home screen's send, receive, add, withdraw): a round glass orb
+    with its glyph, the label under it. */
 export function ActionTile({ to, icon, label }: { to: string; icon: IconName; label: string }) {
   return (
-    <NavLink to={to} className="tile md:min-h-[108px] md:p-4">
-      <span className="tile-icon" aria-hidden="true">
-        <Icon name={icon} size={16} strokeWidth={2.3} />
+    <NavLink to={to} className="orb-action">
+      <span className="orb" aria-hidden="true">
+        <Icon name={icon} size={24} strokeWidth={2.1} />
       </span>
-      <span className="caps truncate">{label}</span>
+      <span className="max-w-full truncate">{label}</span>
     </NavLink>
   );
 }

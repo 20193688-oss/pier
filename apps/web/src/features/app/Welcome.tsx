@@ -1,6 +1,6 @@
-/* Welcome, sign-up and sign-in. The welcome sits on the aura over the whole screen: the mark's
-   slid P drawn large in the ice, then, where the aura turns to night, what the app is for and two
-   ways in (create an account, sign in). Each opens a plain page with the form (src/components/
+/* Welcome, sign-up and sign-in. The welcome sits on the night aura over the whole screen: the
+   mark's slid P large in a glass lens, then what the app is for and two ways in (create an
+   account, sign in). Each opens a plain page with the form (src/components/
    wallet/SignIn.tsx). From a tablet up both are split in two: the aura with the slid P on the
    left, the words and the way in on the right. The screen stays on the route the person was going
    to, so after signing in they land there (a payment link opens the send screen). */
@@ -30,12 +30,14 @@ export default function Welcome() {
 /** The aura half of the welcome on a wide screen: the logo and the slid P, large. */
 function AuraPanel() {
   return (
-    <div className="aura-screen grain m-4 hidden flex-col overflow-hidden rounded-[32px] p-10 md:flex">
-      <div className="tone-light text-ink">
-        <Logo size={24} />
+    <div className="tone-dark aura-card m-4 hidden flex-col overflow-hidden rounded-[32px] p-10 text-ink md:flex">
+      <div>
+        <Logo size={32} />
       </div>
-      <div className="flex flex-1 items-center justify-center text-[#0a0b0e]">
-        <LogoGlyph size={220} />
+      <div className="flex flex-1 items-center justify-center">
+        <span className="glass-lens size-[min(300px,60%)] max-w-[300px]">
+          <LogoGlyph size={140} />
+        </span>
       </div>
     </div>
   );
@@ -74,20 +76,22 @@ function Intro({ onMode }: { onMode: (m: AuthMode) => void }) {
         </div>
       </div>
       {/* The aura runs to the screen's foot: it takes back the frame's bottom padding. */}
-      <div className="aura-screen grain mb-[calc(-16px-env(safe-area-inset-bottom,0px))] flex flex-1 flex-col pb-[calc(28px+env(safe-area-inset-bottom,0px))] md:hidden">
-        <div className="tone-light flex items-center justify-between px-6 pt-3 text-ink">
-          <Logo size={20} />
+      <div className="tone-dark aura mb-[calc(-16px-env(safe-area-inset-bottom,0px))] flex flex-1 flex-col pb-[calc(28px+env(safe-area-inset-bottom,0px))] text-ink md:hidden">
+        <div className="flex items-center justify-between px-6 pt-3">
+          <Logo size={32} />
           <span className="flex items-center gap-1">
             <LangToggle />
             <ThemeToggle />
           </span>
         </div>
 
-        <div className="flex min-h-[200px] flex-1 items-center justify-center text-[#0a0b0e]">
-          <LogoGlyph size={136} />
+        <div className="flex min-h-[220px] flex-1 items-center justify-center">
+          <span className="glass-lens size-[196px]">
+            <LogoGlyph size={92} />
+          </span>
         </div>
 
-        <div className="tone-dark flex flex-col px-6 text-ink">
+        <div className="flex flex-col px-6">
           <h1 className="display text-[clamp(2rem,10vw,2.7rem)]">{w.title}</h1>
           <p className="mt-3 text-[1.0625rem] text-ink-2">{w.lede}</p>
           <div className="mt-8 flex flex-col gap-2">
@@ -100,7 +104,7 @@ function Intro({ onMode }: { onMode: (m: AuthMode) => void }) {
             </button>
             <button
               type="button"
-              className="btn btn-quiet btn-lg w-full text-ink"
+              className="btn btn-glass btn-lg w-full"
               onClick={() => onMode('signin')}
             >
               {a.signIn}
@@ -133,7 +137,7 @@ function Auth({
         <div className="flex items-center justify-between">
           <button
             type="button"
-            className="btn btn-quiet btn-icon -ml-1.5 bg-sheet shadow-[var(--shadow-sheet)]"
+            className="btn btn-orb btn-icon -ml-1.5"
             onClick={onBack}
             aria-label={t.app.back}
           >

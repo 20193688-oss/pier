@@ -198,7 +198,7 @@ function Shell() {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-[color-mix(in_oklab,var(--paper)_90%,transparent)] px-6 py-3 backdrop-blur-md lg:hidden">
             <Link to="/dashboard" aria-label={t.common.nav.home}>
-              <Logo size={20} />
+              <Logo size={32} />
             </Link>
             <button
               type="button"

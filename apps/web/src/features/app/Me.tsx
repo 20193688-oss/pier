@@ -40,11 +40,11 @@ export default function Me() {
     <Screen title={m.title} width="page">
       <div className="grid gap-6 pb-6 lg:grid-cols-2 lg:items-start lg:gap-8">
         <div className="flex flex-col gap-6">
-          {/* Who I am, as a wallet card: the aura from ice to night. */}
-          <section className="tone-dark aura-card grain flex min-h-[208px] flex-col overflow-hidden rounded-[24px] p-5 text-ink shadow-[var(--shadow-float)]">
+          {/* Who I am, as a wallet card: the night aura (tinted glass on the dark theme). */}
+          <section className="tone-dark aura-card flex min-h-[208px] flex-col overflow-hidden rounded-[26px] p-5 text-ink">
             <div className="flex items-start justify-between gap-3">
               <span
-                className="grid size-12 shrink-0 place-items-center rounded-full bg-white text-[1.25rem] font-bold text-[#0a0b0e] uppercase"
+                className="glass-strong grid size-12 shrink-0 place-items-center rounded-full text-[1.25rem] font-bold text-ink uppercase"
                 aria-hidden="true"
               >
                 {profile?.handle ? (
@@ -53,7 +53,7 @@ export default function Me() {
                   <Icon name="user" size={20} strokeWidth={2.2} />
                 )}
               </span>
-              <Link to="/app/handle" className="btn btn-white btn-sm">
+              <Link to="/app/handle" className="btn btn-glass btn-sm">
                 {profile?.handle ? m.change : m.choose}
               </Link>
             </div>
@@ -66,7 +66,7 @@ export default function Me() {
                 <span className="num text-[0.9375rem]">
                   {session ? shortAddress(session.address) : ''}
                 </span>
-                <LogoGlyph size={22} className="text-ink" />
+                <LogoGlyph size={24} className="text-ink" />
               </div>
             </div>
           </section>

@@ -60,7 +60,7 @@ export default function ChargePage() {
     <div className="flex min-h-dvh flex-col">
       <header className="mx-auto flex w-full max-w-xl items-center justify-between px-6 py-4">
         <Link to="/" aria-label={t.common.nav.home} className="rounded-[10px]">
-          <Logo size={20} />
+          <Logo size={32} />
         </Link>
         <div className="flex items-center gap-1">
           <LangToggle />

@@ -1,121 +1,201 @@
-/* Pier's look: night and aura.
+/* Pier's look: glass, in the brand's colours (brand kit v2, Pier_Marca).
 
-   - Night: the base is near-black ink on a cool white page; sheets are white and float on soft
-     shadows. Dark mode turns the page black and the sheets a lifted graphite.
-   - Aura: one atmospheric gradient (ice, sky, royal blue, indigo, night) textured with halftone
-     dots and grain, kept for the moments that carry the product: the welcome, the balance, the
-     wallet card, the landing's hero. Never behind body text that is not set on it on purpose.
-   - Marker: an ice highlighter for the one thing a person must not get wrong (the exact amount to
-     transfer, the active step). Never decoration.
-   - Type: one family, Archivo. Headlines on the aura are uppercase and wide; screen titles and
-     amounts are normal width and medium weight; small action labels are tracked capitals.
-     Tabular figures wherever numbers line up.
-   - Shape: pills for actions and inputs that stand alone, 20px sheets, 12px tiles, 7px icon
-     tiles. Depth comes from a soft shadow on light and a lifted tone on dark.
+   - Palette: Abismo #070B1F (text and dark grounds), Marea #12309E (the glass base), Cobalto
+     #2F54FF (the main colour: primary actions on light), Celeste #5ED8FF (accent and shine),
+     Hielo #EEF6FF (light grounds). The logo's Aurora gradient runs #1FB3F0 to #2F54FF on light
+     and, as Aurora glass, #C4F5FF to #3FBFFF on blue (--logo-1..3).
+   - Ground: one fixed gradient behind every page. Dark: Abismo at the top through Marea, with
+     diffuse cobalt and celeste lights at the foot. Light: Hielo with the same lights, soft. Pages
+     scroll over it, so every glass surface always has something to frost.
+   - Glass (the brand's rule): a white panel at 4-16 % opacity, a 1px white rim at 12-65 %, a
+     24-40px background blur, diffuse cobalt and celeste lights behind. Sheets, wells, controls
+     and the dock are glass; `.glass-strong` is the one thing chosen (the active segment). Never
+     inside the logo.
+   - Aura: the night ground as a panel (`.aura` across the page, `.aura-card` as a card) for the
+     moments that carry the product (the balance, the wallet card, the welcome, the landing's
+     hero). On the dark theme the page already is that ground, so a bleed aura is clear and an
+     aura card turns into glass tinted blue.
+   - Orbs: round glass buttons with a centred glyph and the label under them (the home's actions).
+   - Marker: a celeste highlighter for the one thing a person must not get wrong (the exact amount
+     to transfer). Never decoration; no dot without a reason either.
+   - Type: Sora (the brand's face), SemiBold for titles, Regular for text. Tabular figures where
+     numbers line up; a balance dims its cents.
+   - Shape: pills for actions and inputs that stand alone, 22px sheets, circles for icons.
    - Tones: `.tone-light` and `.tone-dark` set the palette for a part of the page whatever the
-     theme (the aura's top is light, its bottom dark); `.tone-glass` turns sheets and wells into
-     frosted glass for controls set on the aura. */
+     theme (an aura panel is always dark). */
 @import 'tailwindcss';
-@import '@fontsource-variable/archivo/wdth.css';
+@import '@fontsource-variable/sora';
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
+/* The night ground: Abismo through Marea, cobalt and celeste lights at the foot. */
+:root {
+  --night:
+    radial-gradient(55% 34% at 88% 100%, rgb(94 216 255 / 0.4), transparent 72%),
+    radial-gradient(70% 42% at 8% 104%, rgb(47 84 255 / 0.7), transparent 72%),
+    radial-gradient(60% 30% at 50% 112%, rgb(47 84 255 / 0.55), transparent 70%),
+    linear-gradient(
+      180deg,
+      #070b1f 0%,
+      #0a1230 16%,
+      #0d1a4a 34%,
+      #0f2268 52%,
+      #112a86 70%,
+      #12309e 86%,
+      #1a3cba 100%
+    );
+}
+
 :root,
 .tone-light {
-  --paper: #f2f3f5;
-  --sheet: #ffffff;
-  --well: #eceef1;
-  --ink: #0a0b0e;
-  --ink-2: #444952;
-  --ink-3: #686d76;
-  --line: #e3e5e9;
-  --line-2: #c9ced6;
-  --marker: #a6ecfa;
-  --marker-ink: #0a0b0e;
+  --ground:
+    radial-gradient(60% 36% at 92% 0%, rgb(94 216 255 / 0.28), transparent 72%),
+    radial-gradient(70% 40% at 6% 104%, rgb(47 84 255 / 0.2), transparent 72%),
+    radial-gradient(50% 30% at 96% 96%, rgb(94 216 255 / 0.22), transparent 70%),
+    linear-gradient(180deg, #f6faff 0%, #eef6ff 45%, #e2eeff 100%);
+  --paper: #eef6ff;
+  --sheet: rgb(255 255 255 / 0.62);
+  --sheet-solid: #ffffff;
+  --well: rgb(7 11 31 / 0.05);
+  --ink: #070b1f;
+  --ink-2: #343e60;
+  --ink-3: #56607f;
+  --line: rgb(7 11 31 / 0.1);
+  --line-2: rgb(7 11 31 / 0.2);
+  --marker: #5ed8ff;
+  --marker-ink: #070b1f;
   --on-ink: #ffffff;
-  --ok: #12804a;
-  --ok-soft: #ddf3e5;
-  --warn: #8a5800;
-  --warn-soft: #fbf0d6;
-  --bad: #bf3219;
-  --bad-soft: #fce4de;
-  --info: #1f55c7;
-  --info-soft: #e2eafb;
-  --focus: #2563eb;
-  --shadow-sheet: 0 1px 2px rgb(10 11 14 / 0.04), 0 14px 34px -20px rgb(10 11 14 / 0.22);
-  --shadow-float: 0 2px 6px rgb(10 11 14 / 0.06), 0 18px 40px -14px rgb(10 11 14 / 0.3);
+  --primary: #2f54ff;
+  --on-primary: #ffffff;
+  --accent: #2f54ff;
+  --ok: #0f7a46;
+  --ok-soft: rgb(18 140 80 / 0.12);
+  --warn: #855400;
+  --warn-soft: rgb(200 140 20 / 0.16);
+  --bad: #b8301a;
+  --bad-soft: rgb(210 60 30 / 0.12);
+  --on-bad: #ffffff;
+  --info: #2341d6;
+  --info-soft: rgb(47 84 255 / 0.1);
+  --focus: #2f54ff;
+  --logo-1: #1fb3f0;
+  --logo-2: #2f7bff;
+  --logo-3: #2f54ff;
+  --glass: linear-gradient(180deg, rgb(255 255 255 / 0.8), rgb(255 255 255 / 0.55));
+  --glass-strong: linear-gradient(180deg, rgb(255 255 255 / 0.96), rgb(255 255 255 / 0.8));
+  --glass-rim: rgb(255 255 255 / 0.9);
+  --glass-hi: rgb(255 255 255 / 1);
+  --glass-shadow: 0 1px 2px rgb(18 48 158 / 0.06), 0 16px 36px -20px rgb(18 48 158 / 0.3);
+  --glass-dialog: rgb(250 252 255 / 0.9);
+  --bar: rgb(246 250 255 / 0.66);
+  --aura: var(--night);
+  --shadow-sheet: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
+  --shadow-float: 0 2px 6px rgb(18 48 158 / 0.06), 0 22px 44px -16px rgb(18 48 158 / 0.34);
   color-scheme: light;
 }
 
 :root[data-theme='dark'],
 .tone-dark {
-  --paper: #050506;
-  --sheet: #111215;
-  --well: #1b1c21;
-  --ink: #f3f4f6;
-  --ink-2: #b4b8c0;
-  --ink-3: #8b9099;
-  --line: #24262c;
-  --line-2: #373a42;
-  --marker: #a6ecfa;
-  --marker-ink: #0a0b0e;
-  --on-ink: #0a0b0e;
-  --ok: #4fd28d;
-  --ok-soft: #0f2a1b;
-  --warn: #f0b54e;
-  --warn-soft: #33260c;
-  --bad: #ff8b74;
-  --bad-soft: #3a1711;
-  --info: #8fb4ff;
-  --info-soft: #14213d;
-  --focus: #8fb4ff;
-  --shadow-sheet: 0 0 0 1px rgb(255 255 255 / 0.02);
-  --shadow-float: 0 18px 40px -12px rgb(0 0 0 / 0.7);
+  --ground: var(--night);
+  --paper: #0b1333;
+  --sheet: rgb(255 255 255 / 0.075);
+  --sheet-solid: #142152;
+  --well: rgb(255 255 255 / 0.08);
+  --ink: #ffffff;
+  --ink-2: #c8d3f0;
+  --ink-3: #9eadd6;
+  --line: rgb(255 255 255 / 0.12);
+  --line-2: rgb(255 255 255 / 0.24);
+  --marker: #5ed8ff;
+  --marker-ink: #070b1f;
+  --on-ink: #070b1f;
+  --primary: #ffffff;
+  --on-primary: #070b1f;
+  --accent: #5ed8ff;
+  --ok: #67e3a6;
+  --ok-soft: rgb(95 224 162 / 0.15);
+  --warn: #ffcb66;
+  --warn-soft: rgb(255 200 97 / 0.15);
+  --bad: #ffa08c;
+  --bad-soft: rgb(255 120 100 / 0.17);
+  --on-bad: #2a0b05;
+  --info: #8ee4ff;
+  --info-soft: rgb(94 216 255 / 0.16);
+  --focus: #5ed8ff;
+  --logo-1: #c4f5ff;
+  --logo-2: #7fe0ff;
+  --logo-3: #3fbfff;
+  --glass: linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.05));
+  --glass-strong: linear-gradient(180deg, rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.09));
+  --glass-rim: rgb(255 255 255 / 0.18);
+  --glass-hi: rgb(255 255 255 / 0.3);
+  --glass-shadow: 0 18px 40px -24px rgb(3 6 20 / 0.8);
+  --glass-dialog: rgb(16 26 72 / 0.8);
+  --bar: rgb(10 16 44 / 0.5);
+  --shadow-sheet: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
+  --shadow-float: 0 24px 50px -20px rgb(3 6 20 / 0.85);
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --paper: #050506;
-    --sheet: #111215;
-    --well: #1b1c21;
-    --ink: #f3f4f6;
-    --ink-2: #b4b8c0;
-    --ink-3: #8b9099;
-    --line: #24262c;
-    --line-2: #373a42;
-    --marker: #a6ecfa;
-    --marker-ink: #0a0b0e;
-    --on-ink: #0a0b0e;
-    --ok: #4fd28d;
-    --ok-soft: #0f2a1b;
-    --warn: #f0b54e;
-    --warn-soft: #33260c;
-    --bad: #ff8b74;
-    --bad-soft: #3a1711;
-    --info: #8fb4ff;
-    --info-soft: #14213d;
-    --focus: #8fb4ff;
-    --shadow-sheet: 0 0 0 1px rgb(255 255 255 / 0.02);
-    --shadow-float: 0 18px 40px -12px rgb(0 0 0 / 0.7);
+    --ground: var(--night);
+    --paper: #0b1333;
+    --sheet: rgb(255 255 255 / 0.075);
+    --sheet-solid: #142152;
+    --well: rgb(255 255 255 / 0.08);
+    --ink: #ffffff;
+    --ink-2: #c8d3f0;
+    --ink-3: #9eadd6;
+    --line: rgb(255 255 255 / 0.12);
+    --line-2: rgb(255 255 255 / 0.24);
+    --marker: #5ed8ff;
+    --marker-ink: #070b1f;
+    --on-ink: #070b1f;
+    --primary: #ffffff;
+    --on-primary: #070b1f;
+    --accent: #5ed8ff;
+    --ok: #67e3a6;
+    --ok-soft: rgb(95 224 162 / 0.15);
+    --warn: #ffcb66;
+    --warn-soft: rgb(255 200 97 / 0.15);
+    --bad: #ffa08c;
+    --bad-soft: rgb(255 120 100 / 0.17);
+    --on-bad: #2a0b05;
+    --info: #8ee4ff;
+    --info-soft: rgb(94 216 255 / 0.16);
+    --focus: #5ed8ff;
+    --logo-1: #c4f5ff;
+    --logo-2: #7fe0ff;
+    --logo-3: #3fbfff;
+    --glass: linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.05));
+    --glass-strong: linear-gradient(180deg, rgb(255 255 255 / 0.2), rgb(255 255 255 / 0.09));
+    --glass-rim: rgb(255 255 255 / 0.18);
+    --glass-hi: rgb(255 255 255 / 0.3);
+    --glass-shadow: 0 18px 40px -24px rgb(3 6 20 / 0.8);
+    --glass-dialog: rgb(16 26 72 / 0.8);
+    --bar: rgb(10 16 44 / 0.5);
+    --shadow-sheet: inset 0 1px 0 var(--glass-hi), var(--glass-shadow);
+    --shadow-float: 0 24px 50px -20px rgb(3 6 20 / 0.85);
     color-scheme: dark;
   }
 }
 
-/* Frosted controls on the aura (set together with .tone-dark). */
-.tone-glass {
-  --paper: rgb(255 255 255 / 0.07);
-  --sheet: rgb(255 255 255 / 0.1);
-  --well: rgb(255 255 255 / 0.11);
-  --line: rgb(255 255 255 / 0.16);
-  --line-2: rgb(255 255 255 / 0.3);
-  --ink-2: rgb(255 255 255 / 0.82);
-  --ink-3: rgb(255 255 255 / 0.66);
+/* The bleed aura is the night ground on the light page and clear on the dark one (where the page
+   already is that ground). Set on the root only, so a `.tone-dark` panel keeps it. */
+:root[data-theme='dark'] {
+  --aura: transparent;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --aura: transparent;
+  }
 }
 
 @theme inline {
   --color-paper: var(--paper);
   --color-sheet: var(--sheet);
+  --color-sheet-solid: var(--sheet-solid);
   --color-well: var(--well);
   --color-ink: var(--ink);
   --color-ink-2: var(--ink-2);
@@ -125,17 +205,21 @@
   --color-marker: var(--marker);
   --color-marker-ink: var(--marker-ink);
   --color-on-ink: var(--on-ink);
+  --color-primary: var(--primary);
+  --color-on-primary: var(--on-primary);
+  --color-accent: var(--accent);
   --color-ok: var(--ok);
   --color-ok-soft: var(--ok-soft);
   --color-warn: var(--warn);
   --color-warn-soft: var(--warn-soft);
   --color-bad: var(--bad);
   --color-bad-soft: var(--bad-soft);
+  --color-on-bad: var(--on-bad);
   --color-info: var(--info);
   --color-info-soft: var(--info-soft);
-  --font-sans: 'Archivo Variable', 'Archivo', ui-sans-serif, system-ui, sans-serif;
-  --radius-sheet: 20px;
-  --radius-ctl: 14px;
+  --font-sans: 'Sora Variable', 'Sora', ui-sans-serif, system-ui, sans-serif;
+  --radius-sheet: 22px;
+  --radius-ctl: 16px;
 }
 
 @layer base {
@@ -164,7 +248,17 @@
   body {
     margin: 0;
     min-height: 100dvh;
-    background: var(--paper);
+    background: transparent;
+  }
+  /* The ground: fixed to the viewport (a fixed layer, since iOS ignores a fixed background), so
+     the page scrolls over it and every glass surface frosts the same light. */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    background: var(--ground);
   }
   ::selection {
     background: var(--marker);
@@ -179,8 +273,8 @@
   h2,
   h3,
   h4 {
-    font-weight: 620;
-    letter-spacing: -0.02em;
+    font-weight: 600;
+    letter-spacing: -0.025em;
     line-height: 1.15;
     text-wrap: balance;
   }
@@ -219,15 +313,13 @@
     line-height: 1;
   }
   .wide {
-    font-stretch: 118%;
+    letter-spacing: 0.01em;
   }
-  /* The aura's headline voice: wide capitals. */
+  /* The aura's headline voice: Sora SemiBold, large and tight. */
   .display {
-    text-transform: uppercase;
-    font-stretch: 116%;
-    font-weight: 720;
-    letter-spacing: -0.012em;
-    line-height: 1;
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.04;
   }
   /* Small action labels: tracked capitals. */
   .caps {
@@ -238,147 +330,203 @@
     line-height: 1.2;
   }
 
-  .sheet {
-    background: var(--sheet);
-    border: 1px solid var(--line);
-    border-radius: var(--radius-sheet);
+  /* Glass: a translucent, blurred surface with a thin rim and a highlight along its top edge.
+     `.sheet` is the card; `.glass` the same surface for anything else (a pill, a bar, a panel);
+     `.bg-sheet` (the colour alone) frosts too, so a card built from utilities is glass as well. */
+  .sheet,
+  .glass {
+    background: var(--glass);
+    border: 1px solid var(--glass-rim);
     box-shadow: var(--shadow-sheet);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+  }
+  .sheet {
+    border-radius: var(--radius-sheet);
+  }
+  .bg-sheet {
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
+  }
+  /* The one glass that is chosen: the active segment, the selected chip. */
+  .glass-strong {
+    background: var(--glass-strong);
+    border: 1px solid var(--glass-rim);
+    box-shadow:
+      inset 0 1px 0 var(--glass-hi),
+      0 8px 20px -10px rgb(2 6 24 / 0.55);
+    -webkit-backdrop-filter: blur(18px) saturate(170%);
+    backdrop-filter: blur(18px) saturate(170%);
+  }
+  /* A glass row or card that opens something: it lightens under the pointer. */
+  .glass-hover {
+    transition:
+      background-color 200ms ease,
+      border-color 200ms ease,
+      transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .glass-hover:hover {
+      background-color: var(--well);
+      border-color: var(--line-2);
+    }
   }
 
-  /* The aura: ice at the top through sky and royal blue into indigo and night (the welcome, the
-     landing's hero). */
+  /* The aura: the night gradient as a panel, always dark (set with .tone-dark). `.aura` runs
+     across the page: on the dark theme the ground already is that gradient, so it is clear.
+     `.aura-card` is a card: on the dark theme it turns into glass tinted blue. */
   .aura {
     position: relative;
     isolation: isolate;
-    background:
-      radial-gradient(80% 42% at 50% 30%, rgb(255 255 255 / 0.5), transparent 72%),
-      linear-gradient(
-        180deg,
-        #b4f1fc 0%,
-        #93dcf3 20%,
-        #6fb0ea 40%,
-        #4361cf 58%,
-        #2a2492 70%,
-        #120f45 82%,
-        #050509 100%
-      );
+    background: var(--aura);
   }
-  /* The aura over a whole screen that may scroll: the stops follow the viewport, so whatever runs
-     past the first screen sits on night. */
-  .aura-screen {
-    position: relative;
-    isolation: isolate;
-    background-color: #050509;
-    background-image:
-      radial-gradient(62vh 30vh at 50% 22vh, rgb(255 255 255 / 0.5), transparent 72%),
-      linear-gradient(
-        180deg,
-        #b4f1fc 0,
-        #93dcf3 14vh,
-        #6fb0ea 28vh,
-        #4361cf 44vh,
-        #2a2492 56vh,
-        #120f45 72vh,
-        #050509 90vh
-      );
-    background-repeat: no-repeat;
-  }
-  /* Night with the glow rising from below (the balance). */
-  .aura-night {
-    position: relative;
-    isolation: isolate;
-    background:
-      radial-gradient(
-        70% 70% at 88% 108%,
-        rgb(226 242 255 / 0.95) 0%,
-        rgb(120 170 255 / 0.55) 32%,
-        transparent 68%
-      ),
-      radial-gradient(75% 80% at 8% 110%, rgb(46 52 196 / 0.85), transparent 70%),
-      linear-gradient(180deg, #000 0%, #030409 38%, #0d1650 74%, #2346c6 100%);
-  }
-  /* The wallet card: ice on top, deep navy in the middle, night at the bottom. */
   .aura-card {
     position: relative;
     isolation: isolate;
+    background: var(--night);
+    border: 1px solid rgb(255 255 255 / 0.14);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.22),
+      0 24px 48px -24px rgb(8 20 70 / 0.6);
+  }
+  :root[data-theme='dark'] .aura-card {
     background:
-      radial-gradient(90% 50% at 30% 0%, rgb(220 246 255 / 0.65), transparent 70%),
-      linear-gradient(180deg, #9ed6ee 0%, #5d93d8 26%, #1d2f91 54%, #080b29 78%, #000 100%);
+      radial-gradient(90% 70% at 15% 0%, rgb(140 170 255 / 0.22), transparent 70%),
+      linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
   }
-  /* The aura's texture, as in print: a halftone screen (a dot every 4px) under a stipple of grain
-     (dots of a pixel or two, strong enough to see). Both sit between the aura and the content. */
-  .grain::before,
-  .grain::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    z-index: -1;
-    pointer-events: none;
-    border-radius: inherit;
-  }
-  .grain::before {
-    background-image: radial-gradient(circle, rgb(255 255 255 / 0.55) 0.75px, transparent 1.35px);
-    background-size: 4px 4px;
-    mix-blend-mode: soft-light;
-  }
-  .grain::after {
-    opacity: 0.6;
-    mix-blend-mode: overlay;
-    background-size: 160px 160px;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n' x='0' y='0'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.2' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncR type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncG type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncB type='linear' slope='2.2' intercept='-0.6'/%3E%3CfeFuncA type='linear' slope='0' intercept='1'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  }
-
-  /* An action tile (the home's send, receive, add, withdraw): a pale square, a black icon tile at
-     its top and a tracked capital label at its foot. */
-  .tile {
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    gap: 0.9rem;
-    min-height: 88px;
-    padding: 0.6rem;
-    border-radius: 12px;
-    background: rgb(255 255 255 / 0.92);
-    color: #0a0b0e;
-    text-decoration: none;
-    box-shadow: 0 10px 24px -16px rgb(0 0 0 / 0.5);
-    transition:
-      transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
-      box-shadow 220ms ease,
-      background-color 200ms ease;
-  }
-  @media (hover: hover) and (pointer: fine) {
-    .tile:hover {
-      background: #fff;
-      transform: translateY(-3px);
-      box-shadow: 0 18px 32px -18px rgb(0 0 0 / 0.65);
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .aura-card {
+      background:
+        radial-gradient(90% 70% at 15% 0%, rgb(140 170 255 / 0.22), transparent 70%),
+        linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      backdrop-filter: blur(24px) saturate(160%);
     }
   }
-  .tile:active {
-    transform: scale(0.97);
+  /* A bleed aura that becomes a card from a tablet up (the home's balance). */
+  @media (min-width: 768px) {
+    .aura.aura-md-card {
+      background: var(--night);
+      border: 1px solid rgb(255 255 255 / 0.14);
+      box-shadow:
+        inset 0 1px 0 rgb(255 255 255 / 0.22),
+        0 24px 48px -24px rgb(8 20 70 / 0.6);
+    }
+    :root[data-theme='dark'] .aura.aura-md-card {
+      background:
+        radial-gradient(90% 70% at 15% 0%, rgb(140 170 255 / 0.22), transparent 70%),
+        linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      backdrop-filter: blur(24px) saturate(160%);
+    }
   }
-  .tile .caps {
-    font-size: 0.65rem;
-    letter-spacing: 0.035em;
+  @media (min-width: 768px) and (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) .aura.aura-md-card {
+      background:
+        radial-gradient(90% 70% at 15% 0%, rgb(140 170 255 / 0.22), transparent 70%),
+        linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.04));
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      backdrop-filter: blur(24px) saturate(160%);
+    }
   }
+
+  /* An orb: a round glass button, its glyph in the middle and its label under it (the home's
+     send, receive, add, withdraw). The rim catches the light top left and bottom right. */
+  .orb-action {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+    color: var(--ink-2);
+    text-decoration: none;
+    font-size: 0.9375rem;
+    font-weight: 500;
+  }
+  .orb {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 64px;
+    height: 64px;
+    border-radius: 999px;
+    color: var(--ink);
+    background:
+      radial-gradient(110% 110% at 30% 12%, rgb(255 255 255 / 0.16), transparent 62%),
+      linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.04));
+    border: 1px solid rgb(255 255 255 / 0.22);
+    box-shadow:
+      inset 1px 1px 1px rgb(255 255 255 / 0.28),
+      inset -1px -1px 1px rgb(255 255 255 / 0.12),
+      0 14px 28px -16px rgb(2 6 24 / 0.7);
+    -webkit-backdrop-filter: blur(16px) saturate(170%);
+    backdrop-filter: blur(16px) saturate(170%);
+    transition:
+      transform 220ms cubic-bezier(0.2, 0.7, 0.2, 1),
+      background-color 200ms ease,
+      box-shadow 220ms ease;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .orb-action:hover .orb {
+      transform: translateY(-2px);
+      background-color: rgb(255 255 255 / 0.08);
+    }
+    .orb-action:hover {
+      color: var(--ink);
+    }
+  }
+  .orb-action:active .orb {
+    transform: scale(0.94);
+  }
+  @media (min-width: 768px) {
+    .orb {
+      width: 72px;
+      height: 72px;
+    }
+  }
+  /* A lens: a large liquid-glass disc holding the mark (the welcome). Light catches its rim top
+     left and pools blue at its foot. */
+  .glass-lens {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 1;
+    border-radius: 999px;
+    color: #fff;
+    background:
+      radial-gradient(90% 90% at 28% 14%, rgb(255 255 255 / 0.24), transparent 52%),
+      radial-gradient(80% 70% at 72% 96%, rgb(130 165 255 / 0.32), transparent 70%),
+      linear-gradient(180deg, rgb(255 255 255 / 0.1), rgb(255 255 255 / 0.03));
+    border: 1px solid rgb(255 255 255 / 0.26);
+    box-shadow:
+      inset 2px 2px 2px rgb(255 255 255 / 0.32),
+      inset -2px -2px 3px rgb(255 255 255 / 0.12),
+      inset 0 -28px 56px rgb(120 150 255 / 0.14);
+  }
+  /* A small glass circle for a glyph (a notice's mark). */
   .tile-icon {
     display: grid;
     place-items: center;
-    width: 26px;
-    height: 26px;
-    border-radius: 7px;
-    background: #0a0b0e;
-    color: #fff;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: var(--glass-strong);
+    border: 1px solid var(--glass-rim);
+    box-shadow: inset 0 1px 0 var(--glass-hi);
+    color: var(--ink);
   }
-  /* An icon in a soft square (list rows, settings). */
+  /* A glyph in a glass circle (list rows, settings). */
   .icon-tile {
     display: grid;
     place-items: center;
     flex: none;
     width: 42px;
     height: 42px;
-    border-radius: 11px;
-    background: var(--well);
+    border-radius: 999px;
+    background: var(--glass);
+    border: 1px solid var(--glass-rim);
+    box-shadow: inset 0 1px 0 var(--glass-hi);
     color: var(--ink);
   }
 
@@ -420,49 +568,54 @@
     }
   }
 
-  /* A slip: a sheet with a perforated tear line, used for the order a person pays (a receipt). The
-     notches take the colour behind the slip (--notch, the page by default; transparent drops them,
-     for a slip set on the aura). */
+  /* A slip: a glass card with a perforated tear line, used for the order a person pays (a
+     receipt). The tear is a long dashed rule; notches (--notch, none by default) can be given the
+     colour behind the slip where it is flat. */
   .slip {
     position: relative;
-    background: var(--sheet);
-    border: 1px solid var(--line);
+    background: var(--glass);
+    border: 1px solid var(--glass-rim);
     border-radius: var(--radius-sheet);
     box-shadow: var(--shadow-sheet);
+    -webkit-backdrop-filter: blur(24px) saturate(160%);
+    backdrop-filter: blur(24px) saturate(160%);
   }
   .tear {
     position: relative;
     height: 22px;
     margin: 0 -1px;
     background:
-      radial-gradient(circle at 0 50%, var(--notch, var(--paper)) 10px, transparent 10.5px) left /
+      radial-gradient(circle at 0 50%, var(--notch, transparent) 10px, transparent 10.5px) left /
         22px 22px no-repeat,
-      radial-gradient(circle at 100% 50%, var(--notch, var(--paper)) 10px, transparent 10.5px)
+      radial-gradient(circle at 100% 50%, var(--notch, transparent) 10px, transparent 10.5px)
         right / 22px 22px no-repeat;
   }
   .tear::after {
     content: '';
     position: absolute;
-    left: 18px;
-    right: 18px;
-    top: 50%;
-    border-top: 2px dashed var(--line-2);
+    left: 20px;
+    right: 20px;
+    top: calc(50% - 0.75px);
+    height: 1.5px;
+    background: repeating-linear-gradient(90deg, var(--line-2) 0 14px, transparent 14px 24px);
   }
 
-  /* Form controls */
+  /* Form controls: a glass well that lights its rim when focused. */
   .field {
     width: 100%;
     min-height: 50px;
     padding: 0.7rem 1rem;
     background: var(--well);
     color: var(--ink);
-    border: 1px solid transparent;
+    border: 1px solid var(--line);
     border-radius: var(--radius-ctl);
+    box-shadow: inset 0 1px 2px rgb(2 6 24 / 0.06);
     font: inherit;
     font-size: 1rem;
     transition:
       border-color 120ms,
-      background-color 120ms;
+      background-color 120ms,
+      box-shadow 160ms;
   }
   .field::placeholder {
     color: var(--ink-3);
@@ -473,8 +626,9 @@
   }
   .field:focus {
     outline: none;
-    border-color: var(--ink);
+    border-color: var(--line-2);
     background: var(--sheet);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--focus) 28%, transparent);
   }
   .field[aria-invalid='true'] {
     border-color: var(--bad);
@@ -482,18 +636,19 @@
   select.field {
     appearance: none;
     padding-right: 2.4rem;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23868b94' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238f97b3' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.85rem center;
     background-size: 1.1rem;
   }
   select.field option {
-    background: var(--sheet);
+    background: var(--sheet-solid);
     color: var(--ink);
   }
 
-  /* Buttons are pills: ink is the primary action (white on the dark), line the secondary, quiet
-     the tertiary; white and glass sit on the aura whatever the theme. */
+  /* Buttons are pills: ink is the primary action (solid: white on the dark, cobalt on the light),
+     line the secondary (a glass pill), quiet the tertiary; white and glass sit on the aura
+     whatever the theme. */
   .btn {
     display: inline-flex;
     align-items: center;
@@ -518,21 +673,28 @@
   .btn:disabled {
     opacity: 0.5;
   }
+  /* The primary: Cobalto on light, white on the dark and on the aura. */
   .btn-ink {
-    background: var(--ink);
-    color: var(--on-ink);
+    background: var(--primary);
+    color: var(--on-primary);
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.35),
+      0 8px 20px -12px rgb(3 6 20 / 0.6);
   }
   .btn-ink:hover:not(:disabled) {
-    background: color-mix(in oklab, var(--ink) 86%, var(--paper));
+    background: color-mix(in oklab, var(--primary) 88%, var(--paper));
   }
   .btn-line {
-    background: transparent;
+    background: var(--glass);
     color: var(--ink);
-    border-color: var(--line-2);
+    border-color: var(--glass-rim);
+    box-shadow: inset 0 1px 0 var(--glass-hi);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
   }
   .btn-line:hover:not(:disabled) {
-    border-color: var(--ink);
-    background: var(--well);
+    border-color: var(--line-2);
+    background-color: var(--well);
   }
   .btn-quiet {
     background: transparent;
@@ -544,23 +706,42 @@
   }
   .btn-bad {
     background: var(--bad);
-    color: #fff;
+    color: var(--on-bad);
   }
   .btn-white {
     background: #fff;
-    color: #0a0b0e;
+    color: #070b1f;
+    box-shadow:
+      inset 0 1px 0 rgb(255 255 255 / 0.6),
+      0 10px 24px -12px rgb(2 6 24 / 0.6);
   }
   .btn-white:hover:not(:disabled) {
-    background: #eef1f5;
+    background: #eef2fb;
   }
   .btn-glass {
-    background: rgb(255 255 255 / 0.12);
+    background: linear-gradient(180deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.06));
     color: #fff;
-    border-color: rgb(255 255 255 / 0.22);
-    backdrop-filter: blur(10px);
+    border-color: rgb(255 255 255 / 0.24);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.3);
+    -webkit-backdrop-filter: blur(16px) saturate(170%);
+    backdrop-filter: blur(16px) saturate(170%);
   }
   .btn-glass:hover:not(:disabled) {
-    background: rgb(255 255 255 / 0.2);
+    background-color: rgb(255 255 255 / 0.1);
+  }
+  /* A round glass icon button (the screen's back, the home's eye). */
+  .btn-orb {
+    background: var(--glass);
+    color: var(--ink);
+    border-color: var(--glass-rim);
+    box-shadow:
+      inset 0 1px 0 var(--glass-hi),
+      0 8px 18px -12px rgb(2 6 24 / 0.55);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
+  }
+  .btn-orb:hover:not(:disabled) {
+    background-color: var(--well);
   }
   .btn-lg {
     min-height: 54px;
@@ -618,23 +799,17 @@
   }
 
   /* Status pills */
+  /* A status in words on a soft tint (no dot: the word is the status). */
   .pill {
     display: inline-flex;
     align-items: center;
     gap: 0.4rem;
-    padding: 0.2rem 0.65rem 0.2rem 0.5rem;
+    padding: 0.2rem 0.65rem;
     border-radius: 999px;
     font-size: 0.8125rem;
     font-weight: 600;
     line-height: 1.4;
     white-space: nowrap;
-  }
-  .pill::before {
-    content: '';
-    width: 0.45rem;
-    height: 0.45rem;
-    border-radius: 999px;
-    background: currentColor;
   }
   .pill-ok {
     background: var(--ok-soft);
@@ -665,21 +840,36 @@
     padding: 4px;
     gap: 4px;
     background: var(--well);
+    border: 1px solid var(--line);
     border-radius: 999px;
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    backdrop-filter: blur(16px) saturate(160%);
   }
   .seg > button {
     min-height: 42px;
     border-radius: 999px;
-    border: 0;
+    border: 1px solid transparent;
     background: transparent;
     color: var(--ink-2);
     font: inherit;
     font-weight: 620;
+    transition:
+      background-color 200ms ease,
+      color 200ms ease,
+      box-shadow 220ms ease;
   }
+  .seg > button:hover:not([aria-selected='true'], [aria-pressed='true']) {
+    color: var(--ink);
+  }
+  /* The chosen segment is a lifted glass pill (the reference's "Stablecoins"). */
   .seg > button[aria-selected='true'],
   .seg > button[aria-pressed='true'] {
-    background: var(--ink);
-    color: var(--on-ink);
+    background: var(--glass-strong);
+    border-color: var(--glass-rim);
+    color: var(--ink);
+    box-shadow:
+      inset 0 1px 0 var(--glass-hi),
+      0 8px 20px -10px rgb(2 6 24 / 0.55);
   }
 
   /* Data tables in the dashboard */
@@ -774,7 +964,9 @@
     color: var(--ink);
   }
   .prose-doc pre {
-    background: #0a0b0e;
+    background: rgb(8 12 34 / 0.78);
+    border: 1px solid rgb(255 255 255 / 0.1);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.08);
     color: #e9ecf1;
     border-radius: 14px;
     padding: 1rem 1.1rem;
@@ -793,13 +985,9 @@
    phone's safe areas (notch, home indicator) kept clear and a floating dock for the tabs. */
 @layer components {
   .app-backdrop {
-    background: var(--paper);
+    background: transparent;
   }
-  @media (min-width: 640px) {
-    .app-backdrop {
-      background: var(--well);
-      padding: 0;
-    }
+  @media (min-width: 640px) and (max-width: 767px) {
     .app-column {
       box-shadow: 0 0 0 1px var(--line);
     }
@@ -881,22 +1069,49 @@
   /* The dock: the tabs as one floating pill above the home indicator. */
   .app-dock {
     bottom: calc(14px + env(safe-area-inset-bottom, 0px));
-    background: color-mix(in oklab, var(--sheet) 94%, transparent);
-    border: 1px solid var(--line);
-    box-shadow: var(--shadow-float);
-    backdrop-filter: blur(14px);
+    background: var(--glass);
+    border: 1px solid var(--glass-rim);
+    box-shadow:
+      inset 0 1px 0 var(--glass-hi),
+      var(--shadow-float);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    backdrop-filter: blur(28px) saturate(180%);
   }
   .app-column {
     padding-left: env(safe-area-inset-left, 0px);
     padding-right: env(safe-area-inset-right, 0px);
   }
-  /* A sheet that rises over the aura above it. */
+  /* A glass sheet that rises over the aura above it. */
   .rise {
     position: relative;
     z-index: 1;
     margin-top: -22px;
-    border-radius: 24px 24px 0 0;
-    background: var(--sheet);
+    border-radius: 26px 26px 0 0;
+    background: var(--glass);
+    border-top: 1px solid var(--glass-rim);
+    box-shadow: inset 0 1px 0 var(--glass-hi);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    backdrop-filter: blur(28px) saturate(160%);
+  }
+  /* The home's rising sheet is a sheet on a phone only; from a tablet up its parts are cards. */
+  @media (min-width: 768px) {
+    .rise.rise-phone {
+      border: 0;
+      border-radius: 0;
+      background: none;
+      box-shadow: none;
+      -webkit-backdrop-filter: none;
+      backdrop-filter: none;
+    }
+    .home-recent {
+      padding: 1.5rem;
+      border-radius: 24px;
+      background: var(--glass);
+      border: 1px solid var(--glass-rim);
+      box-shadow: var(--shadow-sheet);
+      -webkit-backdrop-filter: blur(24px) saturate(160%);
+      backdrop-filter: blur(24px) saturate(160%);
+    }
   }
   /* The scanner: the camera fills its frame; the viewfinder corners sit on top. */
   .scan-frame {

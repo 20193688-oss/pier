@@ -163,17 +163,16 @@ export function ActivityRow({ item }: { item: ActivityItem }) {
         <Icon name={icon} size={19} strokeWidth={2.1} />
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
-        <b className="flex min-w-0 items-center gap-2 font-medium">
-          <span className={`truncate ${struck}`}>{title}</span>
+        <b className={`truncate font-medium ${struck}`}>{title}</b>
+        <span className="flex min-w-0 items-center gap-1.5 text-[0.8125rem] text-ink-3">
           {unread && (
-            <span
-              className="size-2 shrink-0 rounded-full bg-bad"
-              role="img"
-              aria-label={t.p2p.chat.unread}
-            />
+            <span className="inline-flex shrink-0 items-center gap-1 font-semibold text-info">
+              <Icon name="chat" size={13} strokeWidth={2.2} />
+              {t.p2p.chat.unread}
+            </span>
           )}
-        </b>
-        <span className={`truncate text-[0.8125rem] text-ink-3 ${struck}`}>{sub}</span>
+          <span className={`truncate ${struck}`}>{sub}</span>
+        </span>
       </span>
       <span className="flex flex-col items-end gap-1">
         <b className={`num font-medium ${voided ? struck : incoming ? 'text-ok' : ''}`}>
@@ -302,7 +301,7 @@ export function InstallBanner() {
   };
   return (
     <section
-      className="flex items-start gap-3 rounded-[18px] bg-well p-4"
+      className="glass flex items-start gap-3 rounded-[22px] p-4"
       aria-labelledby="install-h"
     >
       <span className="tile-icon mt-0.5 shrink-0" aria-hidden="true">
@@ -351,7 +350,7 @@ export function WalletSummary() {
       : null;
   return (
     <section
-      className="tone-dark aura-night grain overflow-hidden rounded-[24px] p-6 text-ink"
+      className="tone-dark aura-card overflow-hidden rounded-[26px] p-6 text-ink"
       aria-label={h.balance}
     >
       <p className="text-[0.875rem] font-medium text-ink-3">{h.balance}</p>
